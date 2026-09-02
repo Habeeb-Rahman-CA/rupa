@@ -1,0 +1,241 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+// =============================================================================
+// Mobile layout
+// =============================================================================
+.mobile-shell {
+  // Fixed to viewport so .mobile-main is a real scroll container.
+  // With min-height, the shell grew with content and .mobile-main never
+  // overflowed — scroll ended up on <body> instead, which broke the
+  // pull-to-refresh directive's scrollTop=0 check.
+  height: 100vh;
+  height: 100dvh;              // dynamic viewport for mobile URL-bar shifts
+  display: flex;
+  flex-direction: column;
+  background: var(--app-canvas);
+  padding-top: env(safe-area-inset-top);
+  overflow: hidden;
+}
+
+.mobile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 8px;
+  background: var(--app-canvas);
+}
+
+.greeting {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.greeting .hi {
+  font-size: 12px;
+  color: var(--app-ink-muted);
+  letter-spacing: 0.02em;
+}
+.greeting .name {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--app-ink);
+  margin-top: 2px;
+}
+
+.header-btn {
+  color: var(--app-ink);
+}
+
+.mobile-main {
+  flex: 1;
+  min-height: 0;               // let flex actually constrain this child
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 20px 100px;    // bottom padding for nav
+}
+
+// ---------- Bottom nav (mobile) --------------------------------------------
+.bottom-nav {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  height: 58px;
+  display: grid;
+  grid-template-columns: 1fr 1fr auto 1fr 1fr;
+  align-items: center;
+  padding: 4px 8px;
+  background: var(--app-surface);
+  border-radius: 999px;
+  box-shadow: var(--app-shadow-lg);
+  z-index: 20;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--app-ink-muted);
+  text-decoration: none;
+  height: 44px;
+  border-radius: 999px;
+  transition: color .15s ease, background .15s ease;
+
+  lucide-icon {
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
+  }
+
+  &.active {
+    color: var(--app-ink);
+    background: var(--app-ink-dark-soft);
+  }
+}
+
+.fab {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--app-ink-dark);
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  box-shadow:
+    0 6px 14px rgba(11, 13, 16, 0.28),
+    0 2px 4px rgba(15, 17, 20, 0.10);
+  transform: translateY(-6px);
+  transition: transform .15s ease, box-shadow .15s ease;
+
+  lucide-icon {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+  }
+
+  &:active {
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+// =============================================================================
+// Desktop layout
+// =============================================================================
+.desktop-shell {
+  height: 100vh;
+  background: var(--app-canvas);
+  overflow: hidden;
+}
+
+.desktop-sidenav {
+  width: 240px;
+  background: var(--app-surface);
+  border-right: 1px solid var(--app-hairline);
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+
+  // Clip anything inside from spilling horizontally
+  ::ng-deep .mat-drawer-inner-container {
+    overflow-x: hidden !important;
+    overflow-y: auto;
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  padding: 20px 20px 16px;
+}
+.brand-logo {
+  display: block;
+  height: 28px;
+  width: auto;
+}
+
+.nav-list {
+  flex: 1;
+  padding-top: 0;
+  min-width: 0;
+  overflow-x: hidden;
+
+  ::ng-deep .mat-mdc-list-item {
+    border-radius: 12px;
+    margin: 2px 8px;
+    height: 44px;
+    width: auto;
+    max-width: calc(100% - 16px);
+
+    &.active {
+      background: var(--app-accent-soft);
+      lucide-icon { color: var(--app-accent); }
+      .mdc-list-item__primary-text {
+        color: var(--app-accent);
+        font-weight: 500;
+      }
+    }
+  }
+}
+
+.nav-divider {
+  height: 1px;
+  background: var(--app-hairline);
+  margin: 8px 16px;
+}
+
+.sidenav-footer {
+  padding: 12px;
+  border-top: 1px solid var(--app-hairline);
+  min-width: 0;
+}
+.user-menu-btn {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-start !important;
+  color: var(--app-ink-muted);
+  padding: 0 10px !important;
+
+  ::ng-deep .mdc-button__label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    overflow: hidden;
+  }
+}
+.user-email {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.desktop-content {
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--app-canvas);
+}
+.desktop-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 32px 48px;
+}
+.desktop-fab {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  transform: none;
+  background: var(--app-ink-dark);
+
+  &:active {
+    transform: scale(0.98);
+  }
+}

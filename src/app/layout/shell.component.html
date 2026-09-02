@@ -1,0 +1,142 @@
+@if (isHandset()) {
+  <!-- ---------- Mobile layout ---------- -->
+  <div class="mobile-shell">
+    <header class="mobile-header">
+      <div class="greeting">
+        <div class="hi">Hey,</div>
+        <div class="name">{{ displayName() || 'there' }}</div>
+      </div>
+      <button
+        mat-icon-button
+        class="header-btn"
+        [matMenuTriggerFor]="moreMenu"
+        aria-label="More"
+      >
+        <lucide-icon name="more-horizontal" />
+      </button>
+      <mat-menu #moreMenu="matMenu">
+        @for (item of moreNav; track item.path) {
+          <a mat-menu-item [routerLink]="item.path">
+            <lucide-icon [name]="item.icon" />
+            <span>{{ item.label }}</span>
+          </a>
+        }
+        <button mat-menu-item (click)="signOut()">
+          <lucide-icon name="log-out" />
+          <span>Sign out</span>
+        </button>
+        <div class="menu-version">
+          v{{ appVersion }} &middot; built by <strong>bilet</strong>
+        </div>
+      </mat-menu>
+    </header>
+
+    <main class="mobile-main" appPullToRefresh [onRefresh]="refreshAll">
+      <router-outlet />
+    </main>
+
+    <nav class="bottom-nav">
+      @for (item of navLeft; track item.path) {
+        <a
+          [routerLink]="item.path"
+          routerLinkActive="active"
+          class="tab"
+          [attr.aria-label]="item.label"
+        >
+          <lucide-icon [name]="item.icon" />
+        </a>
+      }
+      <button
+        class="fab"
+        (click)="openQuickAdd()"
+        aria-label="Add transaction"
+        type="button"
+      >
+        <lucide-icon name="plus" />
+      </button>
+      @for (item of navRight; track item.path) {
+        <a
+          [routerLink]="item.path"
+          routerLinkActive="active"
+          class="tab"
+          [attr.aria-label]="item.label"
+        >
+          <lucide-icon [name]="item.icon" />
+        </a>
+      }
+    </nav>
+  </div>
+} @else {
+  <!-- ---------- Desktop layout ---------- -->
+  <mat-sidenav-container class="desktop-shell" autosize>
+    <mat-sidenav mode="side" opened class="desktop-sidenav">
+      <div class="brand">
+        <img
+          class="brand-logo"
+          src="rupa-logo-dark.png"
+          alt="rūpa"
+          width="88"
+          height="28"
+        />
+      </div>
+
+      <mat-nav-list class="nav-list">
+        @for (item of navLeft.concat(navRight); track item.path) {
+          <a
+            mat-list-item
+            [routerLink]="item.path"
+            routerLinkActive="active"
+          >
+            <lucide-icon matListItemIcon [name]="item.icon" />
+            <span matListItemTitle>{{ item.label }}</span>
+          </a>
+        }
+        <div class="nav-divider"></div>
+        @for (item of moreNav; track item.path) {
+          <a
+            mat-list-item
+            [routerLink]="item.path"
+            routerLinkActive="active"
+          >
+            <lucide-icon matListItemIcon [name]="item.icon" />
+            <span matListItemTitle>{{ item.label }}</span>
+          </a>
+        }
+      </mat-nav-list>
+
+      <div class="sidenav-footer">
+        <button
+          mat-button
+          class="user-menu-btn"
+          [matMenuTriggerFor]="userMenu"
+        >
+          <lucide-icon name="circle-user" />
+          <span class="user-email">{{ userEmail() }}</span>
+        </button>
+        <mat-menu #userMenu="matMenu">
+          <button mat-menu-item (click)="signOut()">
+            <lucide-icon name="log-out" />
+            <span>Sign out</span>
+          </button>
+          <div class="menu-version">
+          v{{ appVersion }} &middot; built by <strong>bilet</strong>
+        </div>
+        </mat-menu>
+      </div>
+    </mat-sidenav>
+
+    <mat-sidenav-content class="desktop-content">
+      <div class="desktop-inner">
+        <router-outlet />
+      </div>
+      <button
+        class="fab desktop-fab"
+        (click)="openQuickAdd()"
+        aria-label="Add transaction"
+        type="button"
+      >
+        <lucide-icon name="plus" />
+      </button>
+    </mat-sidenav-content>
+  </mat-sidenav-container>
+}
