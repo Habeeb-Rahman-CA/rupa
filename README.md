@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/rupa-logo-dark.png" alt="rūpa" width="220" />
+  <img src="public/rupa-icon.png" alt="rūpa" width="220" />
 </p>
 
 <h1 align="center">rūpa</h1>
