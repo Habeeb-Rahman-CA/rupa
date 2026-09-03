@@ -7,13 +7,8 @@
 // Mobile layout
 // =============================================================================
 .mobile-shell {
-  // Fixed to viewport so .mobile-main is a real scroll container.
-  // With min-height, the shell grew with content and .mobile-main never
-  // overflowed — scroll ended up on <body> instead, which broke the
-  // pull-to-refresh directive's scrollTop=0 check.
-  height: 100vh;
-  height: 100dvh;              // dynamic viewport for mobile URL-bar shifts
-  width: 100vw;
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
   background: var(--app-canvas);
@@ -58,7 +53,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding: 8px 16px calc(76px + env(safe-area-inset-bottom));
+  padding: 8px 16px calc(64px + env(safe-area-inset-bottom));
 }
 
 // ---------- Bottom nav (mobile) --------------------------------------------
