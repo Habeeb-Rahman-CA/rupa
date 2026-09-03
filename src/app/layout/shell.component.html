@@ -21,17 +21,32 @@
             <span>{{ item.label }}</span>
           </a>
         }
+        <button mat-menu-item (click)="checkPwaUpdate()">
+          <lucide-icon [name]="pwaUpdateAvailable() ? 'download' : 'refresh-cw'" />
+          <span>{{ pwaUpdateAvailable() ? 'Update & Reload App' : 'Check for updates' }}</span>
+        </button>
         <button mat-menu-item (click)="signOut()">
           <lucide-icon name="log-out" />
           <span>Sign out</span>
         </button>
-        <div class="menu-version">
-          v{{ appVersion }} &middot; built by <strong>bilet</strong>
+        <div class="menu-version" (click)="checkPwaUpdate()" title="Click to check for updates">
+          v{{ appVersion }} &middot; @if (pwaUpdateAvailable()) { <strong class="update-badge">Update Ready!</strong> } @else { built by <strong>bilet</strong> }
         </div>
       </mat-menu>
     </header>
 
     <main class="mobile-main" appPullToRefresh [onRefresh]="refreshAll">
+      @if (pwaUpdateAvailable()) {
+        <div class="pwa-update-banner">
+          <div class="pwa-update-text">
+            <lucide-icon name="download" />
+            <span>New version available!</span>
+          </div>
+          <button mat-flat-button color="primary" class="pwa-reload-btn" (click)="reloadPwa()">
+            Reload Now
+          </button>
+        </div>
+      }
       <router-outlet />
     </main>
 
@@ -114,19 +129,34 @@
           <span class="user-email">{{ userEmail() }}</span>
         </button>
         <mat-menu #userMenu="matMenu">
+          <button mat-menu-item (click)="checkPwaUpdate()">
+            <lucide-icon [name]="pwaUpdateAvailable() ? 'download' : 'refresh-cw'" />
+            <span>{{ pwaUpdateAvailable() ? 'Update & Reload App' : 'Check for updates' }}</span>
+          </button>
           <button mat-menu-item (click)="signOut()">
             <lucide-icon name="log-out" />
             <span>Sign out</span>
           </button>
-          <div class="menu-version">
-          v{{ appVersion }} &middot; built by <strong>bilet</strong>
-        </div>
+          <div class="menu-version" (click)="checkPwaUpdate()" title="Click to check for updates">
+            v{{ appVersion }} &middot; @if (pwaUpdateAvailable()) { <strong class="update-badge">Update Ready!</strong> } @else { built by <strong>bilet</strong> }
+          </div>
         </mat-menu>
       </div>
     </mat-sidenav>
 
     <mat-sidenav-content class="desktop-content">
       <div class="desktop-inner">
+        @if (pwaUpdateAvailable()) {
+          <div class="pwa-update-banner">
+            <div class="pwa-update-text">
+              <lucide-icon name="download" />
+              <span>A new version of rūpa is available! Reload to apply the update.</span>
+            </div>
+            <button mat-flat-button color="primary" class="pwa-reload-btn" (click)="reloadPwa()">
+              Reload Now
+            </button>
+          </div>
+        }
         <router-outlet />
       </div>
       <button

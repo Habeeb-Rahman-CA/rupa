@@ -13,6 +13,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { AuthService } from '../core/services/auth.service';
 import { DataSyncService } from '../core/services/data-sync.service';
+import { PwaUpdateService } from '../core/services/pwa-update.service';
 import { TransactionsService } from '../core/services/transactions.service';
 import { CategoriesService } from '../core/services/categories.service';
 import { DebtsService } from '../core/services/debts.service';
@@ -50,6 +51,7 @@ export class ShellComponent {
   private readonly bottomSheet = inject(MatBottomSheet);
   private readonly auth = inject(AuthService);
   private readonly dataSyncService = inject(DataSyncService);
+  private readonly pwaUpdateService = inject(PwaUpdateService);
   private readonly transactionsService = inject(TransactionsService);
   private readonly categoriesService = inject(CategoriesService);
   private readonly debtsService = inject(DebtsService);
@@ -82,6 +84,9 @@ export class ShellComponent {
   readonly appVersion = APP_VERSION;
   readonly balance = this.transactionsService.balance;
   readonly userEmail = computed(() => this.auth.user()?.email ?? '');
+  readonly pwaUpdateAvailable = this.pwaUpdateService.updateAvailable;
+  readonly isCheckingPwa = this.pwaUpdateService.isChecking;
+
   readonly displayName = computed(() => {
     const u = this.auth.user();
     if (!u) return '';
@@ -103,6 +108,14 @@ export class ShellComponent {
 
   openQuickAdd(): void {
     this.bottomSheet.open(QuickAddSheetComponent, { panelClass: 'quick-add-sheet' });
+  }
+
+  async checkPwaUpdate(): Promise<void> {
+    await this.pwaUpdateService.checkForUpdate(true);
+  }
+
+  async reloadPwa(): Promise<void> {
+    await this.pwaUpdateService.reloadToUpdate();
   }
 
   async signOut(): Promise<void> {
