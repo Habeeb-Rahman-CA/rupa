@@ -267,9 +267,12 @@ interface DayRow {
       .stat { text-align: center; min-width: 0; }
       .stat-value {
         margin-top: 6px;
-        font-size: 18px;
+        font-size: clamp(13px, 3.8vw, 18px);
         font-weight: 700;
         font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .v-divider {
         width: 1px;
@@ -420,15 +423,19 @@ interface DayRow {
         padding: 14px 16px;
         text-decoration: none;
         color: inherit;
+        min-width: 0;
         transition: transform .1s ease;
 
         &:active { transform: scale(0.98); }
       }
       .ob-value {
         margin-top: 6px;
-        font-size: 20px;
+        font-size: clamp(16px, 4.5vw, 20px);
         font-weight: 700;
         font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .ob-hint {
         margin-top: 4px;

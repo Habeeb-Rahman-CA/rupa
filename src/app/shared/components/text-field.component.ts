@@ -119,7 +119,7 @@ import { LucideAngularModule } from 'lucide-angular';
         outline: 0;
         background: transparent;
         font: inherit;
-        font-size: 15px;
+        font-size: 16px;
         color: var(--app-ink);
         appearance: none;
       }

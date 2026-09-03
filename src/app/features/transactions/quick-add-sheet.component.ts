@@ -6,7 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatBottomSheetRef } from '@angular/material/bottom-sheet';
+import { MatBottomSheet, MatBottomSheetRef } from '@angular/material/bottom-sheet';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatChipsModule } from '@angular/material/chips';
@@ -17,6 +17,7 @@ import { CategoriesService } from '../../core/services/categories.service';
 import { TransactionsService } from '../../core/services/transactions.service';
 import { Category, TxDirection } from '../../core/models/domain.models';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
+import { SetOpeningBalanceSheetComponent } from '../dashboard/set-opening-balance-sheet.component';
 
 const NEW_CATEGORY = '__new__';
 
@@ -97,6 +98,13 @@ const NEW_CATEGORY = '__new__';
         (valueChange)="notes.set($event ? String($event) : '')"
       />
 
+      <div class="starting-balance-link">
+        Setting your initial money?
+        <button type="button" class="link-btn" (click)="openStartingBalance()">
+          Set starting balance
+        </button>
+      </div>
+
       <div class="actions">
         <button mat-button (click)="close()" [disabled]="submitting()">Cancel</button>
         <button
@@ -130,6 +138,20 @@ const NEW_CATEGORY = '__new__';
         font-weight: 600;
       }
       .cat-label { margin-bottom: 8px; }
+      .starting-balance-link {
+        font-size: 12px;
+        color: var(--app-ink-muted);
+      }
+      .link-btn {
+        background: none;
+        border: none;
+        padding: 0;
+        color: var(--app-accent);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .link-btn:hover { text-decoration: underline; }
       .actions {
         display: flex;
         justify-content: flex-end;
@@ -148,6 +170,7 @@ export class QuickAddSheetComponent {
   protected readonly String = String;
 
   private readonly ref = inject(MatBottomSheetRef<QuickAddSheetComponent>);
+  private readonly bottomSheet = inject(MatBottomSheet);
   private readonly categoriesService = inject(CategoriesService);
   private readonly transactionsService = inject(TransactionsService);
   private readonly snack = inject(MatSnackBar);
@@ -219,6 +242,11 @@ export class QuickAddSheetComponent {
       });
       this.submitting.set(false);
     }
+  }
+
+  openStartingBalance(): void {
+    this.ref.dismiss();
+    this.bottomSheet.open(SetOpeningBalanceSheetComponent);
   }
 
   close(): void {

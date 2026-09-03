@@ -4,12 +4,15 @@ import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { TransactionsService } from './transactions.service';
 
+export type DebtTransactionImpact = 'default' | 'income' | 'expense' | 'none';
+
 export interface CreateDebtInput {
   person_id: string;
   direction: DebtDirection;
   amount: number;
   reason?: string | null;
   opened_on?: string; // ISO
+  impact?: DebtTransactionImpact;
 }
 
 export interface AddPaymentInput {
@@ -57,42 +60,72 @@ export class DebtsService {
     });
   }
 
+  private loadPromise: Promise<void> | null = null;
+
   async load(): Promise<void> {
-    this._isLoading.set(true);
-    const { data, error } = await this.supabase.client
-      .from('debts')
-      .select('*')
-      .order('opened_on', { ascending: false });
-    this._isLoading.set(false);
-    if (error) {
-      console.error('Failed to load debts', error);
+    if (!this.auth.isAuthenticated()) {
+      this._debts.set([]);
       return;
     }
-    this._debts.set((data ?? []) as Debt[]);
+    if (this.loadPromise) return this.loadPromise;
+
+    this._isLoading.set(true);
+    this.loadPromise = (async () => {
+      try {
+        const { data, error } = await this.supabase.client
+          .from('debts')
+          .select('*')
+          .order('opened_on', { ascending: false });
+
+        if (error) {
+          console.error('Failed to load debts', error);
+          return;
+        }
+        this._debts.set((data ?? []) as Debt[]);
+      } finally {
+        this._isLoading.set(false);
+        this.loadPromise = null;
+      }
+    })();
+
+    return this.loadPromise;
   }
 
   /**
-   * Creates a debt and its linked initial transaction.
-   *   direction 'i_owe'    → someone gave YOU money → 'in' transaction
-   *   direction 'they_owe' → YOU gave someone money → 'out' transaction
+   * Creates a debt with configurable income/expense transaction impact.
+   * If impact is 'none', no cashflow transaction is created (opening balance).
    */
   async create(input: CreateDebtInput): Promise<Debt> {
     if (!(input.amount > 0)) throw new Error('Amount must be greater than zero.');
     const ownerId = this.requireUserId();
     const openedOn = input.opened_on ?? todayIso();
+    const impact = input.impact ?? 'default';
 
-    // 1. Create the initial transaction
-    const txDirection = input.direction === 'i_owe' ? 'in' : 'out';
-    const tx = await this.insertTransaction({
-      owner_id: ownerId,
-      amount: input.amount,
-      direction: txDirection,
-      occurred_on: openedOn,
-      notes: input.reason?.trim() || null,
-      source: 'debt',
-    });
+    let txDirection: 'in' | 'out' | null = null;
+    if (impact === 'income') {
+      txDirection = 'in';
+    } else if (impact === 'expense') {
+      txDirection = 'out';
+    } else if (impact === 'default') {
+      txDirection = input.direction === 'i_owe' ? 'in' : 'out';
+    } else if (impact === 'none') {
+      txDirection = null;
+    }
 
-    // 2. Create the debt, referencing the transaction
+    // 1. Create initial transaction if required
+    let tx: Transaction | null = null;
+    if (txDirection) {
+      tx = await this.insertTransaction({
+        owner_id: ownerId,
+        amount: input.amount,
+        direction: txDirection,
+        occurred_on: openedOn,
+        notes: input.reason?.trim() || null,
+        source: 'debt',
+      });
+    }
+
+    // 2. Create the debt row
     const { data, error } = await this.supabase.client
       .from('debts')
       .insert({
@@ -107,18 +140,21 @@ export class DebtsService {
       .select()
       .single();
     if (error) {
-      console.error('Failed to create debt (transaction already saved)', error);
-      // Roll back the transaction we just made so balance stays right
-      await this.txService.delete(tx.id).catch(() => undefined);
+      console.error('Failed to create debt', error);
+      if (tx) {
+        await this.txService.delete(tx.id).catch(() => undefined);
+      }
       throw error;
     }
 
     const debt = data as Debt;
-    // Link the transaction back to the debt for traceability
-    await this.supabase.client
-      .from('transactions')
-      .update({ source_ref_id: debt.id })
-      .eq('id', tx.id);
+    // Link transaction back to debt if created
+    if (tx) {
+      await this.supabase.client
+        .from('transactions')
+        .update({ source_ref_id: debt.id })
+        .eq('id', tx.id);
+    }
 
     this._debts.update((list) => [debt, ...list]);
     await this.txService.refresh();
@@ -191,10 +227,13 @@ export class DebtsService {
   }
 
   async delete(id: string): Promise<void> {
-    // Deleting a debt also deletes its debt_payments (FK cascade),
-    // but the linked transactions do NOT cascade — those remain in the ledger.
-    // Remove them explicitly so the balance stays consistent with what the
-    // user sees on the Debts page.
+    const debt = this._debts().find((d) => d.id === id);
+    if (!debt) return;
+
+    // 1. Optimistic removal from signal for immediate UI update
+    this._debts.update((list) => list.filter((d) => d.id !== id));
+
+    // Fetch linked transactions
     const { data: txRows } = await this.supabase.client
       .from('transactions')
       .select('id')
@@ -204,14 +243,14 @@ export class DebtsService {
     const { error } = await this.supabase.client.from('debts').delete().eq('id', id);
     if (error) {
       console.error('Failed to delete debt', error);
+      // Revert signal update on failure
+      this._debts.update((list) => [debt, ...list]);
       throw error;
     }
 
     for (const row of txRows ?? []) {
-      await this.supabase.client.from('transactions').delete().eq('id', row.id);
+      await this.txService.delete(row.id).catch(() => undefined);
     }
-
-    this._debts.update((list) => list.filter((d) => d.id !== id));
     await this.txService.refresh();
   }
 

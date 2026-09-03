@@ -27,11 +27,17 @@ export class AuthService {
   constructor() {
     this.whenReady = this.supabase.client.auth
       .getSession()
-      .then(({ data }) => {
-        this._session.set(data.session);
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('Failed to restore Supabase session', error.message);
+          void this.signOut();
+        } else {
+          this._session.set(data.session);
+        }
       })
       .catch((err) => {
         console.error('Failed to restore Supabase session', err);
+        void this.signOut();
       })
       .finally(() => {
         this._ready.set(true);
@@ -39,8 +45,11 @@ export class AuthService {
 
     // Keep the signal in sync as tokens refresh / user signs in or out.
     const { data: sub } = this.supabase.client.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         this._session.set(session);
+        if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) {
+          this._session.set(null);
+        }
       },
     );
     this.destroyRef.onDestroy(() => sub.subscription.unsubscribe());
@@ -51,7 +60,7 @@ export class AuthService {
     // an expired access token doesn't cause a silent redirect to /login.
     if (typeof document !== 'undefined') {
       const onVisible = (): void => {
-        if (document.visibilityState === 'visible') {
+        if (document.visibilityState === 'visible' && this._session()) {
           void this.refreshIfPossible();
         }
       };
@@ -66,18 +75,21 @@ export class AuthService {
 
   /**
    * Ask Supabase to refresh the access token using the persisted refresh
-   * token. If the refresh token itself has expired the user will be signed
-   * out (session becomes null) and the guard sends them to /login.
+   * token. If the refresh token itself has expired or is invalid (HTTP 400),
+   * sign out cleanly so the user can log in again.
    */
   async refreshIfPossible(): Promise<void> {
+    if (!this._session()) return;
     try {
       const { error } = await this.supabase.client.auth.refreshSession();
       if (error) {
-        // Refresh token expired or revoked — user must sign in again.
-        console.warn('Session refresh failed', error.message);
+        // Refresh token expired, invalid, or revoked — user must sign in again.
+        console.warn('Session refresh failed:', error.message);
+        await this.signOut();
       }
     } catch (err) {
-      console.error('Session refresh threw', err);
+      console.error('Session refresh error:', err);
+      await this.signOut();
     }
   }
 
@@ -96,8 +108,13 @@ export class AuthService {
     });
   }
 
-  signOut() {
-    return this.supabase.client.auth.signOut();
+  async signOut(): Promise<void> {
+    this._session.set(null);
+    try {
+      await this.supabase.client.auth.signOut();
+    } catch {
+      // Ignore network errors on signout
+    }
   }
 
   sendPasswordReset(email: string) {

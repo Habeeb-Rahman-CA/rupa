@@ -24,19 +24,35 @@ export class PeopleService {
     });
   }
 
-  async load(): Promise<void> {
-    this._isLoading.set(true);
-    const { data, error } = await this.supabase.client
-      .from('people')
-      .select('*')
-      .order('name', { ascending: true });
-    this._isLoading.set(false);
+  private loadPromise: Promise<void> | null = null;
 
-    if (error) {
-      console.error('Failed to load people', error);
+  async load(): Promise<void> {
+    if (!this.auth.isAuthenticated()) {
+      this._people.set([]);
       return;
     }
-    this._people.set((data ?? []) as Person[]);
+    if (this.loadPromise) return this.loadPromise;
+
+    this._isLoading.set(true);
+    this.loadPromise = (async () => {
+      try {
+        const { data, error } = await this.supabase.client
+          .from('people')
+          .select('*')
+          .order('name', { ascending: true });
+
+        if (error) {
+          console.error('Failed to load people', error);
+          return;
+        }
+        this._people.set((data ?? []) as Person[]);
+      } finally {
+        this._isLoading.set(false);
+        this.loadPromise = null;
+      }
+    })();
+
+    return this.loadPromise;
   }
 
   async create(name: string, phone?: string | null, notes?: string | null): Promise<Person> {
@@ -64,12 +80,19 @@ export class PeopleService {
   }
 
   async delete(id: string): Promise<void> {
+    const person = this._people().find((p) => p.id === id);
+    if (!person) return;
+
+    // 1. Optimistic removal for instant UI feedback
+    this._people.update((list) => list.filter((p) => p.id !== id));
+
     const { error } = await this.supabase.client.from('people').delete().eq('id', id);
     if (error) {
       console.error('Failed to delete person', error);
+      // Revert on failure
+      this._people.update((list) => [...list, person]);
       throw error;
     }
-    this._people.update((list) => list.filter((p) => p.id !== id));
   }
 
   private requireUserId(): string {

@@ -81,7 +81,8 @@ export interface ChartPoint {
         @if (highlight() != null && highlight()! >= 0 && highlight()! < points().length) {
           <div
             class="tooltip"
-            [style.left.%]="((highlight()!) / (points().length - 1)) * 100"
+            [style.left.%]="tooltipLeftPercent()"
+            [style.transform]="tooltipTransform()"
           >
             <div class="tt-val">{{ tooltipValue() }}</div>
           </div>
@@ -96,6 +97,7 @@ export interface ChartPoint {
       .chart {
         position: relative;
         width: 100%;
+        padding-top: 24px;
       }
       .svg {
         display: block;
@@ -113,9 +115,10 @@ export interface ChartPoint {
       }
       .tooltip {
         position: absolute;
-        top: -6px;
-        transform: translateX(-50%);
+        top: -4px;
         pointer-events: none;
+        z-index: 10;
+        transition: left 0.15s ease, transform 0.15s ease;
       }
       .tt-val {
         background: var(--app-ink-dark);
@@ -126,6 +129,7 @@ export interface ChartPoint {
         font-weight: 600;
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
+        box-shadow: var(--app-shadow-md);
       }
       .empty {
         color: var(--app-ink-muted);
@@ -187,6 +191,18 @@ export class LineChartComponent {
     if (pts.length < 2) return '';
     const last = pts.length - 1;
     return `${line} L ${this.xFor(last)} ${this.h - this.padBottom} L ${this.xFor(0)} ${this.h - this.padBottom} Z`;
+  });
+
+  readonly tooltipLeftPercent = computed(() => {
+    const i = this.highlight();
+    const len = this.points().length;
+    if (i == null || len <= 1) return 0;
+    return (i / (len - 1)) * 100;
+  });
+
+  readonly tooltipTransform = computed(() => {
+    const pct = this.tooltipLeftPercent();
+    return `translateX(-${pct}%)`;
   });
 
   tooltipValue(): string {

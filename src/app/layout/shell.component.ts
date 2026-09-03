@@ -12,6 +12,7 @@ import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { AuthService } from '../core/services/auth.service';
+import { DataSyncService } from '../core/services/data-sync.service';
 import { TransactionsService } from '../core/services/transactions.service';
 import { CategoriesService } from '../core/services/categories.service';
 import { DebtsService } from '../core/services/debts.service';
@@ -48,6 +49,7 @@ export class ShellComponent {
   private readonly breakpoints = inject(BreakpointObserver);
   private readonly bottomSheet = inject(MatBottomSheet);
   private readonly auth = inject(AuthService);
+  private readonly dataSyncService = inject(DataSyncService);
   private readonly transactionsService = inject(TransactionsService);
   private readonly categoriesService = inject(CategoriesService);
   private readonly debtsService = inject(DebtsService);
@@ -111,14 +113,6 @@ export class ShellComponent {
   // Bound as a field so `this` is preserved when passed as a callback.
   readonly refreshAll = async (): Promise<void> => {
     await this.auth.refreshIfPossible();
-    const detailId = this.eventsService.currentDetail()?.event.id;
-    await Promise.all([
-      this.transactionsService.refresh(),
-      this.categoriesService.load(),
-      this.peopleService.load(),
-      this.debtsService.load(),
-      this.eventsService.loadList(),
-      detailId ? this.eventsService.loadDetail(detailId) : Promise.resolve(),
-    ]);
+    await this.dataSyncService.syncAll();
   };
 }

@@ -35,20 +35,36 @@ export class CategoriesService {
     });
   }
 
-  async load(): Promise<void> {
-    this._isLoading.set(true);
-    const { data, error } = await this.supabase.client
-      .from('categories')
-      .select('*')
-      .order('kind', { ascending: true })
-      .order('name', { ascending: true });
-    this._isLoading.set(false);
+  private loadPromise: Promise<void> | null = null;
 
-    if (error) {
-      console.error('Failed to load categories', error);
+  async load(): Promise<void> {
+    if (!this.auth.isAuthenticated()) {
+      this._categories.set([]);
       return;
     }
-    this._categories.set((data ?? []) as Category[]);
+    if (this.loadPromise) return this.loadPromise;
+
+    this._isLoading.set(true);
+    this.loadPromise = (async () => {
+      try {
+        const { data, error } = await this.supabase.client
+          .from('categories')
+          .select('*')
+          .order('kind', { ascending: true })
+          .order('name', { ascending: true });
+
+        if (error) {
+          console.error('Failed to load categories', error);
+          return;
+        }
+        this._categories.set((data ?? []) as Category[]);
+      } finally {
+        this._isLoading.set(false);
+        this.loadPromise = null;
+      }
+    })();
+
+    return this.loadPromise;
   }
 
   async create(name: string, kind: CategoryKind): Promise<Category | null> {
@@ -74,15 +90,22 @@ export class CategoriesService {
   }
 
   async delete(id: string): Promise<void> {
+    const category = this._categories().find((c) => c.id === id);
+    if (!category) return;
+
+    // 1. Optimistic removal for instant UI feedback
+    this._categories.update((list) => list.filter((c) => c.id !== id));
+
     const { error } = await this.supabase.client
       .from('categories')
       .delete()
       .eq('id', id);
     if (error) {
       console.error('Failed to delete category', error);
+      // Revert on failure
+      this._categories.update((list) => [...list, category]);
       throw error;
     }
-    this._categories.update((list) => list.filter((c) => c.id !== id));
   }
 
   async seedDefaults(): Promise<void> {

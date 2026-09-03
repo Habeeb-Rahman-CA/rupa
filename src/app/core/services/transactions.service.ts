@@ -26,11 +26,13 @@ export class TransactionsService {
   private readonly _transactions = signal<Transaction[]>([]);
   private readonly _balance = signal<number>(0);
   private readonly _monthly = signal<MonthlyStats>(emptyStats);
+  private readonly _openingBalance = signal<number | null>(null);
   private readonly _isLoading = signal(false);
 
   readonly transactions = this._transactions.asReadonly();
   readonly balance = this._balance.asReadonly();
   readonly monthly = this._monthly.asReadonly();
+  readonly openingBalance = this._openingBalance.asReadonly();
   readonly isLoading = this._isLoading.asReadonly();
 
   constructor() {
@@ -41,18 +43,39 @@ export class TransactionsService {
         this._transactions.set([]);
         this._balance.set(0);
         this._monthly.set(emptyStats);
+        this._openingBalance.set(null);
       }
     });
   }
 
+  private refreshPromise: Promise<void> | null = null;
+
   async refresh(): Promise<void> {
+    if (!this.auth.isAuthenticated()) {
+      this._transactions.set([]);
+      this._balance.set(0);
+      this._monthly.set(emptyStats);
+      this._openingBalance.set(null);
+      return;
+    }
+    if (this.refreshPromise) return this.refreshPromise;
+
     this._isLoading.set(true);
-    await Promise.all([
-      this.loadTransactions(),
-      this.loadBalance(),
-      this.loadMonthly(),
-    ]);
-    this._isLoading.set(false);
+    this.refreshPromise = (async () => {
+      try {
+        await Promise.all([
+          this.loadTransactions(),
+          this.loadBalance(),
+          this.loadMonthly(),
+          this.loadOpeningBalance(),
+        ]);
+      } finally {
+        this._isLoading.set(false);
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 
   async loadTransactions(limit = 200): Promise<void> {
@@ -137,16 +160,93 @@ export class TransactionsService {
 
   async delete(id: string): Promise<void> {
     const removed = this._transactions().find((t) => t.id === id);
+    if (!removed) return;
+
+    // 1. Optimistic removal from state for immediate UI feedback
+    this._transactions.update((list) => list.filter((t) => t.id !== id));
+    this.applyToTotals(removed, -1);
+
     const { error } = await this.supabase.client
       .from('transactions')
       .delete()
       .eq('id', id);
+
     if (error) {
       console.error('Failed to delete transaction', error);
+      // Revert state if backend request fails
+      this._transactions.update((list) => [removed, ...list]);
+      this.applyToTotals(removed, +1);
       throw error;
     }
-    this._transactions.update((list) => list.filter((t) => t.id !== id));
-    if (removed) this.applyToTotals(removed, -1);
+  }
+
+  async loadOpeningBalance(): Promise<void> {
+    const ownerId = this.auth.user()?.id;
+    if (!ownerId) {
+      this._openingBalance.set(null);
+      return;
+    }
+
+    const { data } = await this.supabase.client
+      .from('transactions')
+      .select('amount, direction')
+      .eq('owner_id', ownerId)
+      .eq('notes', 'Opening balance')
+      .maybeSingle();
+
+    if (data) {
+      const amt = Number(data.amount);
+      this._openingBalance.set(data.direction === 'in' ? amt : -amt);
+    } else {
+      this._openingBalance.set(null);
+    }
+  }
+
+  async setOpeningBalance(amount: number): Promise<void> {
+    const ownerId = this.auth.user()?.id;
+    if (!ownerId) throw new Error('Not signed in.');
+
+    const { data: existing } = await this.supabase.client
+      .from('transactions')
+      .select('id')
+      .eq('owner_id', ownerId)
+      .eq('notes', 'Opening balance')
+      .maybeSingle();
+
+    const direction: TxDirection = amount >= 0 ? 'in' : 'out';
+    const absAmount = Math.abs(amount);
+
+    if (existing) {
+      if (absAmount === 0 && amount === 0) {
+        await this.supabase.client.from('transactions').delete().eq('id', existing.id);
+      } else {
+        const { error } = await this.supabase.client
+          .from('transactions')
+          .update({
+            amount: absAmount,
+            direction,
+            occurred_on: '2000-01-01',
+          })
+          .eq('id', existing.id);
+        if (error) throw error;
+      }
+    } else {
+      if (absAmount > 0) {
+        const { error } = await this.supabase.client
+          .from('transactions')
+          .insert({
+            owner_id: ownerId,
+            amount: absAmount,
+            direction,
+            occurred_on: '2000-01-01',
+            notes: 'Opening balance',
+            source: 'manual',
+          });
+        if (error) throw error;
+      }
+    }
+
+    await this.refresh();
   }
 
   private applyToTotals(tx: Transaction, sign: 1 | -1): void {

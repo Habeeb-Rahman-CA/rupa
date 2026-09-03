@@ -11,7 +11,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
-import { DebtsService } from '../../core/services/debts.service';
+import {
+  DebtTransactionImpact,
+  DebtsService,
+} from '../../core/services/debts.service';
 import { PeopleService } from '../../core/services/people.service';
 import { DebtDirection } from '../../core/models/domain.models';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
@@ -45,14 +48,6 @@ const NEW_PERSON = '__new__';
           <mat-button-toggle value="i_owe">You owe</mat-button-toggle>
         </mat-button-toggle-group>
       </header>
-
-      <div class="hint">
-        @if (direction() === 'they_owe') {
-          You gave someone money — we’ll log the expense and remember they owe you back.
-        } @else {
-          Someone lent you money — we’ll log the income and remember to pay it back.
-        }
-      </div>
 
       <app-select-field
         label="Person"
@@ -95,6 +90,24 @@ const NEW_PERSON = '__new__';
         (valueChange)="reason.set($any($event) ?? '')"
       />
 
+      <app-select-field
+        label="Income / Expense impact"
+        placeholder="Choose impact"
+        [options]="impactOptions()"
+        [value]="impact()"
+        (valueChange)="impact.set($any($event))"
+      />
+
+      <div class="hint">
+        @if (impact() === 'none') {
+          This debt will only be tracked under your owed balances and will <strong>not</strong> change your monthly Income, Expense, or Total Balance.
+        } @else if (impact() === 'expense' || (impact() === 'default' && direction() === 'they_owe')) {
+          Will log an <strong>Expense</strong> transaction for today.
+        } @else {
+          Will log an <strong>Income</strong> transaction for today.
+        }
+      </div>
+
       <div class="actions">
         <button mat-button (click)="close()" [disabled]="submitting()">Cancel</button>
         <button
@@ -127,6 +140,7 @@ const NEW_PERSON = '__new__';
       .hint {
         font-size: 12px;
         color: var(--app-ink-muted);
+        line-height: 1.35;
       }
       .actions {
         display: flex;
@@ -159,6 +173,26 @@ export class AddDebtSheetComponent {
     return opts;
   });
   readonly direction = signal<DebtDirection>('they_owe');
+  readonly impact = signal<DebtTransactionImpact>('default');
+
+  readonly impactOptions = computed<SelectOption<DebtTransactionImpact>[]>(() => {
+    const dir = this.direction();
+    return [
+      {
+        value: 'default',
+        label: dir === 'they_owe' ? 'Log as Expense (Cash Out)' : 'Log as Income (Cash In)',
+      },
+      {
+        value: 'none',
+        label: 'Don’t affect Income/Expense (Opening balance)',
+      },
+      {
+        value: dir === 'they_owe' ? 'income' : 'expense',
+        label: dir === 'they_owe' ? 'Log as Income (Cash In)' : 'Log as Expense (Cash Out)',
+      },
+    ];
+  });
+
   readonly submitting = signal(false);
 
   readonly personId = signal<string | null>(null);
@@ -204,6 +238,7 @@ export class AddDebtSheetComponent {
         direction: this.direction(),
         amount: Number(this.amount()),
         reason: this.reason() || null,
+        impact: this.impact(),
       });
       this.snack.open('Debt saved to your ledger.', undefined, { duration: 2000 });
       this.ref.dismiss({ saved: true });

@@ -84,18 +84,36 @@ export class EventsService {
 
   // ---------- list ----------------------------------------------------------
 
+  private loadListPromise: Promise<void> | null = null;
+
   async loadList(): Promise<void> {
-    this._isLoading.set(true);
-    const { data, error } = await this.supabase.client
-      .from('events')
-      .select('*')
-      .order('starts_on', { ascending: false });
-    this._isLoading.set(false);
-    if (error) {
-      console.error('Failed to load events', error);
+    if (!this.auth.isAuthenticated()) {
+      this._events.set([]);
+      this._currentDetail.set(null);
       return;
     }
-    this._events.set((data ?? []) as EventRecord[]);
+    if (this.loadListPromise) return this.loadListPromise;
+
+    this._isLoading.set(true);
+    this.loadListPromise = (async () => {
+      try {
+        const { data, error } = await this.supabase.client
+          .from('events')
+          .select('*')
+          .order('starts_on', { ascending: false });
+
+        if (error) {
+          console.error('Failed to load events', error);
+          return;
+        }
+        this._events.set((data ?? []) as EventRecord[]);
+      } finally {
+        this._isLoading.set(false);
+        this.loadListPromise = null;
+      }
+    })();
+
+    return this.loadListPromise;
   }
 
   async create(input: CreateEventInput): Promise<EventRecord> {
@@ -140,8 +158,14 @@ export class EventsService {
   }
 
   async delete(id: string): Promise<void> {
+    const evt = this._events().find((e) => e.id === id);
+    if (!evt) return;
+
+    // 1. Optimistic removal for instant UI feedback
+    this._events.update((list) => list.filter((e) => e.id !== id));
+    if (this._currentDetail()?.event.id === id) this._currentDetail.set(null);
+
     // Fetch all linked transaction ids first so we can clean them up.
-    // event_expenses and event_settlements both hold transaction_id refs.
     const { data: expRows } = await this.supabase.client
       .from('event_expenses')
       .select('transaction_id')
@@ -156,18 +180,18 @@ export class EventsService {
       ...(setRows ?? []).map((r) => r.transaction_id as string),
     ]);
 
-    // Cascade will remove participants/expenses/expense_participants/settlements.
     const { error } = await this.supabase.client.from('events').delete().eq('id', id);
     if (error) {
       console.error('Failed to delete event', error);
+      // Revert on failure
+      this._events.update((list) => [evt, ...list]);
       throw error;
     }
+
     for (const txId of txIds) {
-      await this.supabase.client.from('transactions').delete().eq('id', txId);
+      await this.txService.delete(txId).catch(() => undefined);
     }
 
-    this._events.update((list) => list.filter((e) => e.id !== id));
-    if (this._currentDetail()?.event.id === id) this._currentDetail.set(null);
     await this.txService.refresh();
   }
 

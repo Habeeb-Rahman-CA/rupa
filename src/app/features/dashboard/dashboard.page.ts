@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatBottomSheet, MatBottomSheetModule } from '@angular/material/bottom-sheet';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
@@ -16,6 +17,7 @@ import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
 import { DebtsService } from '../../core/services/debts.service';
 import { Transaction } from '../../core/models/domain.models';
+import { SetOpeningBalanceSheetComponent } from './set-opening-balance-sheet.component';
 
 interface CategorySpend {
   id: string;
@@ -34,16 +36,52 @@ type Range = 'week' | 'month' | 'year';
     FormsModule,
     MatButtonModule,
     MatButtonToggleModule,
+    MatBottomSheetModule,
     LucideAngularModule,
     SignedMoneyPipe,
     LineChartComponent,
   ],
   template: `
+    @if (showBalanceBanner()) {
+      <section class="starting-balance-banner app-card">
+        <div class="banner-top">
+          <div class="banner-badge">
+            <lucide-icon name="wallet" />
+          </div>
+          <div class="banner-info">
+            <h3>Set your starting balance</h3>
+            <p>
+              Add your current cash or bank balance so your monthly income and expense metrics remain 100% accurate.
+            </p>
+          </div>
+        </div>
+        <div class="banner-actions">
+          <button mat-flat-button color="primary" (click)="openSetBalance()">
+            Set Balance
+          </button>
+          <button mat-button (click)="dismissBalanceBanner()">
+            Maybe later
+          </button>
+        </div>
+      </section>
+    }
+
     <!-- HERO -->
     <section class="hero app-card">
       <div class="hero-top">
-        <div>
-          <div class="micro-label">Total balance</div>
+        <div class="hero-balance-wrap">
+          <div class="balance-label-row">
+            <span class="micro-label">Total balance</span>
+            <button
+              type="button"
+              class="edit-balance-btn"
+              (click)="openSetBalance()"
+              title="Set starting balance"
+            >
+              <lucide-icon name="pencil" />
+              <span>{{ openingBalance() === null ? 'Set starting balance' : 'Edit' }}</span>
+            </button>
+          </div>
           <div class="hero-amount" [class.money-negative]="balance() < 0">
             {{ balance() | signedMoney }}
           </div>
@@ -80,7 +118,7 @@ type Range = 'week' | 'month' | 'year';
           <div class="chip-icon">
             <lucide-icon name="arrow-up" />
           </div>
-          <div>
+          <div class="chip-content">
             <div class="chip-label">Income</div>
             <div class="chip-value money-positive">
               {{ monthly().received | signedMoney: 'in' }}
@@ -91,7 +129,7 @@ type Range = 'week' | 'month' | 'year';
           <div class="chip-icon">
             <lucide-icon name="arrow-down" />
           </div>
-          <div>
+          <div class="chip-content">
             <div class="chip-label">Expense</div>
             <div class="chip-value money-negative">
               {{ monthly().spent | signedMoney: 'out' }}
@@ -186,16 +224,26 @@ type Range = 'week' | 'month' | 'year';
         align-items: flex-start;
         gap: 12px;
       }
+      .hero-balance-wrap {
+        min-width: 0;
+        flex: 1;
+      }
       .hero-amount {
         margin-top: 4px;
-        font-size: 32px;
+        font-size: clamp(24px, 6.5vw, 32px);
         font-weight: 700;
         letter-spacing: -0.02em;
         color: var(--app-ink);
         font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .hero-amount.money-negative { color: var(--app-negative); }
 
+      .range-toggle {
+        flex: 0 0 auto;
+      }
       .range-toggle ::ng-deep .mat-button-toggle-label-content {
         padding: 0 10px !important;
         line-height: 28px !important;
@@ -204,6 +252,7 @@ type Range = 'week' | 'month' | 'year';
 
       .chart-wrap {
         margin-top: 16px;
+        position: relative;
       }
       .chart-empty {
         margin-top: 16px;
@@ -216,7 +265,7 @@ type Range = 'week' | 'month' | 'year';
       .chip-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 12px;
+        gap: 10px;
         margin-top: 16px;
       }
 
@@ -231,15 +280,19 @@ type Range = 'week' | 'month' | 'year';
         background: var(--app-surface);
         border-radius: var(--app-radius-lg);
         box-shadow: var(--app-shadow-md);
-        padding: 14px 16px;
+        padding: 12px 14px;
         text-decoration: none;
         color: inherit;
+        min-width: 0;
       }
       .owed-value {
         margin-top: 6px;
-        font-size: 18px;
+        font-size: clamp(15px, 4.2vw, 18px);
         font-weight: 700;
         font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       /* ---------- Section headers -------------------------------------- */
@@ -336,6 +389,71 @@ type Range = 'week' | 'month' | 'year';
       }
 
       .w-full { width: 100%; }
+
+      .starting-balance-banner {
+        margin-bottom: 16px;
+        padding: 16px;
+        background: var(--app-surface);
+        border: 1px solid var(--app-hairline);
+        border-radius: var(--app-radius-lg);
+        box-shadow: var(--app-shadow-md);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .banner-top {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .banner-badge {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: var(--app-ink-dark);
+        color: #fff;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+      }
+      .banner-badge lucide-icon { width: 18px; height: 18px; }
+      .banner-info h3 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--app-ink);
+      }
+      .banner-info p {
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: var(--app-ink-muted);
+        line-height: 1.35;
+      }
+      .banner-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+      .balance-label-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .edit-balance-btn {
+        background: none;
+        border: none;
+        padding: 0;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--app-accent);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+      }
+      .edit-balance-btn lucide-icon { width: 12px; height: 12px; }
+      .edit-balance-btn:hover { text-decoration: underline; }
     `,
   ],
 })
@@ -343,14 +461,36 @@ export class DashboardPage {
   private readonly txService = inject(TransactionsService);
   private readonly categoriesService = inject(CategoriesService);
   private readonly debtsService = inject(DebtsService);
+  private readonly bottomSheet = inject(MatBottomSheet);
 
   readonly balance = this.txService.balance;
   readonly monthly = this.txService.monthly;
+  readonly openingBalance = this.txService.openingBalance;
   readonly recent = computed(() => this.txService.transactions().slice(0, 6));
   readonly theyOweTotal = this.debtsService.theyOweYouTotal;
   readonly youOweTotal = this.debtsService.youOweTotal;
 
+  readonly bannerDismissed = signal(
+    typeof localStorage !== 'undefined' &&
+      localStorage.getItem('rupa_dismiss_balance_banner') === 'true',
+  );
+
+  readonly showBalanceBanner = computed(() => {
+    return this.openingBalance() === null && !this.bannerDismissed();
+  });
+
   readonly range = signal<Range>('month');
+
+  openSetBalance(): void {
+    this.bottomSheet.open(SetOpeningBalanceSheetComponent);
+  }
+
+  dismissBalanceBanner(): void {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('rupa_dismiss_balance_banner', 'true');
+    }
+    this.bannerDismissed.set(true);
+  }
 
   // Chart data based on range.
   readonly chart = computed<ChartPoint[]>(() => {

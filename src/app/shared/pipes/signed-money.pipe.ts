@@ -21,9 +21,9 @@ export class SignedMoneyPipe implements PipeTransform {
     if (value == null || Number.isNaN(value)) return '—';
     const abs = Math.abs(value);
     const formatted = this.formatter.format(abs);
-    if (direction === 'in') return `+ ${formatted}`;
-    if (direction === 'out') return `− ${formatted}`;
-    if (value < 0) return `− ${formatted}`;
+    if (direction === 'in') return `+\u00A0${formatted}`;
+    if (direction === 'out') return `−\u00A0${formatted}`;
+    if (value < 0) return `−\u00A0${formatted}`;
     return formatted;
   }
 }
