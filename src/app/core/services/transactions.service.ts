@@ -1,7 +1,9 @@
-import { Injectable, effect, inject, signal } from '@angular/core';
+import { Injectable, Injector, effect, inject, signal } from '@angular/core';
 import { Transaction, TxDirection } from '../models/domain.models';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
+import { DebtsService } from './debts.service';
+import { EventsService } from './events.service';
 
 export interface CreateTransactionInput {
   amount: number;
@@ -22,6 +24,7 @@ const emptyStats: MonthlyStats = { spent: 0, received: 0 };
 export class TransactionsService {
   private readonly supabase = inject(SupabaseService);
   private readonly auth = inject(AuthService);
+  private readonly injector = inject(Injector);
 
   private readonly _transactions = signal<Transaction[]>([]);
   private readonly _balance = signal<number>(0);
@@ -166,12 +169,75 @@ export class TransactionsService {
     this._transactions.update((list) => list.filter((t) => t.id !== id));
     this.applyToTotals(removed, -1);
 
-    const { error } = await this.supabase.client
-      .from('transactions')
-      .delete()
-      .eq('id', id);
+    try {
+      // Clean up debt_payments referencing this transaction if any
+      const { data: debtPayments } = await this.supabase.client
+        .from('debt_payments')
+        .select('id, debt_id, amount')
+        .eq('transaction_id', id);
 
-    if (error) {
+      if (debtPayments && debtPayments.length > 0) {
+        for (const dp of debtPayments) {
+          await this.supabase.client.from('debt_payments').delete().eq('id', dp.id);
+          // Restore debt balance
+          const { data: debt } = await this.supabase.client
+            .from('debts')
+            .select('outstanding')
+            .eq('id', dp.debt_id)
+            .maybeSingle();
+
+          if (debt) {
+            const restored = Math.round((Number(debt.outstanding) + Number(dp.amount)) * 100) / 100;
+            await this.supabase.client
+              .from('debts')
+              .update({ outstanding: restored, closed_on: null })
+              .eq('id', dp.debt_id);
+          }
+        }
+      }
+
+      // Clean up event_expenses referencing this transaction if any
+      const { data: eventExpenses } = await this.supabase.client
+        .from('event_expenses')
+        .select('id')
+        .eq('transaction_id', id);
+
+      if (eventExpenses && eventExpenses.length > 0) {
+        for (const ee of eventExpenses) {
+          await this.supabase.client.from('event_expenses').delete().eq('id', ee.id);
+        }
+      }
+
+      // Clean up event_settlements referencing this transaction if any
+      const { data: eventSettlements } = await this.supabase.client
+        .from('event_settlements')
+        .select('id')
+        .eq('transaction_id', id);
+
+      if (eventSettlements && eventSettlements.length > 0) {
+        for (const es of eventSettlements) {
+          await this.supabase.client.from('event_settlements').delete().eq('id', es.id);
+        }
+      }
+
+      // Delete transaction row
+      const { error } = await this.supabase.client
+        .from('transactions')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Refresh DebtsService & EventsService if present
+      try {
+        const debtsService = this.injector.get(DebtsService);
+        void debtsService.load();
+      } catch {}
+      try {
+        const eventsService = this.injector.get(EventsService);
+        void eventsService.loadList();
+      } catch {}
+    } catch (error) {
       console.error('Failed to delete transaction', error);
       // Revert state if backend request fails
       this._transactions.update((list) => [removed, ...list]);
