@@ -16,8 +16,9 @@ import {
 import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
 import { DebtsService } from '../../core/services/debts.service';
-import { Transaction } from '../../core/models/domain.models';
+import { CategoryKind, Transaction, isSavingsCategory } from '../../core/models/domain.models';
 import { SetOpeningBalanceSheetComponent } from './set-opening-balance-sheet.component';
+import { QuickAddSheetComponent } from '../transactions/quick-add-sheet.component';
 
 interface CategorySpend {
   id: string;
@@ -71,7 +72,7 @@ type Range = 'week' | 'month' | 'year';
       <div class="hero-top">
         <div class="hero-balance-wrap">
           <div class="balance-label-row">
-            <span class="micro-label">Total balance</span>
+            <span class="micro-label">Liquid Cash Balance</span>
             <button
               type="button"
               class="edit-balance-btn"
@@ -121,7 +122,7 @@ type Range = 'week' | 'month' | 'year';
           <div class="chip-content">
             <div class="chip-label">Income</div>
             <div class="chip-value money-positive">
-              {{ monthly().received | signedMoney: 'in' }}
+              {{ periodStats().received | signedMoney: 'in' }}
             </div>
           </div>
         </div>
@@ -132,8 +133,30 @@ type Range = 'week' | 'month' | 'year';
           <div class="chip-content">
             <div class="chip-label">Expense</div>
             <div class="chip-value money-negative">
-              {{ monthly().spent | signedMoney: 'out' }}
+              {{ periodStats().spent | signedMoney: 'out' }}
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- UNIFIED SAVINGS CARD -->
+    <section class="savings-card app-card">
+      <div class="savings-card-left">
+        <div class="savings-badge">
+          <lucide-icon name="piggy-bank" />
+        </div>
+        <div class="savings-info">
+          <div class="micro-label">Total Savings</div>
+          <div class="savings-amount money-savings">
+            {{ totalSavings() | signedMoney }}
+          </div>
+          <div class="savings-sub font-medium">
+            @if (periodStats().saved > 0) {
+              <span class="money-savings">+{{ periodStats().saved | signedMoney }}</span> saved this period
+            } @else {
+              <span>No savings added this period</span>
+            }
           </div>
         </div>
       </div>
@@ -181,7 +204,7 @@ type Range = 'week' | 'month' | 'year';
     </div>
 
     @if (recent().length > 0) {
-      <ul class="tx-list app-card-tight">
+      <ul class="tx-list">
         @for (t of recent(); track t.id; let last = $last) {
           <li class="tx-row" [class.last]="last">
             <div class="tx-icon" [style.background]="tileColor(txLabel(t))">
@@ -191,21 +214,22 @@ type Range = 'week' | 'month' | 'year';
               <div class="tx-title">{{ txLabel(t) }}</div>
               <div class="tx-sub">
                 {{ t.occurred_on | date: 'MMM d' }}
-                @if (t.notes) { Â· {{ t.notes }} }
+                @if (t.notes) { · {{ t.notes }} }
               </div>
             </div>
             <div
               class="tx-amount"
-              [class.money-negative]="t.direction === 'out'"
-              [class.money-positive]="t.direction === 'in'"
+              [class.money-negative]="t.direction === 'out' && !isSavingsTx(t)"
+              [class.money-savings]="isSavingsTx(t)"
+              [class.money-positive]="t.direction === 'in' && !isSavingsTx(t)"
             >
-              {{ t.amount | signedMoney: t.direction }}
+              {{ t.amount | signedMoney: (isSavingsTx(t) ? 'out' : t.direction) }}
             </div>
           </li>
         }
       </ul>
     } @else {
-      <button class="dashed-tile w-full">
+      <button class="dashed-tile w-full" (click)="openQuickAdd()">
         <lucide-icon name="plus" />
         Add your first transaction
       </button>
@@ -265,9 +289,68 @@ type Range = 'week' | 'month' | 'year';
       .chip-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 10px;
+        gap: 12px;
         margin-top: 16px;
       }
+
+      /* ---------- Savings card ----------------------------------------- */
+      .savings-card {
+        margin-top: 16px;
+        padding: 16px 20px;
+      }
+      .savings-card-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .savings-card-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+        flex: 1;
+      }
+      .savings-badge {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        background: var(--app-savings-soft);
+        color: var(--app-savings);
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+      }
+      .savings-badge lucide-icon { width: 22px; height: 22px; }
+      .savings-info { min-width: 0; }
+      .savings-amount {
+        font-size: clamp(20px, 5.5vw, 24px);
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.25;
+        margin-top: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .savings-sub {
+        font-size: 12px;
+        color: var(--app-ink-muted);
+        margin-top: 3px;
+      }
+      .move-savings-btn {
+        background: var(--app-ink-dark) !important;
+        color: #fff !important;
+        border-radius: var(--app-radius-md) !important;
+        font-weight: 600 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        padding: 0 16px !important;
+        height: 40px !important;
+      }
+      .move-savings-btn lucide-icon { width: 16px; height: 16px; }
 
       /* ---------- Owed row --------------------------------------------- */
       .owed-row {
@@ -361,6 +444,9 @@ type Range = 'week' | 'month' | 'year';
         list-style: none;
         margin: 0;
         padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
       }
       .tx-row {
         display: grid;
@@ -368,7 +454,10 @@ type Range = 'week' | 'month' | 'year';
         gap: 12px;
         align-items: center;
         padding: 12px 16px;
-        border-bottom: 1px solid var(--app-hairline);
+        background: var(--app-surface);
+        border-radius: var(--app-radius-md);
+        border: 1px solid var(--app-hairline);
+        box-shadow: var(--app-shadow-sm);
       }
       .tx-row.last { border-bottom: 0; }
       .tx-icon {
@@ -466,6 +555,7 @@ export class DashboardPage {
   readonly balance = this.txService.balance;
   readonly monthly = this.txService.monthly;
   readonly openingBalance = this.txService.openingBalance;
+  readonly totalSavings = this.txService.totalSavings;
   readonly recent = computed(() => this.txService.transactions().slice(0, 6));
   readonly theyOweTotal = this.debtsService.theyOweYouTotal;
   readonly youOweTotal = this.debtsService.youOweTotal;
@@ -481,8 +571,86 @@ export class DashboardPage {
 
   readonly range = signal<Range>('month');
 
+  readonly periodStats = computed(() => {
+    const txs = this.txService.transactions();
+    const categories = this.categoriesService.categories();
+    const range = this.range();
+    const now = new Date();
+
+    let startDate: Date;
+    if (range === 'week') {
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+    } else if (range === 'month') {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else {
+      startDate = new Date(now.getFullYear(), 0, 1);
+    }
+
+    let spent = 0;
+    let received = 0;
+    let saved = 0;
+
+    for (const t of txs) {
+      if (!t.occurred_on) continue;
+      const [ty, tm, td] = t.occurred_on.split('-').map(Number);
+      const txDate = new Date(ty, tm - 1, td);
+
+      if (txDate < startDate) continue;
+
+      const amt = Number(t.amount);
+      const cat = t.category_id ? categories.find((c) => c.id === t.category_id) : null;
+      const isSavings = isSavingsCategory(cat);
+
+      if (isSavings) {
+        if (t.direction === 'out') saved += amt;
+        else if (t.direction === 'in') saved -= amt;
+      } else if (t.direction === 'out') {
+        spent += amt;
+      } else if (t.direction === 'in') {
+        received += amt;
+      }
+    }
+
+    // Fallback: if 'month' is selected and current month has 0 transactions, show last 30 days
+    if (range === 'month' && spent === 0 && received === 0 && saved === 0 && txs.length > 0) {
+      const past30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+      for (const t of txs) {
+        if (!t.occurred_on) continue;
+        const [ty, tm, td] = t.occurred_on.split('-').map(Number);
+        const txDate = new Date(ty, tm - 1, td);
+        if (txDate < past30) continue;
+
+        const amt = Number(t.amount);
+        const cat = t.category_id ? categories.find((c) => c.id === t.category_id) : null;
+        const isSavings = isSavingsCategory(cat);
+
+        if (isSavings) {
+          if (t.direction === 'out') saved += amt;
+          else if (t.direction === 'in') saved -= amt;
+        } else if (t.direction === 'out') {
+          spent += amt;
+        } else if (t.direction === 'in') {
+          received += amt;
+        }
+      }
+    }
+
+    return { spent, received, saved };
+  });
+
   openSetBalance(): void {
     this.bottomSheet.open(SetOpeningBalanceSheetComponent);
+  }
+
+  openQuickAdd(): void {
+    this.bottomSheet.open(QuickAddSheetComponent, { panelClass: 'quick-add-sheet' });
+  }
+
+  openMoveToSavings(): void {
+    this.bottomSheet.open(QuickAddSheetComponent, {
+      data: { defaultKind: 'savings' },
+      panelClass: 'quick-add-sheet',
+    });
   }
 
   dismissBalanceBanner(): void {
@@ -534,6 +702,8 @@ export class DashboardPage {
     const totals = new Map<string, number>();
     for (const t of txs) {
       if (t.direction !== 'out' || !t.category_id) continue;
+      const cat = cats.find((c) => c.id === t.category_id);
+      if (cat?.kind === 'savings') continue; // Exclude savings from spending top tiles
       const [ty, tm] = t.occurred_on.split('-').map(Number);
       if (ty !== y || tm !== m) continue;
       totals.set(t.category_id, (totals.get(t.category_id) ?? 0) + Number(t.amount));
@@ -548,9 +718,15 @@ export class DashboardPage {
       .slice(0, 8);
   });
 
+  isSavingsTx(t: Transaction): boolean {
+    const cat = this.categoriesService.categories().find((c) => c.id === t.category_id);
+    return isSavingsCategory(cat);
+  }
+
   txLabel(t: Transaction): string {
-    return this.categoriesService.categories().find((c) => c.id === t.category_id)?.name
-      ?? (t.direction === 'in' ? 'Income' : 'Expense');
+    const cat = this.categoriesService.categories().find((c) => c.id === t.category_id);
+    if (cat) return cat.name;
+    return t.direction === 'in' ? 'Income' : 'Expense';
   }
 
   iconFor(name: string): string {
@@ -559,7 +735,7 @@ export class DashboardPage {
     if (key.includes('fuel') || key.includes('petrol') || key.includes('transport')) return 'fuel';
     if (key.includes('rent') || key.includes('home')) return 'home';
     if (key.includes('salary')) return 'briefcase';
-    if (key.includes('pf') || key.includes('invest')) return 'piggy-bank';
+    if (key.includes('pf') || key.includes('invest') || key.includes('savin') || key.includes('fund') || key.includes('gold')) return 'piggy-bank';
     if (key.includes('bill') || key.includes('util')) return 'receipt';
     if (key.includes('shop')) return 'shopping-bag';
     if (key.includes('travel') || key.includes('trip')) return 'plane';
@@ -582,6 +758,10 @@ export class DashboardPage {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const catsMap = new Map(
+      this.categoriesService.categories().map((c) => [c.id, c.kind]),
+    );
+
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
@@ -593,6 +773,7 @@ export class DashboardPage {
 
     for (const t of txs) {
       if (t.direction !== 'out') continue;
+      if (t.category_id && catsMap.get(t.category_id) === 'savings') continue;
       const [ty, tm, td] = t.occurred_on.split('-').map(Number);
       const d = new Date(ty, tm - 1, td);
       const diff = Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
@@ -606,6 +787,11 @@ export class DashboardPage {
   private bucketMonthly(txs: Transaction[], months: number): ChartPoint[] {
     const buckets: ChartPoint[] = [];
     const today = new Date();
+
+    const catsMap = new Map(
+      this.categoriesService.categories().map((c) => [c.id, c.kind]),
+    );
+
     for (let i = months - 1; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
       buckets.push({
@@ -617,6 +803,7 @@ export class DashboardPage {
     const startM = today.getMonth() - (months - 1);
     for (const t of txs) {
       if (t.direction !== 'out') continue;
+      if (t.category_id && catsMap.get(t.category_id) === 'savings') continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);
       const idx = (ty - startY) * 12 + (tm - 1 - startM);
       if (idx < 0 || idx >= months) continue;
@@ -627,7 +814,6 @@ export class DashboardPage {
 
   private dayLabel(d: Date, span: number): string {
     if (span <= 7) return d.toLocaleString('en-US', { weekday: 'short' }).slice(0, 1);
-    // 30 days: only show every ~5th day label so they don't overlap
     return d.getDate() % 5 === 0 || d.getDate() === 1 ? String(d.getDate()) : '';
   }
 }

@@ -58,7 +58,7 @@ import { PayDebtDialogComponent } from './pay-debt-dialog.component';
           </span>
         </div>
         @if (theyOwe().length > 0) {
-          <ul class="list app-card-tight">
+          <ul class="list">
             @for (d of theyOwe(); track d.id; let last = $last) {
               <li class="row" [class.last]="last">
                 <div class="avatar" [style.background]="avatarColor(nameFor(d))">
@@ -101,7 +101,7 @@ import { PayDebtDialogComponent } from './pay-debt-dialog.component';
           </span>
         </div>
         @if (youOwe().length > 0) {
-          <ul class="list app-card-tight">
+          <ul class="list">
             @for (d of youOwe(); track d.id; let last = $last) {
               <li class="row" [class.last]="last">
                 <div class="avatar" [style.background]="avatarColor(nameFor(d))">
@@ -158,14 +158,24 @@ import { PayDebtDialogComponent } from './pay-debt-dialog.component';
         font-weight: 700;
         font-variant-numeric: tabular-nums;
       }
-      .list { list-style: none; margin: 0; padding: 0; }
+      .list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
       .row {
         display: grid;
         grid-template-columns: 40px 1fr auto auto;
         gap: 12px;
         align-items: center;
         padding: 12px 6px 12px 16px;
-        border-bottom: 1px solid var(--app-hairline);
+        background: var(--app-surface);
+        border-radius: var(--app-radius-md);
+        border: 1px solid var(--app-hairline);
+        box-shadow: var(--app-shadow-sm);
       }
       .row.last { border-bottom: 0; }
       .avatar {

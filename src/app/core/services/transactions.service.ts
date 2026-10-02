@@ -1,7 +1,8 @@
-import { Injectable, Injector, effect, inject, signal } from '@angular/core';
-import { Transaction, TxDirection } from '../models/domain.models';
+import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
+import { Transaction, TxDirection, isSavingsCategory } from '../models/domain.models';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
+import { CategoriesService } from './categories.service';
 import { DebtsService } from './debts.service';
 import { EventsService } from './events.service';
 
@@ -16,27 +17,75 @@ export interface CreateTransactionInput {
 export interface MonthlyStats {
   spent: number;
   received: number;
+  saved: number;
 }
 
-const emptyStats: MonthlyStats = { spent: 0, received: 0 };
+const emptyStats: MonthlyStats = { spent: 0, received: 0, saved: 0 };
 
 @Injectable({ providedIn: 'root' })
 export class TransactionsService {
   private readonly supabase = inject(SupabaseService);
   private readonly auth = inject(AuthService);
+  private readonly categoriesService = inject(CategoriesService);
   private readonly injector = inject(Injector);
 
   private readonly _transactions = signal<Transaction[]>([]);
   private readonly _balance = signal<number>(0);
-  private readonly _monthly = signal<MonthlyStats>(emptyStats);
   private readonly _openingBalance = signal<number | null>(null);
   private readonly _isLoading = signal(false);
 
   readonly transactions = this._transactions.asReadonly();
   readonly balance = this._balance.asReadonly();
-  readonly monthly = this._monthly.asReadonly();
   readonly openingBalance = this._openingBalance.asReadonly();
   readonly isLoading = this._isLoading.asReadonly();
+
+  readonly monthly = computed<MonthlyStats>(() => {
+    const txs = this._transactions();
+    const categories = this.categoriesService.categories();
+
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth() + 1;
+
+    let spent = 0;
+    let received = 0;
+    let saved = 0;
+
+    for (const t of txs) {
+      if (!t.occurred_on) continue;
+      const [ty, tm] = t.occurred_on.split('-').map(Number);
+      if (ty !== y || tm !== m) continue;
+
+      const amt = Number(t.amount);
+      const cat = t.category_id ? categories.find((c) => c.id === t.category_id) : null;
+      const isSavings = isSavingsCategory(cat);
+
+      if (isSavings) {
+        if (t.direction === 'out') saved += amt;
+        else if (t.direction === 'in') saved -= amt;
+      } else if (t.direction === 'out') {
+        spent += amt;
+      } else if (t.direction === 'in') {
+        received += amt;
+      }
+    }
+
+    return { spent, received, saved };
+  });
+
+  readonly totalSavings = computed<number>(() => {
+    const txs = this._transactions();
+    const categories = this.categoriesService.categories();
+    let total = 0;
+    for (const t of txs) {
+      const cat = t.category_id ? categories.find((c) => c.id === t.category_id) : null;
+      if (isSavingsCategory(cat)) {
+        if (t.direction === 'out') total += Number(t.amount);
+        else if (t.direction === 'in') total -= Number(t.amount);
+      }
+    }
+    return total;
+  });
 
   constructor() {
     effect(() => {
@@ -45,7 +94,6 @@ export class TransactionsService {
       } else {
         this._transactions.set([]);
         this._balance.set(0);
-        this._monthly.set(emptyStats);
         this._openingBalance.set(null);
       }
     });
@@ -57,7 +105,6 @@ export class TransactionsService {
     if (!this.auth.isAuthenticated()) {
       this._transactions.set([]);
       this._balance.set(0);
-      this._monthly.set(emptyStats);
       this._openingBalance.set(null);
       return;
     }
@@ -69,7 +116,6 @@ export class TransactionsService {
         await Promise.all([
           this.loadTransactions(),
           this.loadBalance(),
-          this.loadMonthly(),
           this.loadOpeningBalance(),
         ]);
       } finally {
@@ -105,28 +151,6 @@ export class TransactionsService {
       return;
     }
     this._balance.set(Number(data?.balance ?? 0));
-  }
-
-  async loadMonthly(): Promise<void> {
-    const { start, end } = monthBounds(new Date());
-    const { data, error } = await this.supabase.client
-      .from('transactions')
-      .select('amount, direction')
-      .gte('occurred_on', start)
-      .lt('occurred_on', end);
-    if (error) {
-      console.error('Failed to load monthly stats', error);
-      return;
-    }
-
-    let spent = 0;
-    let received = 0;
-    for (const row of data ?? []) {
-      const amt = Number(row.amount);
-      if (row.direction === 'out') spent += amt;
-      else if (row.direction === 'in') received += amt;
-    }
-    this._monthly.set({ spent, received });
   }
 
   async create(input: CreateTransactionInput): Promise<Transaction> {
@@ -318,14 +342,6 @@ export class TransactionsService {
   private applyToTotals(tx: Transaction, sign: 1 | -1): void {
     const amt = Number(tx.amount) * sign;
     this._balance.update((b) => (tx.direction === 'in' ? b + amt : b - amt));
-
-    if (isInCurrentMonth(tx.occurred_on)) {
-      this._monthly.update((m) =>
-        tx.direction === 'in'
-          ? { ...m, received: m.received + amt }
-          : { ...m, spent: m.spent + amt },
-      );
-    }
   }
 }
 

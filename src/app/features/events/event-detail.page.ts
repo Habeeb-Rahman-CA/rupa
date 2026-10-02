@@ -10,10 +10,11 @@ import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
-import { EventsService, ParticipantWithMeta } from '../../core/services/events.service';
+import { ExpenseWithParticipants, EventsService, ParticipantWithMeta } from '../../core/services/events.service';
 import { PeopleService } from '../../core/services/people.service';
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
 import { openConfirm } from '../../shared/components/confirm-dialog.component';
+import { SwipeableRowComponent } from '../../shared/components/swipeable-row.component';
 import {
   SelectFieldComponent,
   SelectOption,
@@ -32,6 +33,7 @@ import { AddEventExpenseSheetComponent } from './add-event-expense-sheet.compone
     LucideAngularModule,
     SignedMoneyPipe,
     SelectFieldComponent,
+    SwipeableRowComponent,
   ],
   template: `
     @let d = detail();
@@ -110,7 +112,7 @@ import { AddEventExpenseSheetComponent } from './add-event-expense-sheet.compone
         }
       </div>
 
-      <ul class="list app-card-tight">
+      <ul class="list">
         @for (p of d.participants; track p.id; let last = $last) {
           <li class="row" [class.last]="last">
             <div class="avatar" [style.background]="avatarColor(p.name)">
@@ -177,33 +179,26 @@ import { AddEventExpenseSheetComponent } from './add-event-expense-sheet.compone
           No expenses on this split yet. Tap <strong>+</strong> to add one.
         </div>
       } @else {
-        <ul class="list app-card-tight">
-          @for (e of d.expenses; track e.id; let last = $last) {
-            <li class="row" [class.last]="last">
-              <div class="e-icon" [style.background]="avatarColor(e.description)">
-                <lucide-icon name="receipt" />
-              </div>
-              <div class="mid">
-                <div class="title">{{ e.description }}</div>
-                <div class="sub">
-                  {{ e.paidOn | date: 'MMM d' }} ·
-                  {{ e.participantIds.length }} people ·
-                  {{ e.perHead | signedMoney }} each
+        <ul class="list">
+          @for (e of d.expenses; track e.id) {
+            <app-swipeable-row (delete)="confirmDeleteExpense(e)">
+              <div class="row">
+                <div class="e-icon" [style.background]="avatarColor(e.description)">
+                  <lucide-icon name="receipt" />
+                </div>
+                <div class="mid">
+                  <div class="title">{{ e.description }}</div>
+                  <div class="sub">
+                    {{ e.paidOn | date: 'MMM d' }} ·
+                    {{ e.participantIds.length }} people ·
+                    {{ e.perHead | signedMoney }} each
+                  </div>
+                </div>
+                <div class="amount money-negative">
+                  {{ e.amount | signedMoney: 'out' }}
                 </div>
               </div>
-              <div class="amount money-negative">
-                {{ e.amount | signedMoney: 'out' }}
-              </div>
-              <button mat-icon-button [matMenuTriggerFor]="eMenu">
-                <lucide-icon name="more-vertical" />
-              </button>
-              <mat-menu #eMenu="matMenu">
-                <button mat-menu-item (click)="removeExpense(e.id)">
-                  <lucide-icon name="trash-2" />
-                  <span>Delete</span>
-                </button>
-              </mat-menu>
-            </li>
+            </app-swipeable-row>
           }
         </ul>
       }
@@ -298,16 +293,25 @@ import { AddEventExpenseSheetComponent } from './add-event-expense-sheet.compone
         width: 140px;
       }
 
-      .list { list-style: none; margin: 0; padding: 0; }
+      .list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
       .row {
         display: grid;
         grid-template-columns: 40px 1fr auto auto;
         gap: 12px;
         align-items: center;
-        padding: 12px 6px 12px 16px;
-        border-bottom: 1px solid var(--app-hairline);
+        padding: 12px 16px;
+        background: var(--app-surface);
+        border-radius: var(--app-radius-md);
+        border: 1px solid var(--app-hairline);
+        box-shadow: var(--app-shadow-sm);
       }
-      .row.last { border-bottom: 0; }
       .avatar {
         width: 40px;
         height: 40px;
@@ -416,6 +420,19 @@ export class EventDetailPage {
       await this.eventsService.unsettleParticipant(p.id);
     } catch (e: unknown) {
       this.snack.open(errText(e, 'Could not undo'), 'Dismiss', { duration: 4000 });
+    }
+  }
+
+  async confirmDeleteExpense(e: ExpenseWithParticipants): Promise<void> {
+    const ok = await openConfirm(this.dialog, {
+      title: `Delete "${e.description}"?`,
+      message: 'Are you sure you want to delete this split expense?',
+      confirmLabel: 'Delete',
+      destructive: true,
+      icon: 'trash-2',
+    });
+    if (ok) {
+      await this.removeExpense(e.id);
     }
   }
 

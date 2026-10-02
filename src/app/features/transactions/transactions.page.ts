@@ -2,16 +2,18 @@ import { Component, computed, inject } from '@angular/core';
 import { DatePipe } from '@angular/common';
 
 import { MatButtonModule } from '@angular/material/button';
-import { MatMenuModule } from '@angular/material/menu';
-import { LucideAngularModule } from 'lucide-angular';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { LucideAngularModule } from 'lucide-angular';
 
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { SwipeableRowComponent } from '../../shared/components/swipeable-row.component';
+import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
 import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
-import { Transaction } from '../../core/models/domain.models';
+import { Transaction, isSavingsCategory } from '../../core/models/domain.models';
 
 interface DayGroup {
   date: string;
@@ -25,10 +27,10 @@ interface DayGroup {
   imports: [
     DatePipe,
     MatButtonModule,
-    MatMenuModule,
     LucideAngularModule,
     PageHeaderComponent,
     EmptyStateComponent,
+    SwipeableRowComponent,
     SignedMoneyPipe,
   ],
   template: `
@@ -57,39 +59,29 @@ interface DayGroup {
             </span>
           </div>
 
-          <ul class="tx-list app-card-tight">
-            @for (t of g.items; track t.id; let last = $last) {
-              <li class="tx-row" [class.last]="last">
-                <div class="tx-icon" [style.background]="tileColor(labelFor(t))">
-                  <lucide-icon [name]="iconFor(labelFor(t))" />
+          <ul class="tx-list">
+            @for (t of g.items; track t.id) {
+              <app-swipeable-row (delete)="confirmRemove(t)">
+                <div class="tx-row">
+                  <div class="tx-icon" [style.background]="tileColor(t)">
+                    <lucide-icon [name]="iconFor(t)" />
+                  </div>
+                  <div class="tx-mid">
+                    <div class="tx-title">{{ labelFor(t) }}</div>
+                    @if (t.notes) {
+                      <div class="tx-sub">{{ t.notes }}</div>
+                    }
+                  </div>
+                  <div
+                    class="tx-amount"
+                    [class.money-negative]="t.direction === 'out' && !isSavingsTx(t)"
+                    [class.money-savings]="isSavingsTx(t)"
+                    [class.money-positive]="t.direction === 'in' && !isSavingsTx(t)"
+                  >
+                    {{ t.amount | signedMoney: (isSavingsTx(t) ? 'out' : t.direction) }}
+                  </div>
                 </div>
-                <div class="tx-mid">
-                  <div class="tx-title">{{ labelFor(t) }}</div>
-                  @if (t.notes) {
-                    <div class="tx-sub">{{ t.notes }}</div>
-                  }
-                </div>
-                <div
-                  class="tx-amount"
-                  [class.money-negative]="t.direction === 'out'"
-                  [class.money-positive]="t.direction === 'in'"
-                >
-                  {{ t.amount | signedMoney: t.direction }}
-                </div>
-                <button
-                  mat-icon-button
-                  [matMenuTriggerFor]="rowMenu"
-                  aria-label="Row actions"
-                >
-                  <lucide-icon name="more-vertical" />
-                </button>
-                <mat-menu #rowMenu="matMenu">
-                  <button mat-menu-item (click)="remove(t)">
-                    <lucide-icon name="trash-2" />
-                    <span>Delete</span>
-                  </button>
-                </mat-menu>
-              </li>
+              </app-swipeable-row>
             }
           </ul>
         </section>
@@ -121,16 +113,20 @@ interface DayGroup {
         list-style: none;
         margin: 0;
         padding: 0;
+        display: flex;
+        flex-direction: column;
       }
       .tx-row {
         display: grid;
-        grid-template-columns: 40px 1fr auto auto;
+        grid-template-columns: 40px 1fr auto;
         gap: 12px;
         align-items: center;
-        padding: 12px 6px 12px 16px;
-        border-bottom: 1px solid var(--app-hairline);
+        padding: 12px 16px;
+        background: var(--app-surface);
+        border-radius: var(--app-radius-md);
+        border: 1px solid var(--app-hairline);
+        box-shadow: var(--app-shadow-sm);
       }
-      .tx-row.last { border-bottom: 0; }
       .tx-icon {
         width: 40px;
         height: 40px;
@@ -156,6 +152,7 @@ interface DayGroup {
 export class TransactionsPage {
   private readonly service = inject(TransactionsService);
   private readonly categoriesService = inject(CategoriesService);
+  private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
 
   readonly groups = computed<DayGroup[]>(() => {
@@ -175,6 +172,11 @@ export class TransactionsPage {
     return Array.from(map.values());
   });
 
+  isSavingsTx(t: Transaction): boolean {
+    const cat = this.categoriesService.categories().find((c) => c.id === t.category_id);
+    return isSavingsCategory(cat);
+  }
+
   labelFor(t: Transaction): string {
     return (
       this.categoriesService.categories().find((c) => c.id === t.category_id)?.name ??
@@ -182,13 +184,15 @@ export class TransactionsPage {
     );
   }
 
-  iconFor(name: string): string {
+  iconFor(t: Transaction | string): string {
+    const name = typeof t === 'string' ? t : this.labelFor(t);
+    if (typeof t !== 'string' && this.isSavingsTx(t)) return 'piggy-bank';
     const key = name.toLowerCase();
     if (key.includes('food') || key.includes('groc')) return 'utensils-crossed';
     if (key.includes('fuel') || key.includes('petrol') || key.includes('transport')) return 'fuel';
     if (key.includes('rent') || key.includes('home')) return 'home';
     if (key.includes('salary')) return 'briefcase';
-    if (key.includes('pf') || key.includes('invest')) return 'piggy-bank';
+    if (key.includes('pf') || key.includes('invest') || key.includes('savin') || key.includes('fund') || key.includes('gold') || key.includes('fd') || key.includes('sip')) return 'piggy-bank';
     if (key.includes('bill') || key.includes('util')) return 'receipt';
     if (key.includes('shop')) return 'shopping-bag';
     if (key.includes('travel') || key.includes('trip')) return 'plane';
@@ -197,11 +201,26 @@ export class TransactionsPage {
     return 'wallet';
   }
 
-  tileColor(name: string): string {
+  tileColor(t: Transaction | string): string {
+    if (typeof t !== 'string' && this.isSavingsTx(t)) return '#0ea5e9';
+    const name = typeof t === 'string' ? t : this.labelFor(t);
     let hash = 0;
     for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0xffffffff;
     const palette = ['#ef4444','#f97316','#f59e0b','#22c55e','#10b981','#14b8a6','#0ea5e9','#ec4899','#475569'];
     return palette[Math.abs(hash) % palette.length];
+  }
+
+  async confirmRemove(t: Transaction): Promise<void> {
+    const ok = await openConfirm(this.dialog, {
+      title: 'Delete transaction?',
+      message: `Are you sure you want to delete ${this.labelFor(t)} entry of ₹${t.amount}?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      icon: 'trash-2',
+    });
+    if (ok) {
+      await this.remove(t);
+    }
   }
 
   async remove(t: Transaction): Promise<void> {

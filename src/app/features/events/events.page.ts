@@ -44,7 +44,7 @@ import { CreateEventSheetComponent } from './create-event-sheet.component';
         message="Kick one off when you cover a group expense."
       />
     } @else {
-      <ul class="list app-card-tight">
+      <ul class="list">
         @for (e of events(); track e.id; let last = $last) {
           <li [class.last]="last">
             <a class="row" [routerLink]="['/events', e.id]">
@@ -70,15 +70,25 @@ import { CreateEventSheetComponent } from './create-event-sheet.component';
   `,
   styles: [
     `
-      .list { list-style: none; margin: 0; padding: 0; }
-      .list li { border-bottom: 1px solid var(--app-hairline); }
-      .list li.last { border-bottom: 0; }
+      .list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .list li { border-bottom: 0; }
       .row {
         display: grid;
         grid-template-columns: 40px 1fr auto auto;
         gap: 12px;
         align-items: center;
-        padding: 12px 12px 12px 16px;
+        padding: 12px 16px;
+        background: var(--app-surface);
+        border-radius: var(--app-radius-md);
+        border: 1px solid var(--app-hairline);
+        box-shadow: var(--app-shadow-sm);
         text-decoration: none;
         color: inherit;
       }

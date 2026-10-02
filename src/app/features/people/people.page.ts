@@ -1,25 +1,28 @@
 import { Component, inject, signal } from '@angular/core';
 
 import { MatButtonModule } from '@angular/material/button';
-import { MatMenuModule } from '@angular/material/menu';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
+import { SwipeableRowComponent } from '../../shared/components/swipeable-row.component';
+import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { PeopleService } from '../../core/services/people.service';
+import { Person } from '../../core/models/domain.models';
 
 @Component({
   selector: 'app-people-page',
   standalone: true,
   imports: [
     MatButtonModule,
-    MatMenuModule,
     LucideAngularModule,
     PageHeaderComponent,
     EmptyStateComponent,
     TextFieldComponent,
+    SwipeableRowComponent,
   ],
   template: `
     <app-page-header
@@ -57,25 +60,18 @@ import { PeopleService } from '../../core/services/people.service';
         message="Add someone before you record a loan or start a split."
       />
     } @else {
-      <ul class="list app-card-tight">
-        @for (p of people(); track p.id; let last = $last) {
-          <li class="row" [class.last]="last">
-            <div class="avatar" [style.background]="avatarColor(p.name)">
-              {{ initial(p.name) }}
+      <ul class="list">
+        @for (p of people(); track p.id) {
+          <app-swipeable-row (delete)="confirmRemove(p)">
+            <div class="row">
+              <div class="avatar" [style.background]="avatarColor(p.name)">
+                {{ initial(p.name) }}
+              </div>
+              <div class="mid">
+                <div class="title">{{ p.name }}</div>
+              </div>
             </div>
-            <div class="mid">
-              <div class="title">{{ p.name }}</div>
-            </div>
-            <button mat-icon-button [matMenuTriggerFor]="menu">
-              <lucide-icon name="more-vertical" />
-            </button>
-            <mat-menu #menu="matMenu">
-              <button mat-menu-item (click)="remove(p.id)">
-                <lucide-icon name="trash-2" />
-                <span>Delete</span>
-              </button>
-            </mat-menu>
-          </li>
+          </app-swipeable-row>
         }
       </ul>
     }
@@ -92,16 +88,25 @@ import { PeopleService } from '../../core/services/people.service';
         align-items: flex-end;
       }
       .name { flex: 1; min-width: 0; }
-      .list { list-style: none; margin: 0; padding: 0; }
+      .list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
       .row {
         display: grid;
-        grid-template-columns: 40px 1fr auto;
+        grid-template-columns: 40px 1fr;
         gap: 12px;
         align-items: center;
-        padding: 10px 6px 10px 16px;
-        border-bottom: 1px solid var(--app-hairline);
+        padding: 10px 16px;
+        background: var(--app-surface);
+        border-radius: var(--app-radius-md);
+        border: 1px solid var(--app-hairline);
+        box-shadow: var(--app-shadow-sm);
       }
-      .row.last { border-bottom: 0; }
       .avatar {
         width: 40px;
         height: 40px;
@@ -118,6 +123,7 @@ import { PeopleService } from '../../core/services/people.service';
 })
 export class PeoplePage {
   private readonly service = inject(PeopleService);
+  private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
 
   readonly people = this.service.people;
@@ -135,6 +141,19 @@ export class PeoplePage {
       this.snack.open(errText(e, 'Couldn’t add — please try again.'), 'Dismiss', { duration: 4000 });
     } finally {
       this.submitting.set(false);
+    }
+  }
+
+  async confirmRemove(p: Person): Promise<void> {
+    const ok = await openConfirm(this.dialog, {
+      title: `Delete "${p.name}"?`,
+      message: 'Are you sure you want to remove this person?',
+      confirmLabel: 'Delete',
+      destructive: true,
+      icon: 'trash-2',
+    });
+    if (ok) {
+      await this.remove(p.id);
     }
   }
 

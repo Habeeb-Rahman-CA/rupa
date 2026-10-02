@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 
@@ -15,7 +15,7 @@ import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
 import { DebtsService } from '../../core/services/debts.service';
 import { EventsService } from '../../core/services/events.service';
-import { Transaction } from '../../core/models/domain.models';
+import { Transaction, isSavingsCategory } from '../../core/models/domain.models';
 
 interface CategoryRow {
   id: string;
@@ -88,7 +88,14 @@ interface DayRow {
         </div>
         <div class="v-divider"></div>
         <div class="stat">
-          <div class="micro-label">Net</div>
+          <div class="micro-label">Saved</div>
+          <div class="stat-value money-savings">
+            {{ monthly().saved | signedMoney }}
+          </div>
+        </div>
+        <div class="v-divider"></div>
+        <div class="stat">
+          <div class="micro-label">Net Cash</div>
           <div
             class="stat-value"
             [class.money-positive]="monthly().net >= 0"
@@ -101,13 +108,13 @@ interface DayRow {
 
       @if (savingsRate() !== null) {
         <div class="savings-row">
-          <span class="micro-label">Savings rate</span>
+          <span class="micro-label">Monthly Savings Rate</span>
           <span
             class="savings-value"
-            [class.money-positive]="savingsRate()! >= 0"
+            [class.money-savings]="savingsRate()! >= 0"
             [class.money-negative]="savingsRate()! < 0"
           >
-            {{ savingsRate() }}%
+            {{ savingsRate() }}% of income saved
           </span>
         </div>
       }
@@ -131,9 +138,44 @@ interface DayRow {
       }
     </section>
 
-    <!-- Category breakdown -->
+    <!-- Savings breakdown -->
+    @if (savingsCategoryRows().length > 0) {
+      <div class="section-head">
+        <h2>Savings Breakdown</h2>
+        <span class="section-hint">{{ monthDate() | date: 'MMM y' }}</span>
+      </div>
+      <section class="cat-card app-card-tight">
+        <ul class="cat-list">
+          @for (c of savingsCategoryRows(); track c.id; let last = $last) {
+            <li class="cat-row" [class.last]="last">
+              <div class="cat-icon" [style.background]="c.color">
+                <lucide-icon [name]="c.icon" />
+              </div>
+              <div class="cat-body">
+                <div class="cat-head-row">
+                  <span class="cat-name">{{ c.name }}</span>
+                  <span class="cat-amount money-savings">
+                    {{ c.amount | signedMoney }}
+                  </span>
+                </div>
+                <div class="cat-bar-wrap">
+                  <div
+                    class="cat-bar"
+                    [style.width.%]="c.percent"
+                    [style.background]="c.color"
+                  ></div>
+                </div>
+                <div class="cat-pct">{{ c.percent }}% of total monthly savings</div>
+              </div>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
+    <!-- Expense Category breakdown -->
     <div class="section-head">
-      <h2>By category</h2>
+      <h2>Expenses by category</h2>
       <span class="section-hint">{{ monthDate() | date: 'MMM y' }}</span>
     </div>
     @if (categoryRows().length > 0) {
@@ -260,14 +302,14 @@ interface DayRow {
       }
       .stats {
         display: grid;
-        grid-template-columns: 1fr auto 1fr auto 1fr;
+        grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
         align-items: center;
-        gap: 12px;
+        gap: 8px;
       }
       .stat { text-align: center; min-width: 0; }
       .stat-value {
         margin-top: 6px;
-        font-size: clamp(13px, 3.8vw, 18px);
+        font-size: clamp(12px, 3.4vw, 17px);
         font-weight: 700;
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
@@ -465,30 +507,60 @@ export class ReportsPage {
     return this.monthDate() < now;
   });
 
+  constructor() {
+    effect(() => {
+      const txs = this.txService.transactions();
+      if (txs.length > 0) {
+        const latestIso = txs[0].occurred_on;
+        const [y, m] = latestIso.split('-').map(Number);
+        const latestMonth = new Date(y, m - 1, 1);
+        const nowMonth = startOfMonth(new Date());
+        if (latestMonth < nowMonth && this.monthly().spent === 0 && this.monthly().received === 0 && this.monthly().saved === 0) {
+          this.monthDate.set(latestMonth);
+        }
+      }
+    });
+  }
+
   readonly monthly = computed(() => {
     const { y, m } = ym(this.monthDate());
+    const categories = this.categoriesService.categories();
     let spent = 0;
     let received = 0;
+    let saved = 0;
     for (const t of this.txService.transactions()) {
       const [ty, tm] = t.occurred_on.split('-').map(Number);
       if (ty !== y || tm !== m) continue;
       const amt = Number(t.amount);
-      if (t.direction === 'out') spent += amt;
-      else if (t.direction === 'in') received += amt;
+      const cat = t.category_id ? categories.find((c) => c.id === t.category_id) : null;
+      const isSavings = isSavingsCategory(cat);
+
+      if (isSavings) {
+        if (t.direction === 'out') saved += amt;
+        else if (t.direction === 'in') saved -= amt;
+      } else if (t.direction === 'out') {
+        spent += amt;
+      } else if (t.direction === 'in') {
+        received += amt;
+      }
     }
-    return { spent, received, net: received - spent };
+    return { spent, received, saved, net: received - spent - saved };
   });
 
   readonly savingsRate = computed<number | null>(() => {
-    const { spent, received } = this.monthly();
+    const { saved, received } = this.monthly();
     if (received <= 0) return null;
-    const rate = ((received - spent) / received) * 100;
+    const rate = (saved / received) * 100;
     return Math.round(rate);
   });
 
   readonly trend = computed<ChartPoint[]>(() => {
     const anchor = this.monthDate();
     const buckets: ChartPoint[] = [];
+    const catsMap = new Map(
+      this.categoriesService.categories().map((c) => [c.id, c.kind]),
+    );
+
     for (let i = 11; i >= 0; i--) {
       const d = new Date(anchor.getFullYear(), anchor.getMonth() - i, 1);
       buckets.push({
@@ -501,6 +573,7 @@ export class ReportsPage {
 
     for (const t of this.txService.transactions()) {
       if (t.direction !== 'out') continue;
+      if (t.category_id && catsMap.get(t.category_id) === 'savings') continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);
       const idx = (ty - startY) * 12 + (tm - 1 - startM);
       if (idx < 0 || idx >= 12) continue;
@@ -511,7 +584,6 @@ export class ReportsPage {
 
   readonly trendHighlight = computed<number | null>(() => {
     const c = this.trend();
-    // Highlight the currently-selected month (always the last bucket).
     if (c.length === 0) return null;
     return c.length - 1;
   });
@@ -523,6 +595,40 @@ export class ReportsPage {
       maximumFractionDigits: 0,
     }).format(v);
 
+  readonly savingsCategoryRows = computed<CategoryRow[]>(() => {
+    const { y, m } = ym(this.monthDate());
+    const cats = this.categoriesService.categories();
+    const totals = new Map<string, number>();
+    let sum = 0;
+
+    for (const t of this.txService.transactions()) {
+      const [ty, tm] = t.occurred_on.split('-').map(Number);
+      if (ty !== y || tm !== m) continue;
+      const cat = cats.find((c) => c.id === t.category_id);
+      if (!isSavingsCategory(cat)) continue;
+      const key = t.category_id ?? '__savings__';
+      const amt = Number(t.amount);
+      totals.set(key, (totals.get(key) ?? 0) + amt);
+      sum += amt;
+    }
+    if (sum === 0) return [];
+
+    return [...totals.entries()]
+      .map(([id, amount]) => {
+        const cat = cats.find((c) => c.id === id);
+        const name = cat?.name ?? 'Savings';
+        return {
+          id,
+          name,
+          amount,
+          percent: Math.round((amount / sum) * 100),
+          color: colorForName(name),
+          icon: iconForName(name),
+        };
+      })
+      .sort((a, b) => b.amount - a.amount);
+  });
+
   readonly categoryRows = computed<CategoryRow[]>(() => {
     const { y, m } = ym(this.monthDate());
     const cats = this.categoriesService.categories();
@@ -531,6 +637,8 @@ export class ReportsPage {
 
     for (const t of this.txService.transactions()) {
       if (t.direction !== 'out') continue;
+      const cat = cats.find((c) => c.id === t.category_id);
+      if (isSavingsCategory(cat)) continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);
       if (ty !== y || tm !== m) continue;
       const key = t.category_id ?? '__uncategorized__';
@@ -558,9 +666,13 @@ export class ReportsPage {
 
   readonly topDays = computed<DayRow[]>(() => {
     const { y, m } = ym(this.monthDate());
+    const catsMap = new Map(
+      this.categoriesService.categories().map((c) => [c.id, c.kind]),
+    );
     const byDay = new Map<string, number>();
     for (const t of this.txService.transactions()) {
       if (t.direction !== 'out') continue;
+      if (t.category_id && catsMap.get(t.category_id) === 'savings') continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);
       if (ty !== y || tm !== m) continue;
       byDay.set(t.occurred_on, (byDay.get(t.occurred_on) ?? 0) + Number(t.amount));
@@ -579,8 +691,6 @@ export class ReportsPage {
   );
 
   readonly splitOutstanding = computed(() => {
-    // Rough estimate: sum of "they owe you" totals across open events is
-    // heavy to compute here (needs per-event detail). Show 0 as neutral.
     return 0;
   });
 
@@ -616,7 +726,7 @@ function iconForName(name: string): string {
   if (key.includes('fuel') || key.includes('petrol') || key.includes('transport')) return 'fuel';
   if (key.includes('rent') || key.includes('home')) return 'home';
   if (key.includes('salary')) return 'briefcase';
-  if (key.includes('pf') || key.includes('invest')) return 'piggy-bank';
+  if (key.includes('pf') || key.includes('invest') || key.includes('savin') || key.includes('fund') || key.includes('gold')) return 'piggy-bank';
   if (key.includes('bill') || key.includes('util')) return 'receipt';
   if (key.includes('shop')) return 'shopping-bag';
   if (key.includes('travel') || key.includes('trip')) return 'plane';

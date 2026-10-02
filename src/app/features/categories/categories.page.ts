@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatMenuModule } from '@angular/material/menu';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -10,7 +10,9 @@ import { CategoriesService } from '../../core/services/categories.service';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
-import { CategoryKind } from '../../core/models/domain.models';
+import { SwipeableRowComponent } from '../../shared/components/swipeable-row.component';
+import { openConfirm } from '../../shared/components/confirm-dialog.component';
+import { Category, CategoryKind, isSavingsCategory } from '../../core/models/domain.models';
 
 @Component({
   selector: 'app-categories-page',
@@ -18,21 +20,21 @@ import { CategoryKind } from '../../core/models/domain.models';
   imports: [
     MatButtonModule,
     MatButtonToggleModule,
-    MatMenuModule,
     LucideAngularModule,
     PageHeaderComponent,
     EmptyStateComponent,
     TextFieldComponent,
+    SwipeableRowComponent,
   ],
   template: `
-    <app-page-header title="Categories" subtitle="Organize your money in and out" />
+    <app-page-header title="Categories" subtitle="Organize your expenses, income, and savings" />
 
     <section class="add-card app-card">
       <div class="add-form">
         <app-text-field
           class="name"
           label="New category"
-          placeholder="e.g. Food"
+          placeholder="e.g. Emergency Fund"
           [maxlength]="40"
           [value]="name()"
           (valueChange)="name.set($any($event) ?? '')"
@@ -47,6 +49,7 @@ import { CategoryKind } from '../../core/models/domain.models';
           >
             <mat-button-toggle value="expense">Expense</mat-button-toggle>
             <mat-button-toggle value="income">Income</mat-button-toggle>
+            <mat-button-toggle value="savings">Savings</mat-button-toggle>
           </mat-button-toggle-group>
 
           <button
@@ -75,6 +78,41 @@ import { CategoryKind } from '../../core/models/domain.models';
         </button>
       </div>
     } @else {
+      <!-- SAVINGS CATEGORIES -->
+      <section class="group">
+        <div class="group-head">
+          <div class="kind-icon savings">
+            <lucide-icon name="piggy-bank" />
+          </div>
+          <div class="group-title">
+            <div class="group-label">Savings</div>
+            <div class="group-count">{{ savings().length }} {{ savings().length === 1 ? 'category' : 'categories' }}</div>
+          </div>
+        </div>
+        @if (savings().length > 0) {
+          <ul class="list">
+            @for (c of savings(); track c.id) {
+              <app-swipeable-row (delete)="confirmRemove(c)">
+                <div class="row">
+                  <div class="icon-tile" [style.background]="colorFor(c.name)">
+                    <lucide-icon [name]="iconFor(c.name)" />
+                  </div>
+                  <div class="mid">
+                    <div class="title">{{ c.name }}</div>
+                    <div class="sub kind-tag savings">
+                      <lucide-icon name="piggy-bank" /> Savings
+                    </div>
+                  </div>
+                </div>
+              </app-swipeable-row>
+            }
+          </ul>
+        } @else {
+          <div class="app-card placeholder">No savings categories yet.</div>
+        }
+      </section>
+
+      <!-- EXPENSE CATEGORIES -->
       <section class="group">
         <div class="group-head">
           <div class="kind-icon negative">
@@ -86,28 +124,21 @@ import { CategoryKind } from '../../core/models/domain.models';
           </div>
         </div>
         @if (expenses().length > 0) {
-          <ul class="list app-card-tight">
-            @for (c of expenses(); track c.id; let last = $last) {
-              <li class="row" [class.last]="last">
-                <div class="icon-tile" [style.background]="colorFor(c.name)">
-                  <lucide-icon [name]="iconFor(c.name)" />
-                </div>
-                <div class="mid">
-                  <div class="title">{{ c.name }}</div>
-                  <div class="sub kind-tag negative">
-                    <lucide-icon name="arrow-down" /> Expense
+          <ul class="list">
+            @for (c of expenses(); track c.id) {
+              <app-swipeable-row (delete)="confirmRemove(c)">
+                <div class="row">
+                  <div class="icon-tile" [style.background]="colorFor(c.name)">
+                    <lucide-icon [name]="iconFor(c.name)" />
+                  </div>
+                  <div class="mid">
+                    <div class="title">{{ c.name }}</div>
+                    <div class="sub kind-tag negative">
+                      <lucide-icon name="arrow-down" /> Expense
+                    </div>
                   </div>
                 </div>
-                <button mat-icon-button [matMenuTriggerFor]="menu">
-                  <lucide-icon name="more-vertical" />
-                </button>
-                <mat-menu #menu="matMenu">
-                  <button mat-menu-item (click)="remove(c.id)">
-                    <lucide-icon name="trash-2" />
-                    <span>Delete</span>
-                  </button>
-                </mat-menu>
-              </li>
+              </app-swipeable-row>
             }
           </ul>
         } @else {
@@ -115,6 +146,7 @@ import { CategoryKind } from '../../core/models/domain.models';
         }
       </section>
 
+      <!-- INCOME CATEGORIES -->
       <section class="group">
         <div class="group-head">
           <div class="kind-icon positive">
@@ -126,28 +158,21 @@ import { CategoryKind } from '../../core/models/domain.models';
           </div>
         </div>
         @if (incomes().length > 0) {
-          <ul class="list app-card-tight">
-            @for (c of incomes(); track c.id; let last = $last) {
-              <li class="row" [class.last]="last">
-                <div class="icon-tile" [style.background]="colorFor(c.name)">
-                  <lucide-icon [name]="iconFor(c.name)" />
-                </div>
-                <div class="mid">
-                  <div class="title">{{ c.name }}</div>
-                  <div class="sub kind-tag positive">
-                    <lucide-icon name="arrow-up" /> Income
+          <ul class="list">
+            @for (c of incomes(); track c.id) {
+              <app-swipeable-row (delete)="confirmRemove(c)">
+                <div class="row">
+                  <div class="icon-tile" [style.background]="colorFor(c.name)">
+                    <lucide-icon [name]="iconFor(c.name)" />
+                  </div>
+                  <div class="mid">
+                    <div class="title">{{ c.name }}</div>
+                    <div class="sub kind-tag positive">
+                      <lucide-icon name="arrow-up" /> Income
+                    </div>
                   </div>
                 </div>
-                <button mat-icon-button [matMenuTriggerFor]="menu2">
-                  <lucide-icon name="more-vertical" />
-                </button>
-                <mat-menu #menu2="matMenu">
-                  <button mat-menu-item (click)="remove(c.id)">
-                    <lucide-icon name="trash-2" />
-                    <span>Delete</span>
-                  </button>
-                </mat-menu>
-              </li>
+              </app-swipeable-row>
             }
           </ul>
         } @else {
@@ -196,6 +221,10 @@ import { CategoryKind } from '../../core/models/domain.models';
         background: var(--app-positive-soft);
         color: var(--app-positive);
       }
+      .kind-icon.savings {
+        background: var(--app-savings-soft);
+        color: var(--app-savings);
+      }
       .group-title { display: flex; flex-direction: column; }
       .group-label {
         font-size: 15px;
@@ -223,16 +252,26 @@ import { CategoryKind } from '../../core/models/domain.models';
       }
       .kind-tag.negative { color: var(--app-negative); }
       .kind-tag.positive { color: var(--app-positive); }
-      .list { list-style: none; margin: 0; padding: 0; }
+      .kind-tag.savings { color: var(--app-savings); }
+      .list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
       .row {
         display: grid;
-        grid-template-columns: 40px 1fr auto;
+        grid-template-columns: 40px 1fr;
         gap: 12px;
         align-items: center;
-        padding: 10px 6px 10px 16px;
-        border-bottom: 1px solid var(--app-hairline);
+        padding: 10px 16px;
+        background: var(--app-surface);
+        border-radius: var(--app-radius-md);
+        border: 1px solid var(--app-hairline);
+        box-shadow: var(--app-shadow-sm);
       }
-      .row.last { border-bottom: 0; }
       .icon-tile {
         width: 40px;
         height: 40px;
@@ -261,14 +300,18 @@ import { CategoryKind } from '../../core/models/domain.models';
 })
 export class CategoriesPage {
   private readonly service = inject(CategoriesService);
+  private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
 
   readonly categories = this.service.categories;
+  readonly savings = computed(() =>
+    this.categories().filter((c) => isSavingsCategory(c)),
+  );
   readonly expenses = computed(() =>
-    this.categories().filter((c) => c.kind === 'expense'),
+    this.categories().filter((c) => c.kind === 'expense' && !isSavingsCategory(c)),
   );
   readonly incomes = computed(() =>
-    this.categories().filter((c) => c.kind === 'income'),
+    this.categories().filter((c) => c.kind === 'income' && !isSavingsCategory(c)),
   );
 
   readonly submitting = signal(false);
@@ -286,6 +329,19 @@ export class CategoriesPage {
       this.snack.open(errText(e, 'Couldn’t add — please try again.'), 'Dismiss', { duration: 4000 });
     } finally {
       this.submitting.set(false);
+    }
+  }
+
+  async confirmRemove(c: Category): Promise<void> {
+    const ok = await openConfirm(this.dialog, {
+      title: `Delete "${c.name}"?`,
+      message: 'Are you sure you want to delete this category?',
+      confirmLabel: 'Delete',
+      destructive: true,
+      icon: 'trash-2',
+    });
+    if (ok) {
+      await this.remove(c.id);
     }
   }
 
@@ -316,7 +372,7 @@ export class CategoriesPage {
     if (key.includes('fuel') || key.includes('petrol') || key.includes('transport')) return 'fuel';
     if (key.includes('rent') || key.includes('home')) return 'home';
     if (key.includes('salary')) return 'briefcase';
-    if (key.includes('pf') || key.includes('invest')) return 'piggy-bank';
+    if (key.includes('pf') || key.includes('invest') || key.includes('savin') || key.includes('fund') || key.includes('gold')) return 'piggy-bank';
     if (key.includes('bill') || key.includes('util')) return 'receipt';
     if (key.includes('shop')) return 'shopping-bag';
     if (key.includes('travel') || key.includes('trip')) return 'plane';

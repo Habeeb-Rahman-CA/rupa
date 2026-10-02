@@ -1,12 +1,15 @@
 import {
   Component,
   computed,
-  effect,
   inject,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatBottomSheet, MatBottomSheetRef } from '@angular/material/bottom-sheet';
+import {
+  MAT_BOTTOM_SHEET_DATA,
+  MatBottomSheet,
+  MatBottomSheetRef,
+} from '@angular/material/bottom-sheet';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatChipsModule } from '@angular/material/chips';
@@ -15,11 +18,15 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { CategoriesService } from '../../core/services/categories.service';
 import { TransactionsService } from '../../core/services/transactions.service';
-import { Category, TxDirection } from '../../core/models/domain.models';
+import { Category, CategoryKind, TxDirection, isSavingsCategory } from '../../core/models/domain.models';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { SetOpeningBalanceSheetComponent } from '../dashboard/set-opening-balance-sheet.component';
 
 const NEW_CATEGORY = '__new__';
+
+export interface QuickAddSheetData {
+  defaultKind?: CategoryKind;
+}
 
 @Component({
   selector: 'app-quick-add-sheet',
@@ -35,15 +42,22 @@ const NEW_CATEGORY = '__new__';
   template: `
     <div class="sheet">
       <header class="sheet-header">
-        <h2>Add {{ direction() === 'out' ? 'expense' : 'income' }}</h2>
+        <h2>
+          @switch (txKind()) {
+            @case ('expense') { Expense }
+            @case ('income') { Income }
+            @case ('savings') { Savings }
+          }
+        </h2>
         <mat-button-toggle-group
-          [value]="direction()"
-          (change)="setDirection($event.value)"
+          [value]="txKind()"
+          (change)="setTxKind($event.value)"
           hideSingleSelectionIndicator
           class="direction-toggle"
         >
-          <mat-button-toggle value="out">Expense</mat-button-toggle>
-          <mat-button-toggle value="in">Income</mat-button-toggle>
+          <mat-button-toggle value="expense">Expense</mat-button-toggle>
+          <mat-button-toggle value="income">Income</mat-button-toggle>
+          <mat-button-toggle value="savings">Savings</mat-button-toggle>
         </mat-button-toggle-group>
       </header>
 
@@ -81,8 +95,8 @@ const NEW_CATEGORY = '__new__';
       @if (selectedCategoryId() === NEW_CATEGORY) {
         <app-text-field
           #newCatField
-          [label]="'New ' + (direction() === 'out' ? 'expense' : 'income') + ' category'"
-          placeholder="e.g. Petrol"
+          [label]="'New ' + txKind() + ' category'"
+          [placeholder]="txKind() === 'savings' ? 'e.g. Gold Reserve' : 'e.g. Petrol'"
           [maxlength]="40"
           [value]="newCategoryName()"
           (valueChange)="newCategoryName.set($event ? String($event) : '')"
@@ -92,7 +106,7 @@ const NEW_CATEGORY = '__new__';
 
       <app-text-field
         label="Note (optional)"
-        placeholder="A quick reminder for later"
+        [placeholder]="txKind() === 'savings' ? 'e.g. Set aside from monthly salary' : 'A quick reminder for later'"
         [maxlength]="120"
         [value]="notes()"
         (valueChange)="notes.set($event ? String($event) : '')"
@@ -113,7 +127,7 @@ const NEW_CATEGORY = '__new__';
           (click)="save()"
           [disabled]="!canSave() || submitting()"
         >
-          {{ submitting() ? 'Saving…' : 'Save' }}
+          {{ submitting() ? 'Saving…' : (txKind() === 'savings' ? 'Move to Savings' : 'Save') }}
         </button>
       </div>
     </div>
@@ -171,11 +185,12 @@ export class QuickAddSheetComponent {
 
   private readonly ref = inject(MatBottomSheetRef<QuickAddSheetComponent>);
   private readonly bottomSheet = inject(MatBottomSheet);
+  private readonly sheetData = inject<QuickAddSheetData | null>(MAT_BOTTOM_SHEET_DATA, { optional: true });
   private readonly categoriesService = inject(CategoriesService);
   private readonly transactionsService = inject(TransactionsService);
   private readonly snack = inject(MatSnackBar);
 
-  readonly direction = signal<TxDirection>('out');
+  readonly txKind = signal<CategoryKind>(this.sheetData?.defaultKind ?? 'expense');
   readonly submitting = signal(false);
   readonly amount = signal<number | null>(null);
   readonly selectedCategoryId = signal<string | null>(null);
@@ -183,8 +198,13 @@ export class QuickAddSheetComponent {
   readonly notes = signal('');
 
   readonly relevantCategories = computed<Category[]>(() => {
-    const kind = this.direction() === 'out' ? 'expense' : 'income';
-    return this.categoriesService.categories().filter((c) => c.kind === kind);
+    const kind = this.txKind();
+    return this.categoriesService.categories().filter((c) => {
+      if (kind === 'savings') return isSavingsCategory(c);
+      if (kind === 'expense') return c.kind === 'expense' && !isSavingsCategory(c);
+      if (kind === 'income') return c.kind === 'income' && !isSavingsCategory(c);
+      return false;
+    });
   });
 
   readonly canSave = computed(() => {
@@ -200,9 +220,9 @@ export class QuickAddSheetComponent {
     return typeof v === 'number' ? v : v ? Number(v) : null;
   }
 
-  setDirection(next: TxDirection): void {
-    if (this.direction() === next) return;
-    this.direction.set(next);
+  setTxKind(next: CategoryKind): void {
+    if (this.txKind() === next) return;
+    this.txKind.set(next);
     this.selectedCategoryId.set(null);
     this.newCategoryName.set('');
   }
@@ -213,28 +233,32 @@ export class QuickAddSheetComponent {
     try {
       let categoryId: string | null = null;
       if (this.selectedCategoryId() === NEW_CATEGORY) {
-        const kind = this.direction() === 'out' ? 'expense' : 'income';
         const created = await this.categoriesService.create(
           this.newCategoryName(),
-          kind,
+          this.txKind(),
         );
         categoryId = created?.id ?? null;
       } else {
         categoryId = this.selectedCategoryId();
       }
 
+      const direction: TxDirection = this.txKind() === 'income' ? 'in' : 'out';
+
       await this.transactionsService.create({
         amount: Number(this.amount()),
-        direction: this.direction(),
+        direction,
         category_id: categoryId,
         notes: this.notes(),
       });
 
-      this.snack.open(
-        this.direction() === 'out' ? 'Expense recorded.' : 'Income recorded.',
-        undefined,
-        { duration: 2000 },
-      );
+      const message =
+        this.txKind() === 'savings'
+          ? 'Moved to savings.'
+          : this.txKind() === 'income'
+          ? 'Income recorded.'
+          : 'Expense recorded.';
+
+      this.snack.open(message, undefined, { duration: 2000 });
       this.ref.dismiss({ saved: true });
     } catch (e: unknown) {
       this.snack.open(errorText(e, 'Couldn’t save — please try again.'), 'Dismiss', {

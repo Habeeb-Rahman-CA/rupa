@@ -1,6 +1,6 @@
 export type TxDirection = 'in' | 'out';
 export type TxSource = 'manual' | 'debt' | 'event';
-export type CategoryKind = 'income' | 'expense';
+export type CategoryKind = 'income' | 'expense' | 'savings';
 export type DebtDirection = 'i_owe' | 'they_owe';
 export type EventStatus = 'open' | 'settled';
 
@@ -10,6 +10,39 @@ export interface Category {
   name: string;
   kind: CategoryKind;
   created_at: string;
+}
+
+const SAVINGS_PREFIX = 'rupa_savings_cat_';
+
+export function markAsSavingsCategory(id: string): void {
+  if (typeof localStorage !== 'undefined' && id) {
+    try {
+      localStorage.setItem(SAVINGS_PREFIX + id, 'true');
+    } catch {}
+  }
+}
+
+export function isSavingsCategory(cat: Category | null | undefined): boolean {
+  if (!cat) return false;
+  if (cat.kind === 'savings') return true;
+  if (typeof localStorage !== 'undefined' && cat.id) {
+    if (localStorage.getItem(SAVINGS_PREFIX + cat.id) === 'true') return true;
+  }
+  const name = cat.name.toLowerCase();
+  return (
+    name.includes('saving') ||
+    name.includes('emergency') ||
+    name.includes('mutual') ||
+    name.includes('gold') ||
+    name.includes('fixed deposit') ||
+    name.includes('sip') ||
+    name.includes('nps') ||
+    name.includes('fd') ||
+    name.includes('investment') ||
+    name.includes('stock') ||
+    name.includes('share') ||
+    name.includes('bond')
+  );
 }
 
 export interface Person {

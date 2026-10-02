@@ -32,6 +32,8 @@ html {
   --app-positive-soft: rgba(22, 163, 74, 0.12);
   --app-negative: #ef4444;
   --app-negative-soft: rgba(239, 68, 68, 0.10);
+  --app-savings: #0ea5e9;
+  --app-savings-soft: rgba(14, 165, 233, 0.12);
   --app-mint: #16a34a;
   --app-mint-soft: rgba(22, 163, 74, 0.14);
   --app-peach: #ef4444;
@@ -181,6 +183,7 @@ lucide-angular {
 // =============================================================================
 .money-positive { color: var(--app-positive); font-variant-numeric: tabular-nums; }
 .money-negative { color: var(--app-negative); font-variant-numeric: tabular-nums; }
+.money-savings  { color: var(--app-savings);  font-variant-numeric: tabular-nums; }
 .money-neutral  { color: var(--app-ink);      font-variant-numeric: tabular-nums; }
 
 .app-card {
@@ -258,6 +261,10 @@ lucide-angular {
   &.negative {
     background: var(--app-peach-soft);
     .chip-icon { color: var(--app-peach); }
+  }
+  &.savings {
+    background: var(--app-savings-soft);
+    .chip-icon { color: var(--app-savings); }
   }
 }
 
@@ -718,6 +725,15 @@ lucide-angular {
 // ---------- Icon buttons ----------------------------------------------------
 .mat-mdc-icon-button {
   color: var(--app-ink-muted);
+}
+.row-delete-btn {
+  color: var(--app-ink-subtle) !important;
+  transition: color .15s ease, background-color .15s ease !important;
+
+  &:hover {
+    color: var(--app-negative) !important;
+    background: var(--app-negative-soft) !important;
+  }
 }
 
 // ---------- Chips -----------------------------------------------------------

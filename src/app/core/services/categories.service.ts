@@ -1,16 +1,20 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
-import { Category, CategoryKind } from '../models/domain.models';
+import { Category, CategoryKind, markAsSavingsCategory } from '../models/domain.models';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 
 const DEFAULT_CATEGORIES: Array<{ name: string; kind: CategoryKind }> = [
-  { name: 'Salary',    kind: 'income' },
-  { name: 'PF',        kind: 'income' },
-  { name: 'Food',      kind: 'expense' },
-  { name: 'Rent',      kind: 'expense' },
-  { name: 'Fuel',      kind: 'expense' },
-  { name: 'Groceries', kind: 'expense' },
-  { name: 'Bills',     kind: 'expense' },
+  { name: 'Salary',          kind: 'income' },
+  { name: 'PF',              kind: 'income' },
+  { name: 'Food',            kind: 'expense' },
+  { name: 'Rent',            kind: 'expense' },
+  { name: 'Fuel',            kind: 'expense' },
+  { name: 'Groceries',       kind: 'expense' },
+  { name: 'Bills',           kind: 'expense' },
+  { name: 'Emergency Fund',  kind: 'savings' },
+  { name: 'Mutual Funds',    kind: 'savings' },
+  { name: 'Gold & FDs',      kind: 'savings' },
+  { name: 'General Savings', kind: 'savings' },
 ];
 
 @Injectable({ providedIn: 'root' })
@@ -73,18 +77,30 @@ export class CategoriesService {
 
     const ownerId = this.requireUserId();
 
-    const { data, error } = await this.supabase.client
+    let result = await this.supabase.client
       .from('categories')
       .insert({ owner_id: ownerId, name: trimmed, kind })
       .select()
       .single();
 
-    if (error) {
-      console.error('Failed to create category', error);
-      throw error;
+    if (result.error && (kind === 'savings' || result.error.code === '23514')) {
+      // Fallback if DB check constraint on Supabase cloud hasn't been updated yet
+      result = await this.supabase.client
+        .from('categories')
+        .insert({ owner_id: ownerId, name: trimmed, kind: 'expense' })
+        .select()
+        .single();
     }
 
-    const created = data as Category;
+    if (result.error) {
+      console.error('Failed to create category', result.error);
+      throw result.error;
+    }
+
+    const created = result.data as Category;
+    if (kind === 'savings') {
+      markAsSavingsCategory(created.id);
+    }
     this._categories.update((list) => [...list, created]);
     return created;
   }
@@ -111,23 +127,17 @@ export class CategoriesService {
   async seedDefaults(): Promise<void> {
     const existing = this._categories();
     const missing = DEFAULT_CATEGORIES.filter(
-      (d) => !existing.some((c) => c.name === d.name && c.kind === d.kind),
+      (d) => !existing.some((c) => c.name.toLowerCase() === d.name.toLowerCase()),
     );
     if (missing.length === 0) return;
 
-    const ownerId = this.requireUserId();
-    const rows = missing.map((m) => ({ ...m, owner_id: ownerId }));
-
-    const { data, error } = await this.supabase.client
-      .from('categories')
-      .insert(rows)
-      .select();
-
-    if (error) {
-      console.error('Failed to seed default categories', error);
-      throw error;
+    for (const item of missing) {
+      try {
+        await this.create(item.name, item.kind);
+      } catch (err) {
+        console.error(`Could not seed category ${item.name}`, err);
+      }
     }
-    this._categories.update((list) => [...list, ...((data ?? []) as Category[])]);
   }
 
   private requireUserId(): string {
