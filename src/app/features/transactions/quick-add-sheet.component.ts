@@ -83,17 +83,18 @@ export interface QuickAddSheetData {
         (change)="onFileSelected($event)"
       />
 
-      <div class="scan-bar">
+      <div class="scan-bar" [class.is-offline]="isOffline()">
         <span class="scan-tag">
-          <lucide-icon [name]="scanningBill() ? 'sparkles' : 'receipt'" class="scan-tag-icon" />
-          <span>{{ scanningBill() ? 'Scanning…' : 'Scan Bill' }}</span>
+          <lucide-icon [name]="isOffline() ? 'wifi' : (scanningBill() ? 'sparkles' : 'receipt')" class="scan-tag-icon" />
+          <span>{{ isOffline() ? 'Offline (AI Disabled)' : (scanningBill() ? 'Scanning…' : 'Scan Bill') }}</span>
         </span>
         <div class="scan-actions">
           <button
             type="button"
             class="scan-btn"
             (click)="cameraInput.click()"
-            [disabled]="scanningBill()"
+            [disabled]="scanningBill() || isOffline()"
+            [title]="isOffline() ? 'AI scanning requires an active internet connection' : 'Take Photo with Camera'"
           >
             <lucide-icon name="camera" class="scan-btn-icon" />
             <span>Camera</span>
@@ -102,7 +103,8 @@ export interface QuickAddSheetData {
             type="button"
             class="scan-btn"
             (click)="galleryInput.click()"
-            [disabled]="scanningBill()"
+            [disabled]="scanningBill() || isOffline()"
+            [title]="isOffline() ? 'AI scanning requires an active internet connection' : 'Upload Image File'"
           >
             <lucide-icon name="upload" class="scan-btn-icon" />
             <span>Upload</span>
@@ -355,6 +357,7 @@ export class QuickAddSheetComponent {
   readonly txKind = signal<CategoryKind>(this.sheetData?.defaultKind ?? 'expense');
   readonly submitting = signal(false);
   readonly scanningBill = signal(false);
+  readonly isOffline = signal(typeof navigator !== 'undefined' ? !navigator.onLine : false);
   readonly amount = signal<number | null>(null);
   readonly selectedCategoryId = signal<string | null>(null);
   readonly newCategoryName = signal('');
@@ -372,6 +375,11 @@ export class QuickAddSheetComponent {
   });
 
   constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => this.isOffline.set(false));
+      window.addEventListener('offline', () => this.isOffline.set(true));
+    }
+
     effect(() => {
       const primary = this.bankAccountsService.primaryAccount();
       const accounts = this.bankAccountsService.bankAccounts();

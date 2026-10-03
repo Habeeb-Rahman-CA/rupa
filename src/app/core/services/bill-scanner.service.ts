@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { AppSettingsService } from './app-settings.service';
 
 export interface ExtractionResult {
   title: string | null;
@@ -35,9 +36,15 @@ const PRIORITY_AMOUNT_KEYS = [
   providedIn: 'root',
 })
 export class BillScannerService {
+  private readonly appSettings = inject(AppSettingsService);
+
   private getApiKey(): string {
+    const fromSettings = this.appSettings.openRouterApiKey();
+    if (fromSettings) {
+      return fromSettings;
+    }
     if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem('openrouter_api_key');
+      const stored = localStorage.getItem('rupa_openrouter_api_key') || localStorage.getItem('openrouter_api_key');
       if (stored) return stored;
     }
     return '';
@@ -51,9 +58,13 @@ export class BillScannerService {
     prompt: string = DEFAULT_EXTRACTION_PROMPT,
     options: ExtractOptions = {}
   ): Promise<ExtractionResult> {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new Error('You are offline. AI bill scanning requires an active internet connection.');
+    }
+
     const apiKey = options.apiKey || this.getApiKey();
     if (!apiKey) {
-      throw new Error('OpenRouter API key is required.');
+      throw new Error('OpenRouter API key is missing. Please set your key first.');
     }
 
     const model = options.model || 'qwen/qwen3-vl-8b-instruct';
