@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -130,9 +130,12 @@ type Mode = 'login' | 'signup';
             [disabled]="!canSubmit() || submitting()"
           >
             @if (submitting()) {
-              <mat-spinner diameter="20"></mat-spinner>
+              <div class="submit-loading">
+                <mat-spinner diameter="18" class="submit-spinner" />
+                <span>{{ mode() === 'login' ? 'Logging in…' : 'Signing up…' }}</span>
+              </div>
             } @else {
-              {{ mode() === 'login' ? 'Log in' : 'Sign up' }}
+              <span>{{ mode() === 'login' ? 'Log in' : 'Sign up' }}</span>
             }
           </button>
 
@@ -234,9 +237,10 @@ type Mode = 'login' | 'signup';
         border: 0;
         background: transparent;
         color: var(--app-ink-muted);
-        font: inherit;
+        font-family: inherit;
         font-size: 14px;
         font-weight: 600;
+        letter-spacing: -0.005em;
         border-radius: 999px;
         cursor: pointer;
         transition: background .15s ease, color .15s ease;
@@ -279,8 +283,10 @@ type Mode = 'login' | 'signup';
         border: 0;
         background: transparent;
         color: var(--app-ink-muted);
+        font-family: inherit;
         font-size: 13px;
         font-weight: 500;
+        letter-spacing: -0.005em;
         cursor: pointer;
         padding: 4px 6px;
         border-radius: 8px;
@@ -314,9 +320,10 @@ type Mode = 'login' | 'signup';
         border-radius: 999px;
         background: var(--app-ink-dark);
         color: #fff;
+        font-family: inherit;
         font-size: 15px;
         font-weight: 600;
-        letter-spacing: 0.01em;
+        letter-spacing: -0.005em;
         cursor: pointer;
         margin-top: 4px;
         display: grid;
@@ -326,6 +333,21 @@ type Mode = 'login' | 'signup';
         &:hover:not(:disabled) { opacity: 0.94; }
         &:active:not(:disabled) { transform: scale(0.99); }
         &:disabled { opacity: 0.55; cursor: default; }
+      }
+
+      .submit-loading {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        color: #ffffff;
+      }
+
+      .submit-spinner {
+        --mdc-circular-progress-active-indicator-color: #ffffff !important;
+        circle {
+          stroke: #ffffff !important;
+        }
       }
 
       .terms-notice {
@@ -390,6 +412,7 @@ type Mode = 'login' | 'signup';
 export class LoginPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly snack = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);
 
@@ -456,7 +479,7 @@ export class LoginPage {
         return;
       }
       if (data.session) {
-        this.router.navigateByUrl('/dashboard');
+        this.router.navigateByUrl(this.getRedirectUrl());
       } else {
         this.infoMessage.set(
           'Almost there — check your email for a confirmation link, then log in.',
@@ -472,7 +495,12 @@ export class LoginPage {
       this.errorMessage.set(error.message);
       return;
     }
-    this.router.navigateByUrl('/dashboard');
+    this.router.navigateByUrl(this.getRedirectUrl());
+  }
+
+  private getRedirectUrl(): string {
+    const returnUrl = this.route.snapshot.queryParams['returnUrl'];
+    return returnUrl && returnUrl !== '/login' ? returnUrl : '/dashboard';
   }
 
   openContact(): void {

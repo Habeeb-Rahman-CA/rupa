@@ -21,15 +21,19 @@ import { CategoriesService } from '../../core/services/categories.service';
   ],
   template: `
     <div class="dialog-container">
+      <!-- Header -->
       <div class="dialog-header">
-        <h2 mat-dialog-title class="dialog-title">Add Category</h2>
-        <p class="dialog-subtitle">Create a new category for your transactions</p>
+        <div class="header-text-group">
+          <h2 mat-dialog-title class="dialog-title">Add Category</h2>
+          <p class="dialog-subtitle">Create a new category for your transactions</p>
+        </div>
       </div>
 
       <mat-dialog-content class="dialog-content">
         <app-text-field
           label="Category Name"
           placeholder="e.g. Subscriptions, Groceries, Salary"
+          leadIcon="tags"
           [maxlength]="40"
           [value]="name()"
           (valueChange)="name.set($any($event) ?? '')"
@@ -52,13 +56,16 @@ import { CategoriesService } from '../../core/services/categories.service';
         </div>
       </mat-dialog-content>
 
-      <mat-dialog-actions class="dialog-actions" align="end">
-        <button mat-button (click)="close()" [disabled]="submitting()">Cancel</button>
+      <!-- Actions Footer -->
+      <mat-dialog-actions align="end" class="dialog-actions">
+        <button mat-button type="button" (click)="close()" [disabled]="submitting()" class="cancel-btn">Cancel</button>
         <button
           mat-flat-button
           color="primary"
+          type="button"
           (click)="save()"
           [disabled]="!name().trim() || submitting()"
+          class="save-btn"
         >
           {{ submitting() ? 'Saving…' : 'Add Category' }}
         </button>
@@ -69,28 +76,41 @@ import { CategoriesService } from '../../core/services/categories.service';
     `
       .dialog-container {
         padding: 4px;
+        max-width: 480px;
+        background: var(--app-surface);
+        color: var(--app-ink);
+        font-family: inherit;
       }
+
+      /* Header */
       .dialog-header {
-        padding: 16px 24px 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 0 16px 12px 16px;
+        border-bottom: 1px solid var(--app-hairline);
       }
       .dialog-title {
-        margin: 0;
-        padding: 0;
-        font-size: 18px;
-        font-weight: 700;
-        color: var(--app-ink);
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        color: var(--app-ink) !important;
+        margin: 0 !important;
+        line-height: 1.2 !important;
+        padding: 0 !important;
       }
       .dialog-subtitle {
-        margin: 3px 0 0;
-        font-size: 13px;
+        font-size: 12px;
         color: var(--app-ink-muted);
+        margin: 3px 0 0;
       }
+
       .dialog-content {
         display: flex;
         flex-direction: column;
         gap: 16px;
-        padding: 16px 24px 20px !important;
-        min-width: 320px;
+        padding-top: 16px !important;
+        padding-bottom: 16px !important;
+        min-width: 300px;
       }
       .field-group {
         display: flex;
@@ -98,6 +118,7 @@ import { CategoriesService } from '../../core/services/categories.service';
         gap: 6px;
       }
       .ft-label {
+        display: block;
         font-size: 13px;
         font-weight: 500;
         color: var(--app-ink);
@@ -110,8 +131,15 @@ import { CategoriesService } from '../../core/services/categories.service';
         flex: 1;
       }
       .dialog-actions {
-        padding: 12px 24px 16px;
-        gap: 8px;
+        padding-top: 12px;
+      }
+      .save-btn {
+        border-radius: var(--app-radius-md) !important;
+        font-weight: 600 !important;
+      }
+      .cancel-btn {
+        border-radius: var(--app-radius-md) !important;
+        color: var(--app-ink-muted) !important;
       }
     `,
   ],

@@ -47,6 +47,9 @@ export class TransactionsService {
   readonly monthly = computed<MonthlyStats>(() => {
     const txs = this._transactions();
     const categories = this.categoriesService.categories();
+    const savingsCatIds = new Set<string>(
+      categories.filter((c) => isSavingsCategory(c)).map((c) => c.id),
+    );
 
     const now = new Date();
     const y = now.getFullYear();
@@ -57,13 +60,12 @@ export class TransactionsService {
     let saved = 0;
 
     for (const t of txs) {
-      if (!t.occurred_on) continue;
+      if (t.source === 'opening' || !t.occurred_on) continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);
       if (ty !== y || tm !== m) continue;
 
       const amt = Number(t.amount);
-      const cat = t.category_id ? categories.find((c) => c.id === t.category_id) : null;
-      const isSavings = isSavingsCategory(cat);
+      const isSavings = t.category_id ? savingsCatIds.has(t.category_id) : false;
 
       if (isSavings) {
         if (t.direction === 'out') saved += amt;
@@ -81,10 +83,13 @@ export class TransactionsService {
   readonly totalSavings = computed<number>(() => {
     const txs = this._transactions();
     const categories = this.categoriesService.categories();
+    const savingsCatIds = new Set<string>(
+      categories.filter((c) => isSavingsCategory(c)).map((c) => c.id),
+    );
+
     let total = 0;
     for (const t of txs) {
-      const cat = t.category_id ? categories.find((c) => c.id === t.category_id) : null;
-      if (isSavingsCategory(cat)) {
+      if (t.category_id && savingsCatIds.has(t.category_id)) {
         if (t.direction === 'out') total += Number(t.amount);
         else if (t.direction === 'in') total -= Number(t.amount);
       }
@@ -136,25 +141,22 @@ export class TransactionsService {
 
     this._transactions.set(updatedList);
 
-    for (const t of unassigned) {
-      try {
-        const res = await this.supabase.client
-          .from('transactions')
-          .update({ payment_mode: 'bank', bank_account_id: bankAccountId })
-          .eq('id', t.id);
+    const unassignedIds = unassigned.map((t) => t.id);
+    try {
+      const res = await this.supabase.client
+        .from('transactions')
+        .update({ payment_mode: 'bank', bank_account_id: bankAccountId })
+        .in('id', unassignedIds);
 
-        if (res.error) {
-          // PGRST204 or missing column error
-          if (res.error.code === 'PGRST204' || res.error.message?.includes('bank_account_id')) {
-            this.schemaSupportsBankAccounts = false;
-            console.warn('Supabase transactions table is missing bank_account_id column. Disabling auto-mapping sync.');
-            break;
-          }
+      if (res.error) {
+        // PGRST204 or missing column error
+        if (res.error.code === 'PGRST204' || res.error.message?.includes('bank_account_id')) {
+          this.schemaSupportsBankAccounts = false;
+          console.warn('Supabase transactions table is missing bank_account_id column. Disabling auto-mapping sync.');
         }
-      } catch {
-        this.schemaSupportsBankAccounts = false;
-        break;
       }
+    } catch {
+      this.schemaSupportsBankAccounts = false;
     }
   }
 
@@ -298,9 +300,11 @@ export class TransactionsService {
         const card = bankAccountsService.bankAccounts().find((c) => c.id === input.bank_account_id);
         if (card && card.balance !== undefined) {
           const delta = input.direction === 'in' ? input.amount : -input.amount;
-          void bankAccountsService.update(card.id, { balance: Math.max(0, card.balance + delta) });
+          await bankAccountsService.update(card.id, { balance: Math.max(0, card.balance + delta) });
         }
-      } catch {}
+      } catch (err) {
+        console.error('Failed to update bank account balance', err);
+      }
     }
 
     this._transactions.update((list) => [created!, ...list]);
@@ -326,18 +330,29 @@ export class TransactionsService {
       if (debtPayments && debtPayments.length > 0) {
         for (const dp of debtPayments) {
           await this.supabase.client.from('debt_payments').delete().eq('id', dp.id);
-          // Restore debt balance
+          // Restore debt balance based on ground-truth principal minus remaining payments
           const { data: debt } = await this.supabase.client
             .from('debts')
-            .select('outstanding')
+            .select('principal')
             .eq('id', dp.debt_id)
             .maybeSingle();
 
           if (debt) {
-            const restored = Math.round((Number(debt.outstanding) + Number(dp.amount)) * 100) / 100;
+            const { data: remainingPayments } = await this.supabase.client
+              .from('debt_payments')
+              .select('amount')
+              .eq('debt_id', dp.debt_id);
+
+            const totalPaid = (remainingPayments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
+            const restoredOutstanding = Math.max(0, Math.round((Number(debt.principal) - totalPaid + Number.EPSILON) * 100) / 100);
+            const patch: Record<string, unknown> = { outstanding: restoredOutstanding };
+            if (restoredOutstanding > 0) {
+              patch['closed_on'] = null;
+            }
+
             await this.supabase.client
               .from('debts')
-              .update({ outstanding: restored, closed_on: null })
+              .update(patch)
               .eq('id', dp.debt_id);
           }
         }
@@ -404,7 +419,7 @@ export class TransactionsService {
       .from('transactions')
       .select('amount, direction')
       .eq('owner_id', ownerId)
-      .eq('notes', 'Opening balance')
+      .eq('source', 'opening')
       .maybeSingle();
 
     if (data) {
@@ -423,7 +438,7 @@ export class TransactionsService {
       .from('transactions')
       .select('id')
       .eq('owner_id', ownerId)
-      .eq('notes', 'Opening balance')
+      .eq('source', 'opening')
       .maybeSingle();
 
     const direction: TxDirection = amount >= 0 ? 'in' : 'out';
@@ -453,7 +468,7 @@ export class TransactionsService {
             direction,
             occurred_on: '2000-01-01',
             notes: 'Opening balance',
-            source: 'manual',
+            source: 'opening',
           });
         if (error) throw error;
       }
@@ -471,26 +486,9 @@ export class TransactionsService {
 // -------- helpers -----------------------------------------------------------
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function monthBounds(date: Date): { start: string; end: string } {
-  const y = date.getFullYear();
-  const m = date.getMonth();
-  const start = new Date(y, m, 1);
-  const end = new Date(y, m + 1, 1);
-  return { start: toIsoDate(start), end: toIsoDate(end) };
-}
-
-function toIsoDate(d: Date): string {
+  const d = new Date();
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
-}
-
-function isInCurrentMonth(iso: string): boolean {
-  const now = new Date();
-  const [y, m] = iso.split('-').map(Number);
-  return y === now.getFullYear() && m === now.getMonth() + 1;
 }

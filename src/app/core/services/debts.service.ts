@@ -155,10 +155,16 @@ export class DebtsService {
     const debt = data as Debt;
     // Link transaction back to debt if created
     if (tx) {
-      await this.supabase.client
+      const { error: linkErr } = await this.supabase.client
         .from('transactions')
         .update({ source_ref_id: debt.id })
         .eq('id', tx.id);
+      if (linkErr) {
+        console.error('Failed to link transaction to debt, rolling back', linkErr);
+        await this.supabase.client.from('debts').delete().eq('id', debt.id);
+        await this.txService.delete(tx.id).catch(() => undefined);
+        throw linkErr;
+      }
     }
 
     this._debts.update((list) => [debt, ...list]);
@@ -232,44 +238,53 @@ export class DebtsService {
   }
 
   async delete(id: string): Promise<void> {
-    const debt = this._debts().find((d) => d.id === id);
-    if (!debt) return;
+    const currentList = this._debts();
+    const index = currentList.findIndex((d) => d.id === id);
+    if (index === -1) return;
+    const debt = currentList[index];
 
     // 1. Optimistic removal from signal for immediate UI update
     this._debts.update((list) => list.filter((d) => d.id !== id));
 
-    // Fetch linked transactions
+    // 2. Fetch linked transactions
     const { data: txRows } = await this.supabase.client
       .from('transactions')
       .select('id')
       .eq('source', 'debt')
       .eq('source_ref_id', id);
 
+    // 3. Delete linked transactions first so we don't orphan transactions if deletion fails
+    for (const row of txRows ?? []) {
+      try {
+        await this.txService.delete(row.id);
+      } catch (err) {
+        console.error(`Failed to delete transaction ${row.id} linked to debt ${id}`, err);
+        // Revert signal update on failure
+        this._debts.update((list) => {
+          if (list.some((d) => d.id === id)) return list;
+          const restored = [...list];
+          restored.splice(Math.min(index, restored.length), 0, debt);
+          return restored;
+        });
+        throw err;
+      }
+    }
+
+    // 4. Delete debt row
     const { error } = await this.supabase.client.from('debts').delete().eq('id', id);
     if (error) {
       console.error('Failed to delete debt', error);
       // Revert signal update on failure
-      this._debts.update((list) => [debt, ...list]);
+      this._debts.update((list) => {
+        if (list.some((d) => d.id === id)) return list;
+        const restored = [...list];
+        restored.splice(Math.min(index, restored.length), 0, debt);
+        return restored;
+      });
       throw error;
     }
 
-    for (const row of txRows ?? []) {
-      await this.txService.delete(row.id).catch(() => undefined);
-    }
     await this.txService.refresh();
-  }
-
-  private async insertTransaction(payload: Record<string, unknown>): Promise<Transaction> {
-    const { data, error } = await this.supabase.client
-      .from('transactions')
-      .insert(payload)
-      .select()
-      .single();
-    if (error) {
-      console.error('Failed to insert linked transaction', error);
-      throw error;
-    }
-    return data as Transaction;
   }
 
   private requireUserId(): string {
@@ -280,9 +295,13 @@ export class DebtsService {
 }
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function round2(n: number): number {
-  return Math.round(n * 100) / 100;
+  return Math.round((n + Number.EPSILON) * 100) / 100;
 }

@@ -10,6 +10,8 @@ import { MatBottomSheetRef } from '@angular/material/bottom-sheet';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Router } from '@angular/router';
+import { LucideAngularModule } from 'lucide-angular';
 
 import {
   DebtTransactionImpact,
@@ -32,6 +34,7 @@ const NEW_PERSON = '__new__';
   imports: [
     MatButtonModule,
     MatButtonToggleModule,
+    LucideAngularModule,
     TextFieldComponent,
     SelectFieldComponent,
   ],
@@ -97,14 +100,22 @@ const NEW_PERSON = '__new__';
           </mat-button-toggle-group>
         </div>
 
-        @if (paymentMode() === 'bank' && bankAccountOptions().length > 0) {
-          <app-select-field
-            label="Bank Account"
-            placeholder="Select Bank Account"
-            [options]="bankAccountOptions()"
-            [value]="selectedBankAccountId()"
-            (valueChange)="selectedBankAccountId.set($any($event))"
-          />
+        @if (paymentMode() === 'bank') {
+          @if (bankAccountOptions().length > 0) {
+            <app-select-field
+              label="Bank Account"
+              placeholder="Select Bank Account"
+              [options]="bankAccountOptions()"
+              [value]="selectedBankAccountId()"
+              (valueChange)="selectedBankAccountId.set($any($event))"
+            />
+          } @else {
+            <div class="no-bank-notice">
+              <lucide-icon name="alert-circle" />
+              <span>No bank accounts added yet.</span>
+              <button type="button" class="link-btn" (click)="openBankAccounts()">Add Account</button>
+            </div>
+          }
         }
       }
 
@@ -180,6 +191,34 @@ const NEW_PERSON = '__new__';
       .payment-mode-toggle mat-button-toggle {
         flex: 1;
       }
+      .no-bank-notice {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        background: var(--app-bg-hover);
+        border: 1px dashed var(--app-hairline);
+        border-radius: var(--app-radius-md);
+        font-size: 13px;
+        color: var(--app-ink-muted);
+      }
+      .no-bank-notice lucide-icon {
+        width: 16px;
+        height: 16px;
+        color: var(--app-ink-subtle);
+        flex: 0 0 auto;
+      }
+      .link-btn {
+        background: none;
+        border: none;
+        padding: 0;
+        margin-left: auto;
+        color: var(--app-accent);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .link-btn:hover { text-decoration: underline; }
       .hint {
         font-size: 12px;
         color: var(--app-ink-muted);
@@ -206,12 +245,14 @@ export class AddDebtSheetComponent {
   private readonly peopleService = inject(PeopleService);
   private readonly bankAccountsService = inject(BankAccountsService);
   private readonly snack = inject(MatSnackBar);
+  private readonly router = inject(Router);
 
   readonly people = this.peopleService.people;
   readonly personOptions = computed<SelectOption<string>[]>(() => {
     const opts: SelectOption<string>[] = this.people().map((p) => ({
       label: p.name,
       value: p.id,
+      icon: 'user',
     }));
     opts.push({ label: 'Other — add new person', value: NEW_PERSON, icon: 'plus' });
     return opts;
@@ -235,15 +276,15 @@ export class AddDebtSheetComponent {
     return [
       {
         value: 'default',
-        label: dir === 'they_owe' ? 'Log as Expense (Cash Out)' : 'Log as Income (Cash In)',
+        label: dir === 'they_owe' ? 'Cash Out' : 'Cash In',
       },
       {
         value: 'none',
-        label: 'Don’t affect Income/Expense (Opening balance)',
+        label: 'Opening balance',
       },
       {
         value: dir === 'they_owe' ? 'income' : 'expense',
-        label: dir === 'they_owe' ? 'Log as Income (Cash In)' : 'Log as Expense (Cash Out)',
+        label: dir === 'they_owe' ? 'Cash In' : 'Cash Out',
       },
     ];
   });
@@ -337,6 +378,11 @@ export class AddDebtSheetComponent {
 
   close(): void {
     this.ref.dismiss();
+  }
+
+  openBankAccounts(): void {
+    this.ref.dismiss();
+    void this.router.navigate(['/bank-accounts']);
   }
 }
 

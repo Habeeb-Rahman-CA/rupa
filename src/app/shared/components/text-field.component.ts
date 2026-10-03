@@ -10,6 +10,8 @@ import {
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 
+let nextFieldId = 0;
+
 /**
  * Uniform text input that matches the login field exactly.
  * - Label sits ABOVE the field (never floats inside).
@@ -27,7 +29,7 @@ import { LucideAngularModule } from 'lucide-angular';
   imports: [FormsModule, LucideAngularModule],
   template: `
     @if (label()) {
-      <label class="ft-label">{{ label() }}</label>
+      <label class="ft-label" [for]="inputId()">{{ label() }}</label>
     }
     <div
       class="ft-field"
@@ -40,6 +42,7 @@ import { LucideAngularModule } from 'lucide-angular';
       <ng-content select="[prefix]" />
       <input
         #inputEl
+        [id]="inputId()"
         [type]="type()"
         [placeholder]="placeholder()"
         [attr.inputmode]="inputmode() || null"
@@ -74,6 +77,7 @@ import { LucideAngularModule } from 'lucide-angular';
         font-weight: 500;
         color: var(--app-ink);
         margin-bottom: 6px;
+        cursor: pointer;
       }
 
       .ft-field {
@@ -147,6 +151,9 @@ import { LucideAngularModule } from 'lucide-angular';
   ],
 })
 export class TextFieldComponent {
+  private readonly autoId = `tf-input-${++nextFieldId}`;
+
+  readonly idInput = input<string>('', { alias: 'id' });
   readonly label = input<string>('');
   readonly placeholder = input<string>('');
   readonly type = input<'text' | 'number' | 'email' | 'password' | 'tel'>('text');
@@ -168,6 +175,8 @@ export class TextFieldComponent {
   readonly blur = output<void>();
 
   readonly focused = signal(false);
+
+  readonly inputId = computed(() => this.idInput() || this.autoId);
 
   @ViewChild('inputEl') private readonly inputEl?: ElementRef<HTMLInputElement>;
 

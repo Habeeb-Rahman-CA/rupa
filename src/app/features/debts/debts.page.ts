@@ -11,6 +11,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
+import { openConfirm } from '../../shared/components/confirm-dialog.component';
 
 import { DebtsService } from '../../core/services/debts.service';
 import { PeopleService } from '../../core/services/people.service';
@@ -82,7 +83,7 @@ import { PayDebtDialogComponent } from './pay-debt-dialog.component';
                     <lucide-icon name="wallet" />
                     <span>Record payment</span>
                   </button>
-                  <button mat-menu-item (click)="remove(d)">
+                  <button mat-menu-item (click)="confirmRemove(d)">
                     <lucide-icon name="trash-2" />
                     <span>Delete</span>
                   </button>
@@ -125,7 +126,7 @@ import { PayDebtDialogComponent } from './pay-debt-dialog.component';
                     <lucide-icon name="wallet" />
                     <span>Record repayment</span>
                   </button>
-                  <button mat-menu-item (click)="remove(d)">
+                  <button mat-menu-item (click)="confirmRemove(d)">
                     <lucide-icon name="trash-2" />
                     <span>Delete</span>
                   </button>
@@ -242,6 +243,20 @@ export class DebtsPage {
     this.dialog.open(PayDebtDialogComponent, {
       data: { debt, personName: this.nameFor(debt) },
     });
+  }
+
+  async confirmRemove(debt: Debt): Promise<void> {
+    const personName = this.nameFor(debt);
+    const ok = await openConfirm(this.dialog, {
+      title: `Delete debt entry?`,
+      message: `Are you sure you want to delete this debt record for ${personName}?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      icon: 'trash-2',
+    });
+    if (ok) {
+      await this.remove(debt);
+    }
   }
 
   async remove(debt: Debt): Promise<void> {

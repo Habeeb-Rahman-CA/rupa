@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import {
   MAT_DIALOG_DATA,
   MatDialog,
@@ -7,6 +7,13 @@ import {
 } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { LucideAngularModule } from 'lucide-angular';
+import { APP_ICONS } from '../lucide-icons';
+
+const REGISTERED_ICONS = new Set<string>(
+  Object.keys(APP_ICONS).map((k) =>
+    k.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase(),
+  ),
+);
 
 export interface ConfirmDialogData {
   title: string;
@@ -28,12 +35,12 @@ export interface ConfirmDialogData {
   imports: [MatDialogModule, MatButtonModule, LucideAngularModule],
   template: `
     <div class="wrap">
-      @if (data.icon) {
+      @if (resolvedIcon()) {
         <div
           class="icon"
           [class.destructive]="data.destructive"
         >
-          <lucide-icon [name]="data.icon!" />
+          <lucide-icon [name]="resolvedIcon()!" />
         </div>
       }
 
@@ -64,7 +71,7 @@ export interface ConfirmDialogData {
       .wrap {
         min-width: 300px;
         max-width: 400px;
-        padding: 8px 4px 4px;
+        padding: 16px;
       }
       .icon {
         width: 48px;
@@ -74,7 +81,7 @@ export interface ConfirmDialogData {
         place-items: center;
         background: var(--app-accent-soft);
         color: var(--app-accent);
-        margin: 0 auto 12px;
+        margin: 0 auto;
       }
       .icon.destructive {
         background: var(--app-negative-soft);
@@ -86,8 +93,9 @@ export interface ConfirmDialogData {
       }
       h2 {
         text-align: center;
-        margin: 0 0 6px !important;
+        margin: 0 !important;
         font-size: 18px !important;
+        padding: 0;
       }
       .msg {
         text-align: center;
@@ -109,6 +117,17 @@ export interface ConfirmDialogData {
 export class ConfirmDialogComponent {
   private readonly ref = inject(MatDialogRef<ConfirmDialogComponent, boolean>);
   readonly data = inject<ConfirmDialogData>(MAT_DIALOG_DATA);
+
+  readonly resolvedIcon = computed<string | null>(() => {
+    const raw = this.data.icon;
+    if (raw && REGISTERED_ICONS.has(raw.toLowerCase())) {
+      return raw;
+    }
+    if (this.data.destructive) {
+      return 'trash-2';
+    }
+    return raw ? 'check-circle' : null;
+  });
 
   close(result: boolean): void {
     this.ref.close(result);

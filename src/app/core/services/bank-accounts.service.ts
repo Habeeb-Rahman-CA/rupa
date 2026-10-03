@@ -129,7 +129,7 @@ export class BankAccountsService {
     const isFirst = this._bankAccounts().length === 0;
 
     const newCard: BankAccount = {
-      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `card_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: generateUniqueId('card'),
       owner_id: ownerId,
       bank_name: account.bank_name.trim(),
       account_name: account.account_name.trim() || `${account.bank_name} Card`,
@@ -159,15 +159,18 @@ export class BankAccountsService {
     if (newCard.is_primary) {
       try {
         const txService = this.injector.get(TransactionsService);
-        void txService.mapUnassignedTransactionsToPrimary(newCard.id);
-      } catch {}
+        await txService.mapUnassignedTransactionsToPrimary(newCard.id);
+      } catch (err) {
+        console.error('Failed to map unassigned transactions to new primary card', err);
+      }
     }
 
     // Attempt remote save in background
     try {
-      await this.supabase.client.from('bank_accounts').insert(newCard);
-    } catch {
-      // Remote save optional
+      const { error } = await this.supabase.client.from('bank_accounts').insert(newCard);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Failed to save new bank account in Supabase', err);
     }
 
     return newCard;
@@ -192,13 +195,46 @@ export class BankAccountsService {
 
     const updatedCard = updatedList.find((c) => c.id === id) ?? null;
 
+    if (changes.is_primary) {
+      try {
+        const txService = this.injector.get(TransactionsService);
+        await txService.mapUnassignedTransactionsToPrimary(id);
+      } catch (err) {
+        console.error('Failed to map unassigned transactions to primary card', err);
+      }
+    }
+
+    const ownerId = this.auth.user()?.id;
     try {
-      await this.supabase.client
-        .from('bank_accounts')
-        .update(changes)
-        .eq('id', id);
-    } catch {
-      // Remote update optional
+      if (changes.is_primary) {
+        // Set target account primary FIRST
+        const targetQuery = this.supabase.client
+          .from('bank_accounts')
+          .update(changes)
+          .eq('id', id);
+        if (ownerId) targetQuery.eq('owner_id', ownerId);
+        const { error: targetErr } = await targetQuery;
+        if (targetErr) throw targetErr;
+
+        // Unset primary flag on other accounts
+        const othersQuery = this.supabase.client
+          .from('bank_accounts')
+          .update({ is_primary: false })
+          .neq('id', id);
+        if (ownerId) othersQuery.eq('owner_id', ownerId);
+        const { error: othersErr } = await othersQuery;
+        if (othersErr) throw othersErr;
+      } else {
+        const query = this.supabase.client
+          .from('bank_accounts')
+          .update(changes)
+          .eq('id', id);
+        if (ownerId) query.eq('owner_id', ownerId);
+        const { error } = await query;
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error('Failed to update bank account in Supabase', err);
     }
 
     return updatedCard;
@@ -216,9 +252,10 @@ export class BankAccountsService {
     this.saveToLocal(updatedList);
 
     try {
-      await this.supabase.client.from('bank_accounts').delete().eq('id', id);
-    } catch {
-      // Remote delete optional
+      const { error } = await this.supabase.client.from('bank_accounts').delete().eq('id', id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Failed to delete bank account in Supabase', err);
     }
   }
 
@@ -232,20 +269,32 @@ export class BankAccountsService {
 
     try {
       const txService = this.injector.get(TransactionsService);
-      void txService.mapUnassignedTransactionsToPrimary(id);
-    } catch {}
+      await txService.mapUnassignedTransactionsToPrimary(id);
+    } catch (err) {
+      console.error('Failed to map unassigned transactions to primary account', err);
+    }
 
+    const ownerId = this.auth.user()?.id;
     try {
-      await this.supabase.client
-        .from('bank_accounts')
-        .update({ is_primary: false })
-        .neq('id', id);
-      await this.supabase.client
+      // Set the target account to primary FIRST so the database is never left with 0 primary accounts
+      const targetQuery = this.supabase.client
         .from('bank_accounts')
         .update({ is_primary: true })
         .eq('id', id);
-    } catch {
-      // Remote update optional
+      if (ownerId) targetQuery.eq('owner_id', ownerId);
+      const { error: targetErr } = await targetQuery;
+      if (targetErr) throw targetErr;
+
+      // Unset primary flag on all other accounts for this user
+      const othersQuery = this.supabase.client
+        .from('bank_accounts')
+        .update({ is_primary: false })
+        .neq('id', id);
+      if (ownerId) othersQuery.eq('owner_id', ownerId);
+      const { error: othersErr } = await othersQuery;
+      if (othersErr) throw othersErr;
+    } catch (err) {
+      console.error('Failed to update primary status in Supabase', err);
     }
   }
 
@@ -282,3 +331,23 @@ export class BankAccountsService {
     }
   }
 }
+
+function generateUniqueId(prefix = 'card'): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+  const ts = Date.now().toString(36);
+  const perf = typeof performance !== 'undefined' ? performance.now().toString(36).replace('.', '') : '';
+  const rand1 = Math.random().toString(36).substring(2, 10);
+  const rand2 = Math.random().toString(36).substring(2, 10);
+  return `${prefix}_${ts}_${perf}_${rand1}${rand2}`;
+}
+

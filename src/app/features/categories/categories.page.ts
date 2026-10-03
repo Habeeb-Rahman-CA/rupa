@@ -54,111 +54,141 @@ import { CategoryDialogComponent } from './category-dialog.component';
         </button>
       </div>
     } @else {
+      <div class="filter-bar">
+        <mat-button-toggle-group
+          [value]="activeFilter()"
+          (change)="activeFilter.set($event.value)"
+          hideSingleSelectionIndicator
+          class="filter-toggle"
+        >
+          <mat-button-toggle value="all">All</mat-button-toggle>
+          <mat-button-toggle value="savings">Savings</mat-button-toggle>
+          <mat-button-toggle value="expense">Expense</mat-button-toggle>
+          <mat-button-toggle value="income">Income</mat-button-toggle>
+        </mat-button-toggle-group>
+      </div>
+
       <!-- SAVINGS CATEGORIES -->
-      <section class="group">
-        <div class="group-head">
-          <div class="kind-icon savings">
-            <lucide-icon name="piggy-bank" />
+      @if (activeFilter() === 'all' || activeFilter() === 'savings') {
+        <section class="group">
+          <div class="group-head">
+            <div class="kind-icon savings">
+              <lucide-icon name="piggy-bank" />
+            </div>
+            <div class="group-title">
+              <div class="group-label">Savings</div>
+              <div class="group-count">{{ savings().length }} {{ savings().length === 1 ? 'category' : 'categories' }}</div>
+            </div>
           </div>
-          <div class="group-title">
-            <div class="group-label">Savings</div>
-            <div class="group-count">{{ savings().length }} {{ savings().length === 1 ? 'category' : 'categories' }}</div>
-          </div>
-        </div>
-        @if (savings().length > 0) {
-          <ul class="list">
-            @for (c of savings(); track c.id) {
-              <app-swipeable-row (delete)="confirmRemove(c)">
-                <div class="row">
-                  <div class="icon-tile" [style.background]="colorFor(c.name)">
-                    <lucide-icon [name]="iconFor(c.name)" />
-                  </div>
-                  <div class="mid">
-                    <div class="title">{{ c.name }}</div>
-                    <div class="sub kind-tag savings">
-                      <lucide-icon name="piggy-bank" /> Savings
+          @if (savings().length > 0) {
+            <ul class="list">
+              @for (c of savings(); track c.id) {
+                <app-swipeable-row (delete)="confirmRemove(c)">
+                  <div class="row">
+                    <div class="icon-tile" [style.background]="colorFor(c.name)">
+                      <lucide-icon [name]="iconFor(c.name)" />
+                    </div>
+                    <div class="mid">
+                      <div class="title">{{ c.name }}</div>
+                      <div class="sub kind-tag savings">
+                        <lucide-icon name="piggy-bank" /> Savings
+                      </div>
                     </div>
                   </div>
-                </div>
-              </app-swipeable-row>
-            }
-          </ul>
-        } @else {
-          <div class="app-card placeholder">No savings categories yet.</div>
-        }
-      </section>
+                </app-swipeable-row>
+              }
+            </ul>
+          } @else {
+            <div class="app-card placeholder">No savings categories yet.</div>
+          }
+        </section>
+      }
 
       <!-- EXPENSE CATEGORIES -->
-      <section class="group">
-        <div class="group-head">
-          <div class="kind-icon negative">
-            <lucide-icon name="arrow-down" />
+      @if (activeFilter() === 'all' || activeFilter() === 'expense') {
+        <section class="group">
+          <div class="group-head">
+            <div class="kind-icon negative">
+              <lucide-icon name="arrow-down" />
+            </div>
+            <div class="group-title">
+              <div class="group-label">Expense</div>
+              <div class="group-count">{{ expenses().length }} {{ expenses().length === 1 ? 'category' : 'categories' }}</div>
+            </div>
           </div>
-          <div class="group-title">
-            <div class="group-label">Expense</div>
-            <div class="group-count">{{ expenses().length }} {{ expenses().length === 1 ? 'category' : 'categories' }}</div>
-          </div>
-        </div>
-        @if (expenses().length > 0) {
-          <ul class="list">
-            @for (c of expenses(); track c.id) {
-              <app-swipeable-row (delete)="confirmRemove(c)">
-                <div class="row">
-                  <div class="icon-tile" [style.background]="colorFor(c.name)">
-                    <lucide-icon [name]="iconFor(c.name)" />
-                  </div>
-                  <div class="mid">
-                    <div class="title">{{ c.name }}</div>
-                    <div class="sub kind-tag negative">
-                      <lucide-icon name="arrow-down" /> Expense
+          @if (expenses().length > 0) {
+            <ul class="list">
+              @for (c of expenses(); track c.id) {
+                <app-swipeable-row (delete)="confirmRemove(c)">
+                  <div class="row">
+                    <div class="icon-tile" [style.background]="colorFor(c.name)">
+                      <lucide-icon [name]="iconFor(c.name)" />
+                    </div>
+                    <div class="mid">
+                      <div class="title">{{ c.name }}</div>
+                      <div class="sub kind-tag negative">
+                        <lucide-icon name="arrow-down" /> Expense
+                      </div>
                     </div>
                   </div>
-                </div>
-              </app-swipeable-row>
-            }
-          </ul>
-        } @else {
-          <div class="app-card placeholder">No expense categories yet.</div>
-        }
-      </section>
+                </app-swipeable-row>
+              }
+            </ul>
+          } @else {
+            <div class="app-card placeholder">No expense categories yet.</div>
+          }
+        </section>
+      }
 
       <!-- INCOME CATEGORIES -->
-      <section class="group">
-        <div class="group-head">
-          <div class="kind-icon positive">
-            <lucide-icon name="arrow-up" />
+      @if (activeFilter() === 'all' || activeFilter() === 'income') {
+        <section class="group">
+          <div class="group-head">
+            <div class="kind-icon positive">
+              <lucide-icon name="arrow-up" />
+            </div>
+            <div class="group-title">
+              <div class="group-label">Income</div>
+              <div class="group-count">{{ incomes().length }} {{ incomes().length === 1 ? 'category' : 'categories' }}</div>
+            </div>
           </div>
-          <div class="group-title">
-            <div class="group-label">Income</div>
-            <div class="group-count">{{ incomes().length }} {{ incomes().length === 1 ? 'category' : 'categories' }}</div>
-          </div>
-        </div>
-        @if (incomes().length > 0) {
-          <ul class="list">
-            @for (c of incomes(); track c.id) {
-              <app-swipeable-row (delete)="confirmRemove(c)">
-                <div class="row">
-                  <div class="icon-tile" [style.background]="colorFor(c.name)">
-                    <lucide-icon [name]="iconFor(c.name)" />
-                  </div>
-                  <div class="mid">
-                    <div class="title">{{ c.name }}</div>
-                    <div class="sub kind-tag positive">
-                      <lucide-icon name="arrow-up" /> Income
+          @if (incomes().length > 0) {
+            <ul class="list">
+              @for (c of incomes(); track c.id) {
+                <app-swipeable-row (delete)="confirmRemove(c)">
+                  <div class="row">
+                    <div class="icon-tile" [style.background]="colorFor(c.name)">
+                      <lucide-icon [name]="iconFor(c.name)" />
+                    </div>
+                    <div class="mid">
+                      <div class="title">{{ c.name }}</div>
+                      <div class="sub kind-tag positive">
+                        <lucide-icon name="arrow-up" /> Income
+                      </div>
                     </div>
                   </div>
-                </div>
-              </app-swipeable-row>
-            }
-          </ul>
-        } @else {
-          <div class="app-card placeholder">No income categories yet.</div>
-        }
-      </section>
+                </app-swipeable-row>
+              }
+            </ul>
+          } @else {
+            <div class="app-card placeholder">No income categories yet.</div>
+          }
+        </section>
+      }
     }
   `,
   styles: [
     `
+      .filter-bar {
+        margin-bottom: 20px;
+      }
+      .filter-toggle {
+        width: 100%;
+        display: flex;
+      }
+      .filter-toggle mat-button-toggle {
+        flex: 1;
+      }
       .add-card { margin-bottom: 20px; padding: 16px; }
       .add-form {
         display: flex;
@@ -277,6 +307,8 @@ export class CategoriesPage {
   private readonly service = inject(CategoriesService);
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
+
+  readonly activeFilter = signal<'all' | 'savings' | 'expense' | 'income'>('all');
 
   readonly categories = this.service.categories;
   readonly savings = computed(() =>

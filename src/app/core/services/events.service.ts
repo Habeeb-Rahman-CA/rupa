@@ -271,6 +271,7 @@ export class EventsService {
     } catch (err) {
       console.error('Failed to load event detail', err);
       this._currentDetail.set(null);
+      throw err;
     } finally {
       this._isLoading.set(false);
     }
@@ -371,17 +372,22 @@ export class EventsService {
     const exp = detail?.expenses.find((e) => e.id === expenseId);
     if (!exp || !detail) return;
 
-    // Cascade removes event_expense_participants.
+    // Delete linked transaction first to prevent stranded transactions if deletion fails
+    try {
+      await this.txService.delete(exp.transactionId);
+    } catch (err) {
+      console.error('Failed to delete transaction for event expense', err);
+      throw err;
+    }
+
     const { error } = await this.supabase.client
       .from('event_expenses')
       .delete()
       .eq('id', expenseId);
-    if (error) {
-      console.error('Failed to delete expense', error);
+    if (error && error.code !== 'PGRST116') {
+      console.error('Failed to delete event expense row', error);
       throw error;
     }
-    // The linked transaction has ON DELETE RESTRICT — remove it now.
-    await this.supabase.client.from('transactions').delete().eq('id', exp.transactionId);
 
     await this.loadDetail(detail.event.id);
     await this.txService.refresh();
@@ -439,18 +445,22 @@ export class EventsService {
     );
     if (!settlement) return;
 
+    // Delete linked transaction first to prevent stranded transactions if deletion fails
+    try {
+      await this.txService.delete(settlement.transaction_id);
+    } catch (err) {
+      console.error('Failed to delete transaction for settlement', err);
+      throw err;
+    }
+
     const { error } = await this.supabase.client
       .from('event_settlements')
       .delete()
       .eq('id', settlement.id);
-    if (error) {
-      console.error('Failed to remove settlement', error);
+    if (error && error.code !== 'PGRST116') {
+      console.error('Failed to remove settlement row', error);
       throw error;
     }
-    await this.supabase.client
-      .from('transactions')
-      .delete()
-      .eq('id', settlement.transaction_id);
 
     await this.loadDetail(detail.event.id);
     await this.txService.refresh();
@@ -498,17 +508,18 @@ export class EventsService {
       }
     }
 
-    // Person name lookup
-    const people = this.peopleService.people();
-    const nameOf = (personId: string | null): string =>
-      people.find((p) => p.id === personId)?.name ?? 'Unknown';
+    // Person name lookup map for O(1) retrieval
+    const peopleMap = new Map<string, string>();
+    for (const p of this.peopleService.people()) {
+      peopleMap.set(p.id, p.name);
+    }
 
     const settledSet = new Set(settlements.map((s) => s.event_participant_id));
 
     const participantsOut: ParticipantWithMeta[] = participants.map((p) => ({
       id: p.id,
       personId: p.person_id,
-      name: p.is_you ? 'You' : nameOf(p.person_id),
+      name: p.is_you ? 'You' : (p.person_id ? peopleMap.get(p.person_id) ?? 'Unknown' : 'Unknown'),
       isYou: p.is_you,
       totalShare: shareBy.get(p.id) ?? 0,
       isSettled: settledSet.has(p.id),
@@ -540,19 +551,6 @@ export class EventsService {
     };
   }
 
-  private async insertTransaction(payload: Record<string, unknown>): Promise<Transaction> {
-    const { data, error } = await this.supabase.client
-      .from('transactions')
-      .insert(payload)
-      .select()
-      .single();
-    if (error) {
-      console.error('Failed to insert linked transaction', error);
-      throw error;
-    }
-    return data as Transaction;
-  }
-
   private requireUserId(): string {
     const id = this.auth.user()?.id;
     if (!id) throw new Error('Not signed in.');
@@ -561,9 +559,13 @@ export class EventsService {
 }
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function round2(n: number): number {
-  return Math.round(n * 100) / 100;
+  return Math.round((n + Number.EPSILON) * 100) / 100;
 }

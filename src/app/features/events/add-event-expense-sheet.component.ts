@@ -4,6 +4,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Router } from '@angular/router';
+import { LucideAngularModule } from 'lucide-angular';
 
 import { EventsService, ParticipantWithMeta } from '../../core/services/events.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
@@ -25,6 +27,7 @@ export interface AddEventExpenseSheetData {
     MatButtonModule,
     MatButtonToggleModule,
     MatCheckboxModule,
+    LucideAngularModule,
     SignedMoneyPipe,
     TextFieldComponent,
     DateFieldComponent,
@@ -79,14 +82,22 @@ export interface AddEventExpenseSheetData {
         </mat-button-toggle-group>
       </div>
 
-      @if (paymentMode() === 'bank' && bankAccountOptions().length > 0) {
-        <app-select-field
-          label="Bank Account"
-          placeholder="Select Bank Account"
-          [options]="bankAccountOptions()"
-          [value]="selectedBankAccountId()"
-          (valueChange)="selectedBankAccountId.set($any($event))"
-        />
+      @if (paymentMode() === 'bank') {
+        @if (bankAccountOptions().length > 0) {
+          <app-select-field
+            label="Bank Account"
+            placeholder="Select Bank Account"
+            [options]="bankAccountOptions()"
+            [value]="selectedBankAccountId()"
+            (valueChange)="selectedBankAccountId.set($any($event))"
+          />
+        } @else {
+          <div class="no-bank-notice">
+            <lucide-icon name="alert-circle" />
+            <span>No bank accounts added yet.</span>
+            <button type="button" class="link-btn" (click)="openBankAccounts()">Add Account</button>
+          </div>
+        }
       }
 
       <div class="participants-head">
@@ -158,6 +169,34 @@ export interface AddEventExpenseSheetData {
       .payment-mode-toggle mat-button-toggle {
         flex: 1;
       }
+      .no-bank-notice {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        background: var(--app-bg-hover);
+        border: 1px dashed var(--app-hairline);
+        border-radius: var(--app-radius-md);
+        font-size: 13px;
+        color: var(--app-ink-muted);
+      }
+      .no-bank-notice lucide-icon {
+        width: 16px;
+        height: 16px;
+        color: var(--app-ink-subtle);
+        flex: 0 0 auto;
+      }
+      .link-btn {
+        background: none;
+        border: none;
+        padding: 0;
+        margin-left: auto;
+        color: var(--app-accent);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .link-btn:hover { text-decoration: underline; }
       .participants-head {
         display: flex;
         justify-content: space-between;
@@ -195,6 +234,7 @@ export class AddEventExpenseSheetComponent {
   private readonly eventsService = inject(EventsService);
   private readonly bankAccountsService = inject(BankAccountsService);
   private readonly snack = inject(MatSnackBar);
+  private readonly router = inject(Router);
   readonly data = inject<AddEventExpenseSheetData>(MAT_BOTTOM_SHEET_DATA);
 
   readonly description = signal('');
@@ -310,6 +350,11 @@ export class AddEventExpenseSheetComponent {
 
   close(): void {
     this.ref.dismiss();
+  }
+
+  openBankAccounts(): void {
+    this.ref.dismiss();
+    void this.router.navigate(['/bank-accounts']);
   }
 }
 

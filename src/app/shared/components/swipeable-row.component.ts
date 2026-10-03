@@ -1,4 +1,12 @@
-import { Component, EventEmitter, Output, signal, computed } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  EventEmitter,
+  Output,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 @Component({
@@ -104,6 +112,8 @@ import { LucideAngularModule } from 'lucide-angular';
 export class SwipeableRowComponent {
   @Output() delete = new EventEmitter<void>();
 
+  private readonly destroyRef = inject(DestroyRef);
+
   readonly translateX = signal(0);
   readonly animating = signal(false);
 
@@ -117,6 +127,31 @@ export class SwipeableRowComponent {
   private startY = 0;
   private isDragging = false;
   private isHorizontal = false;
+  private activeTimer: ReturnType<typeof setTimeout> | null = null;
+  private isDestroyed = false;
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      this.isDestroyed = true;
+      this.clearTimer();
+    });
+  }
+
+  private clearTimer(): void {
+    if (this.activeTimer !== null) {
+      clearTimeout(this.activeTimer);
+      this.activeTimer = null;
+    }
+  }
+
+  private scheduleReset(delayMs = 300): void {
+    this.clearTimer();
+    this.activeTimer = setTimeout(() => {
+      if (!this.isDestroyed) {
+        this.reset();
+      }
+    }, delayMs);
+  }
 
   transformStyle(): string {
     const x = this.translateX();
@@ -147,6 +182,7 @@ export class SwipeableRowComponent {
         } catch {}
       } else if (Math.abs(dy) > 8) {
         this.isDragging = false;
+        this.reset();
         return;
       }
     }
@@ -170,7 +206,7 @@ export class SwipeableRowComponent {
     if (currentX < -60) {
       this.translateX.set(-80);
       this.delete.emit();
-      setTimeout(() => this.reset(), 300);
+      this.scheduleReset(300);
     } else {
       this.reset();
     }
@@ -179,10 +215,12 @@ export class SwipeableRowComponent {
   onDeleteClick(e: MouseEvent): void {
     e.stopPropagation();
     this.delete.emit();
-    setTimeout(() => this.reset(), 300);
+    this.scheduleReset(300);
   }
 
   reset(): void {
+    this.clearTimer();
+    if (this.isDestroyed) return;
     this.animating.set(true);
     this.translateX.set(0);
   }

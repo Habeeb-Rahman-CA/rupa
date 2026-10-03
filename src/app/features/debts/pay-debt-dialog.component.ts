@@ -3,6 +3,8 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Router } from '@angular/router';
+import { LucideAngularModule } from 'lucide-angular';
 
 import { DebtsService } from '../../core/services/debts.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
@@ -23,94 +25,147 @@ export interface PayDebtDialogData {
     MatDialogModule,
     MatButtonModule,
     MatButtonToggleModule,
+    LucideAngularModule,
     SignedMoneyPipe,
     TextFieldComponent,
     SelectFieldComponent,
   ],
   template: `
-    <h2 mat-dialog-title>
-      @if (data.debt.direction === 'i_owe') {
-        Pay {{ data.personName }} back
-      } @else {
-        {{ data.personName }} paid you
-      }
-    </h2>
-
-    <mat-dialog-content class="content">
-      <p class="outstanding">
-        Outstanding: <strong>{{ +data.debt.outstanding | signedMoney }}</strong>
-      </p>
-
-      <app-text-field
-        label="Amount"
-        placeholder="0.00"
-        type="number"
-        inputmode="decimal"
-        [min]="0"
-        [max]="+data.debt.outstanding"
-        [step]="0.01"
-        [value]="amount()"
-        (valueChange)="amount.set(toNum($event))"
-        (enter)="save()"
-        [autofocus]="true"
-      >
-        <span prefix>₹</span>
-      </app-text-field>
-
-      <div class="field-group">
-        <label class="ft-label">Payment Mode</label>
-        <mat-button-toggle-group
-          [value]="paymentMode()"
-          (change)="setPaymentMode($event.value)"
-          hideSingleSelectionIndicator
-          class="payment-mode-toggle"
-        >
-          <mat-button-toggle value="cash">Cash</mat-button-toggle>
-          <mat-button-toggle value="bank">Bank Account</mat-button-toggle>
-        </mat-button-toggle-group>
+    <div class="dialog-container">
+      <!-- Header -->
+      <div class="dialog-header">
+        <div class="header-text-group">
+          <h2 mat-dialog-title class="dialog-title">
+            @if (data.debt.direction === 'i_owe') {
+              Pay {{ data.personName }} back
+            } @else {
+              {{ data.personName }} paid you
+            }
+          </h2>
+          <p class="dialog-subtitle">Record a settlement transaction for this debt</p>
+        </div>
       </div>
 
-      @if (paymentMode() === 'bank' && bankAccountOptions().length > 0) {
-        <app-select-field
-          label="Bank Account"
-          placeholder="Select Bank Account"
-          [options]="bankAccountOptions()"
-          [value]="selectedBankAccountId()"
-          (valueChange)="selectedBankAccountId.set($any($event))"
+      <mat-dialog-content class="dialog-content">
+        <p class="outstanding">
+          Outstanding balance: <strong>{{ +data.debt.outstanding | signedMoney }}</strong>
+        </p>
+
+        <app-text-field
+          label="Amount"
+          placeholder="0.00"
+          type="number"
+          inputmode="decimal"
+          [min]="0"
+          [max]="+data.debt.outstanding"
+          [step]="0.01"
+          [value]="amount()"
+          (valueChange)="amount.set(toNum($event))"
+          (enter)="save()"
+          [autofocus]="true"
+        >
+          <span prefix>₹</span>
+        </app-text-field>
+
+        <div class="field-group">
+          <label class="ft-label">Payment Mode</label>
+          <mat-button-toggle-group
+            [value]="paymentMode()"
+            (change)="setPaymentMode($event.value)"
+            hideSingleSelectionIndicator
+            class="payment-mode-toggle"
+          >
+            <mat-button-toggle value="cash">Cash</mat-button-toggle>
+            <mat-button-toggle value="bank">Bank Account</mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+
+        @if (paymentMode() === 'bank') {
+          @if (bankAccountOptions().length > 0) {
+            <app-select-field
+              label="Bank Account"
+              placeholder="Select Bank Account"
+              [options]="bankAccountOptions()"
+              [value]="selectedBankAccountId()"
+              (valueChange)="selectedBankAccountId.set($any($event))"
+            />
+          } @else {
+            <div class="no-bank-notice">
+              <lucide-icon name="alert-circle" />
+              <span>No bank accounts added yet.</span>
+              <button type="button" class="link-btn" (click)="openBankAccounts()">Add Account</button>
+            </div>
+          }
+        }
+
+        <app-text-field
+          label="Note (optional)"
+          placeholder="e.g. Paid via UPI"
+          [maxlength]="120"
+          [value]="notes()"
+          (valueChange)="notes.set($any($event) ?? '')"
         />
-      }
+      </mat-dialog-content>
 
-      <app-text-field
-        label="Note (optional)"
-        placeholder="e.g. Paid via UPI"
-        [maxlength]="120"
-        [value]="notes()"
-        (valueChange)="notes.set($any($event) ?? '')"
-      />
-    </mat-dialog-content>
-
-    <mat-dialog-actions align="end">
-      <button mat-button (click)="close()" [disabled]="submitting()">Cancel</button>
-      <button
-        mat-flat-button
-        color="primary"
-        (click)="save()"
-        [disabled]="!canSave() || submitting()"
-      >
-        {{ submitting() ? 'Saving…' : 'Save' }}
-      </button>
-    </mat-dialog-actions>
+      <!-- Actions Footer -->
+      <mat-dialog-actions align="end" class="dialog-actions">
+        <button mat-button type="button" (click)="close()" [disabled]="submitting()" class="cancel-btn">Cancel</button>
+        <button
+          mat-flat-button
+          color="primary"
+          type="button"
+          (click)="save()"
+          [disabled]="!canSave() || submitting()"
+          class="save-btn"
+        >
+          {{ submitting() ? 'Saving…' : 'Save Payment' }}
+        </button>
+      </mat-dialog-actions>
+    </div>
   `,
   styles: [
     `
-      .content {
+      .dialog-container {
+        padding: 4px;
+        max-width: 480px;
+        background: var(--app-surface);
+        color: var(--app-ink);
+        font-family: inherit;
+      }
+
+      /* Header */
+      .dialog-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 0 16px 12px 16px;
+        border-bottom: 1px solid var(--app-hairline);
+      }
+      .dialog-title {
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        color: var(--app-ink) !important;
+        margin: 0 !important;
+        line-height: 1.2 !important;
+        padding: 0 !important;
+      }
+      .dialog-subtitle {
+        font-size: 12px;
+        color: var(--app-ink-muted);
+        margin: 3px 0 0;
+      }
+
+      .dialog-content {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 14px;
+        padding-top: 16px !important;
+        padding-bottom: 16px !important;
         min-width: 300px;
       }
       .outstanding {
-        margin: 0 0 4px;
+        margin: 0 0 2px;
+        font-size: 13px;
         color: var(--app-ink-muted);
       }
       .field-group {
@@ -119,6 +174,7 @@ export interface PayDebtDialogData {
         gap: 6px;
       }
       .ft-label {
+        display: block;
         font-size: 13px;
         font-weight: 500;
         color: var(--app-ink);
@@ -130,6 +186,45 @@ export interface PayDebtDialogData {
       .payment-mode-toggle mat-button-toggle {
         flex: 1;
       }
+      .no-bank-notice {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        background: var(--app-bg-hover);
+        border: 1px dashed var(--app-hairline);
+        border-radius: var(--app-radius-md);
+        font-size: 13px;
+        color: var(--app-ink-muted);
+      }
+      .no-bank-notice lucide-icon {
+        width: 16px;
+        height: 16px;
+        color: var(--app-ink-subtle);
+        flex: 0 0 auto;
+      }
+      .link-btn {
+        background: none;
+        border: none;
+        padding: 0;
+        margin-left: auto;
+        color: var(--app-accent);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .link-btn:hover { text-decoration: underline; }
+      .dialog-actions {
+        padding-top: 12px;
+      }
+      .save-btn {
+        border-radius: var(--app-radius-md) !important;
+        font-weight: 600 !important;
+      }
+      .cancel-btn {
+        border-radius: var(--app-radius-md) !important;
+        color: var(--app-ink-muted) !important;
+      }
     `,
   ],
 })
@@ -138,6 +233,7 @@ export class PayDebtDialogComponent {
   private readonly debtsService = inject(DebtsService);
   private readonly bankAccountsService = inject(BankAccountsService);
   private readonly snack = inject(MatSnackBar);
+  private readonly router = inject(Router);
 
   readonly data = inject<PayDebtDialogData>(MAT_DIALOG_DATA);
   readonly submitting = signal(false);
@@ -221,6 +317,11 @@ export class PayDebtDialogComponent {
 
   close(): void {
     this.ref.close();
+  }
+
+  openBankAccounts(): void {
+    this.ref.close();
+    void this.router.navigate(['/bank-accounts']);
   }
 }
 

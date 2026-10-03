@@ -106,8 +106,9 @@ html {
   box-sizing: border-box;
 }
 
-// Prevent iOS Mobile Safari / Android Chrome auto-zoom on input focus in PWA
-input, select, textarea {
+// Prevent iOS Mobile Safari / Android Chrome auto-zoom on input focus in PWA & enforce uniform font-family
+button, input, select, textarea {
+  font-family: inherit;
   font-size: 16px;
 }
 
@@ -366,9 +367,12 @@ lucide-angular {
   border-radius: var(--app-radius-md) !important;
   box-shadow: var(--app-shadow-lg) !important;
   min-width: 200px !important;
+  max-width: calc(100vw - 32px) !important;
+  overflow-x: hidden !important;
   padding: 6px !important;
   background: var(--app-surface) !important;
   border: 1px solid var(--app-hairline);
+  box-sizing: border-box !important;
 }
 .mat-mdc-menu-content {
   padding: 0 !important;
@@ -830,3 +834,29 @@ lucide-angular {
 .mat-sidenav {
   overflow-x: hidden !important;
 }
+
+// ---------- View Transitions (Smooth 60fps/120fps Route Swaps) --------------
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.18s;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+::view-transition-old(root) {
+  animation-name: rupa-fade-out;
+}
+
+::view-transition-new(root) {
+  animation-name: rupa-fade-in;
+}
+
+@keyframes rupa-fade-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.985); }
+}
+
+@keyframes rupa-fade-in {
+  from { opacity: 0; transform: scale(1.008); }
+  to { opacity: 1; transform: scale(1); }
+}
+

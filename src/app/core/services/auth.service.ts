@@ -30,14 +30,26 @@ export class AuthService {
       .then(({ data, error }) => {
         if (error) {
           console.warn('Failed to restore Supabase session', error.message);
-          void this.signOut();
+          const status = error.status;
+          const msg = error.message?.toLowerCase() ?? '';
+          const isNetwork =
+            status === 0 ||
+            status === 502 ||
+            status === 503 ||
+            status === 504 ||
+            msg.includes('fetch') ||
+            msg.includes('network') ||
+            (typeof navigator !== 'undefined' && !navigator.onLine);
+
+          if (!isNetwork) {
+            void this.signOut();
+          }
         } else {
           this._session.set(data.session);
         }
       })
       .catch((err) => {
         console.error('Failed to restore Supabase session', err);
-        void this.signOut();
       })
       .finally(() => {
         this._ready.set(true);
@@ -76,19 +88,50 @@ export class AuthService {
   /**
    * Ask Supabase to refresh the access token using the persisted refresh
    * token. If the refresh token itself has expired or is invalid (HTTP 400),
-   * sign out cleanly so the user can log in again.
+   * sign out cleanly so the user can log in again. Offline network failures
+   * leave the existing session intact.
    */
   async refreshIfPossible(): Promise<void> {
     if (!this._session()) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+
     try {
       const { error } = await this.supabase.client.auth.refreshSession();
       if (error) {
-        // Refresh token expired, invalid, or revoked — user must sign in again.
-        console.warn('Session refresh failed:', error.message);
+        const msg = error.message?.toLowerCase() ?? '';
+        const status = error.status;
+
+        const isNetworkError =
+          status === 0 ||
+          status === 502 ||
+          status === 503 ||
+          status === 504 ||
+          msg.includes('fetch') ||
+          msg.includes('network') ||
+          msg.includes('offline');
+
+        if (isNetworkError) {
+          console.warn('Session refresh postponed due to network unavailability:', error.message);
+          return;
+        }
+
+        // Only sign out if the refresh token is explicitly invalid, expired, or revoked
+        console.warn('Session refresh failed with invalid token:', error.message);
         await this.signOut();
       }
-    } catch (err) {
-      console.error('Session refresh error:', err);
+    } catch (err: any) {
+      const msg = String(err?.message || err).toLowerCase();
+      const isNetworkError =
+        msg.includes('fetch') ||
+        msg.includes('network') ||
+        msg.includes('offline') ||
+        (typeof navigator !== 'undefined' && !navigator.onLine);
+
+      if (isNetworkError) {
+        console.warn('Session refresh network error, keeping session intact:', err);
+        return;
+      }
+      console.error('Fatal session refresh error:', err);
       await this.signOut();
     }
   }

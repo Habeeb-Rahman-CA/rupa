@@ -34,13 +34,26 @@ import { LucideAngularModule } from 'lucide-angular';
   ],
   template: `
     @if (label()) {
-      <label class="ft-label">{{ label() }}</label>
+      <label class="ft-label" (click)="picker.open()">{{ label() }}</label>
     }
 
-    <div class="df-wrap">
+    <div
+      class="df-wrap"
+      tabindex="0"
+      role="button"
+      [attr.aria-label]="label() || placeholder() || 'Choose date'"
+      [attr.aria-expanded]="isOpen()"
+      aria-haspopup="dialog"
+      (click)="picker.open()"
+      (keydown.enter)="$event.preventDefault(); picker.open()"
+      (keydown.space)="$event.preventDefault(); picker.open()"
+      (keydown.arrowdown)="$event.preventDefault(); picker.open()"
+      (focus)="isFocused.set(true)"
+      (blur)="isFocused.set(false)"
+    >
       <div
         class="df-trigger"
-        [class.focused]="isOpen()"
+        [class.focused]="isFocused() || isOpen()"
         [class.invalid]="invalid()"
       >
         <lucide-icon class="df-lead" name="calendar" />
@@ -49,13 +62,13 @@ import { LucideAngularModule } from 'lucide-angular';
         </span>
       </div>
 
-      <!-- Invisible toggle overlaying the trigger — receives the click -->
+      <!-- Invisible toggle overlaying the trigger -->
       <mat-datepicker-toggle
         class="df-toggle-overlay"
         [for]="picker"
         [disableRipple]="true"
         tabindex="-1"
-        aria-label="Open date picker"
+        aria-hidden="true"
       />
     </div>
 
@@ -87,11 +100,21 @@ import { LucideAngularModule } from 'lucide-angular';
         font-weight: 500;
         color: var(--app-ink);
         margin-bottom: 6px;
+        cursor: pointer;
       }
 
       .df-wrap {
         position: relative;
         width: 100%;
+        outline: none;
+        cursor: pointer;
+        border-radius: 14px;
+      }
+
+      .df-wrap:focus-visible .df-trigger {
+        background: #fff;
+        border-color: var(--app-accent);
+        box-shadow: 0 0 0 2px var(--app-accent-soft);
       }
 
       .df-trigger {
@@ -104,7 +127,6 @@ import { LucideAngularModule } from 'lucide-angular';
         border: 1px solid transparent;
         border-radius: 14px;
         transition: background .15s ease, border-color .15s ease;
-        pointer-events: none; // clicks go to the overlay toggle
       }
       .df-trigger.focused {
         background: #fff;
@@ -133,24 +155,23 @@ import { LucideAngularModule } from 'lucide-angular';
         color: var(--app-ink-subtle);
       }
 
-      // The mat-datepicker-toggle stretches over the trigger so any click
-      // in the field area opens the picker.
+      // The mat-datepicker-toggle stretches over the trigger
       .df-toggle-overlay {
         position: absolute;
         inset: 0;
         display: block;
         z-index: 1;
+        pointer-events: none;
       }
       .df-toggle-overlay ::ng-deep .mat-mdc-icon-button {
         width: 100%;
         height: 100%;
         border-radius: 14px;
-        opacity: 0;             // invisible but clickable
+        opacity: 0;
         --mdc-icon-button-state-layer-size: 100%;
       }
 
-      // Hide the underlying mat-form-field host; datepicker overlay is
-      // portalled to the body and remains visible.
+      // Hide the underlying mat-form-field host
       .hidden-host {
         position: absolute;
         left: 0;
@@ -173,6 +194,7 @@ export class DateFieldComponent {
   readonly valueChange = output<Date | null>();
 
   readonly isOpen = signal(false);
+  readonly isFocused = signal(false);
 
   onDateChange(e: MatDatepickerInputEvent<Date>): void {
     this.valueChange.emit(e.value ?? null);

@@ -8,12 +8,15 @@ import { AuthService } from '../services/auth.service';
  * route falsely redirects to /login because the guard runs synchronously
  * on boot while getSession() is still in flight.
  */
-export const authGuard: CanActivateFn = async () => {
+export const authGuard: CanActivateFn = async (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
   await auth.whenReady;
 
   if (auth.isAuthenticated()) return true;
-  return router.createUrlTree(['/login']);
+  return router.createUrlTree(['/login'], {
+    queryParams: { returnUrl: state.url },
+  });
 };
+

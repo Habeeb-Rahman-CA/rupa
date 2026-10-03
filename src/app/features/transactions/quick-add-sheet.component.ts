@@ -151,8 +151,9 @@ export interface QuickAddSheetData {
           />
         } @else {
           <div class="no-bank-notice">
-            <span>No bank accounts found.</span>
-            <button type="button" class="link-btn" (click)="openBankAccounts()">Add Bank Account</button>
+            <lucide-icon name="alert-circle" />
+            <span>No bank accounts added yet.</span>
+            <button type="button" class="link-btn" (click)="openBankAccounts()">Add Account</button>
           </div>
         }
       }
@@ -192,13 +193,6 @@ export interface QuickAddSheetData {
         [value]="notes()"
         (valueChange)="notes.set($event ? String($event) : '')"
       />
-
-      <div class="starting-balance-link">
-        Setting your initial money?
-        <button type="button" class="link-btn" (click)="openStartingBalance()">
-          Set starting balance
-        </button>
-      </div>
 
       <div class="actions">
         <button mat-button (click)="close()" [disabled]="submitting()">Cancel</button>
@@ -252,12 +246,19 @@ export interface QuickAddSheetData {
       .no-bank-notice {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        gap: 8px;
         padding: 10px 14px;
         background: var(--app-bg-hover);
+        border: 1px dashed var(--app-hairline);
         border-radius: var(--app-radius-md);
         font-size: 13px;
         color: var(--app-ink-muted);
+      }
+      .no-bank-notice lucide-icon {
+        width: 16px;
+        height: 16px;
+        color: var(--app-ink-subtle);
+        flex: 0 0 auto;
       }
       .cat-label { margin-bottom: 8px; }
       .starting-balance-link {
@@ -268,6 +269,7 @@ export interface QuickAddSheetData {
         background: none;
         border: none;
         padding: 0;
+        margin-left: auto;
         color: var(--app-accent);
         font-size: 12px;
         font-weight: 600;

@@ -4,6 +4,7 @@ import {
   MatDialogModule,
   MatDialogRef,
 } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { CONTACT_INFO } from '../../core/contact-info';
@@ -15,62 +16,82 @@ import { CONTACT_INFO } from '../../core/contact-info';
 @Component({
   selector: 'app-contact-dialog',
   standalone: true,
-  imports: [MatDialogModule, LucideAngularModule],
+  imports: [MatDialogModule, MatButtonModule, LucideAngularModule],
   template: `
-    <div class="wrap">
-      <div class="head">
-        <h2>Contact us</h2>
-        <p>Pick a way to reach out — we'll get back to you shortly.</p>
+    <div class="dialog-container">
+      <!-- Header -->
+      <div class="dialog-header">
+        <div class="header-text-group">
+          <h2 mat-dialog-title class="dialog-title">Contact us</h2>
+          <p class="dialog-subtitle">Pick a way to reach out — we'll get back to you shortly</p>
+        </div>
       </div>
 
-      <div class="options">
-        <a class="opt" [href]="mailtoHref">
-          <div class="opt-icon">
-            <lucide-icon name="mail" />
-          </div>
-          <div class="opt-body">
-            <div class="opt-label">Email</div>
-            <div class="opt-value">{{ contact.email }}</div>
-          </div>
-        </a>
+      <mat-dialog-content class="dialog-content">
+        <div class="options">
+          <a class="opt" [href]="mailtoHref">
+            <div class="opt-icon">
+              <lucide-icon name="mail" />
+            </div>
+            <div class="opt-body">
+              <div class="opt-label">Email</div>
+              <div class="opt-value">{{ contact.email }}</div>
+            </div>
+          </a>
 
-        <a class="opt" [href]="telHref">
-          <div class="opt-icon">
-            <lucide-icon name="phone" />
-          </div>
-          <div class="opt-body">
-            <div class="opt-label">Phone</div>
-            <div class="opt-value">{{ contact.phone }}</div>
-          </div>
-        </a>
-      </div>
+          <a class="opt" [href]="telHref">
+            <div class="opt-icon">
+              <lucide-icon name="phone" />
+            </div>
+            <div class="opt-body">
+              <div class="opt-label">Phone</div>
+              <div class="opt-value">{{ contact.phone }}</div>
+            </div>
+          </a>
+        </div>
+      </mat-dialog-content>
 
-      <mat-dialog-actions align="end" class="actions">
-        <button mat-dialog-close class="close-btn">Close</button>
+      <mat-dialog-actions align="end" class="dialog-actions">
+        <button mat-flat-button color="primary" mat-dialog-close class="close-btn">Close</button>
       </mat-dialog-actions>
     </div>
   `,
   styles: [
     `
-      .wrap {
-        min-width: 300px;
-        max-width: 380px;
-        padding: 24px;
-      }
-      .head {
-        text-align: center;
-        margin-bottom: 16px;
-      }
-      .head h2 {
-        margin: 0 0 6px;
-        font-size: 18px;
-        font-weight: 700;
+      .dialog-container {
+        padding: 4px;
+        max-width: 420px;
+        background: var(--app-surface);
         color: var(--app-ink);
+        font-family: inherit;
       }
-      .head p {
-        margin: 0;
-        font-size: 13px;
+
+      /* Header */
+      .dialog-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 0 16px 12px 16px;
+        border-bottom: 1px solid var(--app-hairline);
+      }
+      .dialog-title {
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        color: var(--app-ink) !important;
+        margin: 0 !important;
+        line-height: 1.2 !important;
+        padding: 0 !important;
+      }
+      .dialog-subtitle {
+        font-size: 12px;
         color: var(--app-ink-muted);
+        margin: 3px 0 0;
+      }
+
+      .dialog-content {
+        padding-top: 16px !important;
+        padding-bottom: 16px !important;
+        min-width: 280px;
       }
 
       .options {
@@ -122,20 +143,14 @@ import { CONTACT_INFO } from '../../core/contact-info';
         white-space: nowrap;
       }
 
-      .actions {
-        padding: 12px 4px 0 !important;
+      .dialog-actions {
+        padding-top: 12px;
       }
       .close-btn {
-        border: 0;
-        background: transparent;
-        color: var(--app-ink-muted);
-        font: inherit;
-        font-weight: 500;
-        padding: 8px 14px;
-        border-radius: 999px;
-        cursor: pointer;
-
-        &:hover { color: var(--app-ink); background: var(--app-canvas); }
+        background: var(--app-ink-dark) !important;
+        color: #ffffff !important;
+        border-radius: var(--app-radius-md) !important;
+        font-weight: 600 !important;
       }
     `,
   ],

@@ -2,7 +2,7 @@ import {
   Component,
   computed,
   ElementRef,
-  ViewChild,
+  viewChild,
   input,
   output,
   signal,
@@ -52,7 +52,11 @@ export interface SelectOption<T = string> {
     </button>
 
     <mat-menu #menu="matMenu" [xPosition]="'before'">
-      <div class="sf-menu-inner" [style.min-width.px]="menuMinWidth()">
+      <div
+        class="sf-menu-inner"
+        [style.width.px]="menuMinWidth()"
+        [style.max-width.px]="menuMinWidth()"
+      >
         @for (opt of options(); track opt.value) {
           <button
             mat-menu-item
@@ -63,7 +67,7 @@ export interface SelectOption<T = string> {
             @if (opt.icon) {
               <lucide-icon [name]="opt.icon" />
             }
-            <span>{{ opt.label }}</span>
+            <span class="sf-item-label">{{ opt.label }}</span>
           </button>
         }
       </div>
@@ -135,6 +139,42 @@ export interface SelectOption<T = string> {
     `,
     // Menu items — styled globally by our overrides; selected state accent
     `
+      ::ng-deep .sf-menu-inner {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        max-height: 240px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+      }
+      ::ng-deep .sf-menu-inner::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::ng-deep .sf-menu-inner::-webkit-scrollbar-thumb {
+        background: var(--app-hairline);
+        border-radius: 999px;
+      }
+      ::ng-deep .sf-menu-inner .mat-mdc-menu-item {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+      }
+      ::ng-deep .sf-menu-inner .mat-mdc-menu-item-text {
+        display: flex !important;
+        align-items: center !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+      }
+      ::ng-deep .sf-menu-inner .sf-item-label {
+        flex: 1 !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
       ::ng-deep .sf-menu-inner .selected {
         background: var(--app-accent-soft) !important;
         color: var(--app-accent) !important;
@@ -152,11 +192,10 @@ export class SelectFieldComponent<T = string> {
 
   readonly isOpen = signal(false);
 
-  @ViewChild('trigger', { read: ElementRef })
-  private readonly triggerEl?: ElementRef<HTMLButtonElement>;
+  readonly triggerEl = viewChild<ElementRef<HTMLButtonElement>>('trigger');
 
   readonly menuMinWidth = computed(
-    () => this.triggerEl?.nativeElement.getBoundingClientRect().width ?? 200,
+    () => this.triggerEl()?.nativeElement.getBoundingClientRect().width ?? 200,
   );
 
   readonly selected = computed<SelectOption<T> | null>(() => {

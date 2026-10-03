@@ -1,5 +1,5 @@
 export type TxDirection = 'in' | 'out';
-export type TxSource = 'manual' | 'debt' | 'event';
+export type TxSource = 'manual' | 'debt' | 'event' | 'opening';
 export type CategoryKind = 'income' | 'expense' | 'savings';
 export type DebtDirection = 'i_owe' | 'they_owe';
 export type EventStatus = 'open' | 'settled';
@@ -13,20 +13,44 @@ export interface Category {
 }
 
 const SAVINGS_PREFIX = 'rupa_savings_cat_';
+const inMemorySavingsCategories = new Set<string>();
+
+function safeGetLocalStorage(): Storage | null {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : null;
+  } catch {
+    return null;
+  }
+}
 
 export function markAsSavingsCategory(id: string): void {
-  if (typeof localStorage !== 'undefined' && id) {
+  if (!id) return;
+  inMemorySavingsCategories.add(id);
+  const storage = safeGetLocalStorage();
+  if (storage) {
     try {
-      localStorage.setItem(SAVINGS_PREFIX + id, 'true');
-    } catch {}
+      storage.setItem(SAVINGS_PREFIX + id, 'true');
+    } catch (err) {
+      console.warn('Failed to persist savings category to localStorage', err);
+    }
   }
 }
 
 export function isSavingsCategory(cat: Category | null | undefined): boolean {
   if (!cat) return false;
   if (cat.kind === 'savings') return true;
-  if (typeof localStorage !== 'undefined' && cat.id) {
-    if (localStorage.getItem(SAVINGS_PREFIX + cat.id) === 'true') return true;
+  if (cat.id && inMemorySavingsCategories.has(cat.id)) return true;
+
+  const storage = safeGetLocalStorage();
+  if (storage && cat.id) {
+    try {
+      if (storage.getItem(SAVINGS_PREFIX + cat.id) === 'true') {
+        inMemorySavingsCategories.add(cat.id);
+        return true;
+      }
+    } catch (err) {
+      console.warn('Failed to read savings category from localStorage', err);
+    }
   }
   const name = cat.name.toLowerCase();
   return (

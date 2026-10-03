@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -22,6 +22,7 @@ import { PersonDialogComponent } from './person-dialog.component';
     LucideAngularModule,
     PageHeaderComponent,
     EmptyStateComponent,
+    TextFieldComponent,
     SwipeableRowComponent,
   ],
   template: `
@@ -39,31 +40,104 @@ import { PersonDialogComponent } from './person-dialog.component';
       </button>
     </app-page-header>
 
-    @if (people().length === 0) {
+    @if (people().length === 0 && !searchQuery()) {
       <app-empty-state
         icon="users"
         title="No one added yet"
         message="Add someone before you record a loan or start a split."
       />
     } @else {
-      <ul class="list">
-        @for (p of people(); track p.id) {
-          <app-swipeable-row (delete)="confirmRemove(p)">
-            <div class="row">
-              <div class="avatar" [style.background]="avatarColor(p.name)">
-                {{ initial(p.name) }}
+      <div class="toolbar">
+        <app-text-field
+          class="search-input"
+          placeholder="Search people…"
+          leadIcon="search"
+          [value]="searchQuery()"
+          (valueChange)="searchQuery.set($any($event) ?? '')"
+        />
+
+        <button
+          type="button"
+          class="sort-btn"
+          [class.active]="sortOrder() === 'desc'"
+          (click)="toggleSort()"
+          [title]="sortOrder() === 'asc' ? 'Sorted A to Z (Click to sort Z to A)' : 'Sorted Z to A (Click to sort A to Z)'"
+          [attr.aria-label]="sortOrder() === 'asc' ? 'Sort descending' : 'Sort ascending'"
+        >
+          <lucide-icon [name]="sortOrder() === 'asc' ? 'arrow-down-a-z' : 'arrow-up-a-z'" />
+        </button>
+      </div>
+
+      @if (filteredPeople().length === 0) {
+        <div class="no-results">
+          <lucide-icon name="search" />
+          <span>No people matching "{{ searchQuery() }}"</span>
+        </div>
+      } @else {
+        <ul class="list">
+          @for (p of filteredPeople(); track p.id) {
+            <app-swipeable-row (delete)="confirmRemove(p)">
+              <div class="row">
+                <div class="avatar" [style.background]="avatarColor(p.name)">
+                  {{ initial(p.name) }}
+                </div>
+                <div class="mid">
+                  <div class="title">{{ p.name }}</div>
+                </div>
               </div>
-              <div class="mid">
-                <div class="title">{{ p.name }}</div>
-              </div>
-            </div>
-          </app-swipeable-row>
-        }
-      </ul>
+            </app-swipeable-row>
+          }
+        </ul>
+      }
     }
   `,
   styles: [
     `
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .search-input {
+        flex: 1;
+        min-width: 0;
+      }
+      .sort-btn {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        background: var(--app-input-bg);
+        border: 1px solid transparent;
+        color: var(--app-ink);
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        flex: 0 0 auto;
+        transition: background .15s ease, border-color .15s ease, color .15s ease;
+      }
+      .sort-btn:hover {
+        background: var(--app-surface);
+        border-color: var(--app-hairline);
+      }
+      .sort-btn.active {
+        background: var(--app-accent-soft);
+        color: var(--app-accent);
+        border-color: var(--app-accent);
+      }
+      .no-results {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 32px 16px;
+        color: var(--app-ink-muted);
+        font-size: 14px;
+      }
+      .no-results lucide-icon {
+        width: 18px;
+        height: 18px;
+      }
       .add-card {
         margin-bottom: 20px;
         padding: 16px;
@@ -80,6 +154,7 @@ import { PersonDialogComponent } from './person-dialog.component';
         padding: 0;
         display: flex;
         flex-direction: column;
+        gap: 8px;
       }
       .row {
         display: grid;
@@ -113,6 +188,28 @@ export class PeoplePage {
 
   readonly people = this.service.people;
   readonly submitting = signal(false);
+
+  readonly searchQuery = signal('');
+  readonly sortOrder = signal<'asc' | 'desc'>('asc');
+
+  readonly filteredPeople = computed(() => {
+    const q = this.searchQuery().trim().toLowerCase();
+    const order = this.sortOrder();
+    let list = this.people();
+
+    if (q) {
+      list = list.filter((p) => p.name.toLowerCase().includes(q));
+    }
+
+    return [...list].sort((a, b) => {
+      const res = a.name.localeCompare(b.name);
+      return order === 'asc' ? res : -res;
+    });
+  });
+
+  toggleSort(): void {
+    this.sortOrder.update((curr) => (curr === 'asc' ? 'desc' : 'asc'));
+  }
 
   openAddDialog(): void {
     this.dialog.open(PersonDialogComponent, {

@@ -81,6 +81,9 @@ export class PullToRefreshDirective {
       el.removeEventListener('touchmove', onMove);
       el.removeEventListener('touchend', onEnd);
       el.removeEventListener('touchcancel', onEnd);
+      if (this.indicator && this.indicator.parentNode) {
+        this.renderer.removeChild(el, this.indicator);
+      }
     });
   }
 

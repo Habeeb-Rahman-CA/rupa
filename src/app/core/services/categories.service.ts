@@ -106,8 +106,10 @@ export class CategoriesService {
   }
 
   async delete(id: string): Promise<void> {
-    const category = this._categories().find((c) => c.id === id);
-    if (!category) return;
+    const currentList = this._categories();
+    const index = currentList.findIndex((c) => c.id === id);
+    if (index === -1) return;
+    const category = currentList[index];
 
     // 1. Optimistic removal for instant UI feedback
     this._categories.update((list) => list.filter((c) => c.id !== id));
@@ -118,8 +120,14 @@ export class CategoriesService {
       .eq('id', id);
     if (error) {
       console.error('Failed to delete category', error);
-      // Revert on failure
-      this._categories.update((list) => [...list, category]);
+      // Revert on failure at the exact original index to preserve list order
+      this._categories.update((list) => {
+        if (list.some((c) => c.id === id)) return list;
+        const restored = [...list];
+        const insertAt = Math.min(index, restored.length);
+        restored.splice(insertAt, 0, category);
+        return restored;
+      });
       throw error;
     }
   }
