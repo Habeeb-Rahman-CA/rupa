@@ -114,7 +114,11 @@ export class TransactionsService {
     });
   }
 
+  private schemaSupportsBankAccounts = true;
+
   async mapUnassignedTransactionsToPrimary(bankAccountId: string): Promise<void> {
+    if (!this.schemaSupportsBankAccounts) return;
+
     const current = this._transactions();
     const unassigned = current.filter((t) => !t.bank_account_id);
     if (unassigned.length === 0) return;
@@ -134,12 +138,22 @@ export class TransactionsService {
 
     for (const t of unassigned) {
       try {
-        await this.supabase.client
+        const res = await this.supabase.client
           .from('transactions')
           .update({ payment_mode: 'bank', bank_account_id: bankAccountId })
           .eq('id', t.id);
+
+        if (res.error) {
+          // PGRST204 or missing column error
+          if (res.error.code === 'PGRST204' || res.error.message?.includes('bank_account_id')) {
+            this.schemaSupportsBankAccounts = false;
+            console.warn('Supabase transactions table is missing bank_account_id column. Disabling auto-mapping sync.');
+            break;
+          }
+        }
       } catch {
-        // Fallback for remote schema
+        this.schemaSupportsBankAccounts = false;
+        break;
       }
     }
   }

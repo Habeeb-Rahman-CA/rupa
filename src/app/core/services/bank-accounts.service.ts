@@ -52,11 +52,26 @@ export class BankAccountsService {
           .order('created_at', { ascending: false });
 
         if (!error && data) {
-          const list = (data as BankAccount[]).filter(
+          const remoteList = (data as BankAccount[]).filter(
             (c) => !c.id.startsWith('demo_card_') && !c.id.startsWith('sample_card_')
           );
-          this._bankAccounts.set(list);
-          this.saveToLocal(list);
+
+          if (remoteList.length > 0) {
+            this._bankAccounts.set(remoteList);
+            this.saveToLocal(remoteList);
+            return;
+          }
+
+          // If Supabase table is empty, check if user has local cards to upload
+          const localCards = this.getLocalCards();
+          if (localCards.length > 0) {
+            this._bankAccounts.set(localCards);
+            void this.syncLocalCardsToSupabase(localCards);
+            return;
+          }
+
+          this._bankAccounts.set([]);
+          this.saveToLocal([]);
           return;
         }
       } catch {
@@ -231,6 +246,31 @@ export class BankAccountsService {
         .eq('id', id);
     } catch {
       // Remote update optional
+    }
+  }
+
+  private getLocalCards(): BankAccount[] {
+    try {
+      const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (local) {
+        const parsed = JSON.parse(local) as BankAccount[];
+        if (Array.isArray(parsed)) {
+          return parsed.filter((c) => !c.id.startsWith('demo_card_') && !c.id.startsWith('sample_card_'));
+        }
+      }
+    } catch {}
+    return [];
+  }
+
+  private async syncLocalCardsToSupabase(cards: BankAccount[]): Promise<void> {
+    const ownerId = this.auth.user()?.id;
+    if (!ownerId || cards.length === 0) return;
+
+    for (const card of cards) {
+      try {
+        const payload = { ...card, owner_id: ownerId };
+        await this.supabase.client.from('bank_accounts').upsert(payload);
+      } catch {}
     }
   }
 

@@ -21,6 +21,7 @@ import { Router } from '@angular/router';
 import { CategoriesService } from '../../core/services/categories.service';
 import { TransactionsService } from '../../core/services/transactions.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
+import { BillScannerService } from '../../core/services/bill-scanner.service';
 import { Category, CategoryKind, PaymentMode, TxDirection, isSavingsCategory } from '../../core/models/domain.models';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
@@ -65,6 +66,49 @@ export interface QuickAddSheetData {
           <mat-button-toggle value="savings">Savings</mat-button-toggle>
         </mat-button-toggle-group>
       </header>
+
+      <input
+        #cameraInput
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style="display: none"
+        (change)="onFileSelected($event)"
+      />
+      <input
+        #galleryInput
+        type="file"
+        accept="image/*"
+        style="display: none"
+        (change)="onFileSelected($event)"
+      />
+
+      <div class="scan-bar">
+        <span class="scan-tag">
+          <lucide-icon [name]="scanningBill() ? 'sparkles' : 'receipt'" class="scan-tag-icon" />
+          <span>{{ scanningBill() ? 'Scanning…' : 'Scan Bill' }}</span>
+        </span>
+        <div class="scan-actions">
+          <button
+            type="button"
+            class="scan-btn"
+            (click)="cameraInput.click()"
+            [disabled]="scanningBill()"
+          >
+            <lucide-icon name="camera" class="scan-btn-icon" />
+            <span>Camera</span>
+          </button>
+          <button
+            type="button"
+            class="scan-btn"
+            (click)="galleryInput.click()"
+            [disabled]="scanningBill()"
+          >
+            <lucide-icon name="upload" class="scan-btn-icon" />
+            <span>Upload</span>
+          </button>
+        </div>
+      </div>
 
       <app-text-field
         label="Amount"
@@ -238,6 +282,59 @@ export interface QuickAddSheetData {
         transform: scale(0.9);
         transform-origin: right center;
       }
+      .scan-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 12px;
+        background: var(--app-bg-hover, rgba(99, 102, 241, 0.06));
+        border: 1px solid var(--app-border, rgba(99, 102, 241, 0.15));
+        border-radius: var(--app-radius-md, 10px);
+      }
+      .scan-tag {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--app-accent, #6366f1);
+      }
+      .scan-tag-icon {
+        width: 15px;
+        height: 15px;
+      }
+      .scan-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .scan-btn {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        background: var(--app-card-bg, #ffffff);
+        border: 1px solid var(--app-border, #e5e7eb);
+        border-radius: 6px;
+        color: var(--app-ink, #374151);
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .scan-btn:hover:not([disabled]) {
+        background: var(--app-accent, #6366f1);
+        color: #ffffff;
+        border-color: var(--app-accent, #6366f1);
+      }
+      .scan-btn[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .scan-btn-icon {
+        width: 14px;
+        height: 14px;
+      }
     `,
   ],
 })
@@ -253,9 +350,11 @@ export class QuickAddSheetComponent {
   private readonly bankAccountsService = inject(BankAccountsService);
   private readonly router = inject(Router);
   private readonly snack = inject(MatSnackBar);
+  private readonly billScanner = inject(BillScannerService);
 
   readonly txKind = signal<CategoryKind>(this.sheetData?.defaultKind ?? 'expense');
   readonly submitting = signal(false);
+  readonly scanningBill = signal(false);
   readonly amount = signal<number | null>(null);
   readonly selectedCategoryId = signal<string | null>(null);
   readonly newCategoryName = signal('');
@@ -387,6 +486,43 @@ export class QuickAddSheetComponent {
   openBankAccounts(): void {
     this.ref.dismiss();
     void this.router.navigate(['/bank-accounts']);
+  }
+
+  async onFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    this.scanningBill.set(true);
+
+    try {
+      const result = await this.billScanner.extractBill(file);
+
+      if (result.total_amount) {
+        const cleaned = result.total_amount.replace(/[^0-9.]/g, '');
+        const num = parseFloat(cleaned);
+        if (!isNaN(num) && num > 0) {
+          this.amount.set(num);
+        }
+      }
+
+      if (result.title) {
+        this.notes.set(result.title);
+      }
+
+      const statusMsg = result.total_amount || result.title
+        ? `Bill scanned: ${result.title ?? ''} ${result.total_amount ? '₹' + result.total_amount : ''}`.trim()
+        : 'Bill scanned, but details could not be parsed automatically.';
+
+      this.snack.open(statusMsg, 'OK', { duration: 3500 });
+    } catch (err: unknown) {
+      this.snack.open(errorText(err, 'Failed to scan bill image.'), 'Dismiss', {
+        duration: 4000,
+      });
+    } finally {
+      this.scanningBill.set(false);
+      input.value = '';
+    }
   }
 
   close(): void {
