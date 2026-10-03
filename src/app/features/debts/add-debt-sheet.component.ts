@@ -16,7 +16,8 @@ import {
   DebtsService,
 } from '../../core/services/debts.service';
 import { PeopleService } from '../../core/services/people.service';
-import { DebtDirection } from '../../core/models/domain.models';
+import { BankAccountsService } from '../../core/services/bank-accounts.service';
+import { DebtDirection, PaymentMode } from '../../core/models/domain.models';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import {
   SelectFieldComponent,
@@ -82,6 +83,31 @@ const NEW_PERSON = '__new__';
         <span prefix>₹</span>
       </app-text-field>
 
+      @if (impact() !== 'none') {
+        <div class="field-group">
+          <label class="ft-label">Payment Mode</label>
+          <mat-button-toggle-group
+            [value]="paymentMode()"
+            (change)="setPaymentMode($event.value)"
+            hideSingleSelectionIndicator
+            class="payment-mode-toggle"
+          >
+            <mat-button-toggle value="cash">Cash</mat-button-toggle>
+            <mat-button-toggle value="bank">Bank Account</mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+
+        @if (paymentMode() === 'bank' && bankAccountOptions().length > 0) {
+          <app-select-field
+            label="Bank Account"
+            placeholder="Select Bank Account"
+            [options]="bankAccountOptions()"
+            [value]="selectedBankAccountId()"
+            (valueChange)="selectedBankAccountId.set($any($event))"
+          />
+        }
+      }
+
       <app-text-field
         label="Reason (optional)"
         placeholder="e.g. Bike loan, dinner IOU"
@@ -137,6 +163,23 @@ const NEW_PERSON = '__new__';
       }
       h2 { margin: 0; font-size: 16px; font-weight: 600; }
       .full { width: 100%; }
+      .field-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .ft-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--app-ink);
+      }
+      .payment-mode-toggle {
+        width: 100%;
+        display: flex;
+      }
+      .payment-mode-toggle mat-button-toggle {
+        flex: 1;
+      }
       .hint {
         font-size: 12px;
         color: var(--app-ink-muted);
@@ -161,6 +204,7 @@ export class AddDebtSheetComponent {
   private readonly ref = inject(MatBottomSheetRef<AddDebtSheetComponent>);
   private readonly debtsService = inject(DebtsService);
   private readonly peopleService = inject(PeopleService);
+  private readonly bankAccountsService = inject(BankAccountsService);
   private readonly snack = inject(MatSnackBar);
 
   readonly people = this.peopleService.people;
@@ -174,6 +218,17 @@ export class AddDebtSheetComponent {
   });
   readonly direction = signal<DebtDirection>('they_owe');
   readonly impact = signal<DebtTransactionImpact>('default');
+
+  readonly paymentMode = signal<PaymentMode>('cash');
+  readonly selectedBankAccountId = signal<string | null>(null);
+
+  readonly bankAccountOptions = computed<SelectOption[]>(() => {
+    return this.bankAccountsService.bankAccounts().map((acc) => ({
+      value: acc.id,
+      label: acc.is_primary ? `${acc.bank_name} (${acc.account_name}) ★` : `${acc.bank_name} (${acc.account_name})`,
+      icon: 'landmark',
+    }));
+  });
 
   readonly impactOptions = computed<SelectOption<DebtTransactionImpact>[]>(() => {
     const dir = this.direction();
@@ -208,6 +263,9 @@ export class AddDebtSheetComponent {
     if (!amt || amt <= 0) return false;
     const pid = this.personId();
     if (pid === NEW_PERSON) return this.newPersonName().trim().length > 0;
+    if (this.impact() !== 'none' && this.paymentMode() === 'bank' && this.bankAccountOptions().length > 0 && !this.selectedBankAccountId()) {
+      return false;
+    }
     return !!pid;
   });
 
@@ -216,7 +274,31 @@ export class AddDebtSheetComponent {
       if (this.personId() === NEW_PERSON) {
         queueMicrotask(() => this.newPersonField?.focus());
       }
+      const primary = this.bankAccountsService.primaryAccount();
+      const accounts = this.bankAccountsService.bankAccounts();
+      if (primary && !this.selectedBankAccountId()) {
+        this.selectedBankAccountId.set(primary.id);
+      }
+      if (accounts.length > 0 && this.paymentMode() === 'cash' && !this.userExplicitlySetCash) {
+        this.paymentMode.set('bank');
+        if (primary) {
+          this.selectedBankAccountId.set(primary.id);
+        }
+      }
     });
+  }
+
+  private userExplicitlySetCash = false;
+
+  setPaymentMode(mode: PaymentMode): void {
+    this.userExplicitlySetCash = mode === 'cash';
+    this.paymentMode.set(mode);
+    if (mode === 'bank' && !this.selectedBankAccountId()) {
+      const primary = this.bankAccountsService.primaryAccount();
+      if (primary) {
+        this.selectedBankAccountId.set(primary.id);
+      }
+    }
   }
 
   toNum(v: string | number | null): number | null {
@@ -233,12 +315,17 @@ export class AddDebtSheetComponent {
         personId = created.id;
       }
 
+      const mode = this.paymentMode();
+      const bankId = mode === 'bank' ? this.selectedBankAccountId() : null;
+
       await this.debtsService.create({
         person_id: personId!,
         direction: this.direction(),
         amount: Number(this.amount()),
         reason: this.reason() || null,
         impact: this.impact(),
+        payment_mode: mode,
+        bank_account_id: bankId,
       });
       this.snack.open('Debt saved to your ledger.', undefined, { duration: 2000 });
       this.ref.dismiss({ saved: true });

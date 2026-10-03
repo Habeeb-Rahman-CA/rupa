@@ -1,13 +1,17 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { MAT_BOTTOM_SHEET_DATA, MatBottomSheetRef } from '@angular/material/bottom-sheet';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { EventsService, ParticipantWithMeta } from '../../core/services/events.service';
+import { BankAccountsService } from '../../core/services/bank-accounts.service';
+import { PaymentMode } from '../../core/models/domain.models';
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { DateFieldComponent } from '../../shared/components/date-field.component';
+import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
 
 export interface AddEventExpenseSheetData {
   eventId: string;
@@ -19,10 +23,12 @@ export interface AddEventExpenseSheetData {
   standalone: true,
   imports: [
     MatButtonModule,
+    MatButtonToggleModule,
     MatCheckboxModule,
     SignedMoneyPipe,
     TextFieldComponent,
     DateFieldComponent,
+    SelectFieldComponent,
   ],
   template: `
     <div class="sheet">
@@ -59,6 +65,29 @@ export interface AddEventExpenseSheetData {
           (valueChange)="paidOn.set($event)"
         />
       </div>
+
+      <div class="field-group">
+        <label class="ft-label">Payment Mode</label>
+        <mat-button-toggle-group
+          [value]="paymentMode()"
+          (change)="setPaymentMode($event.value)"
+          hideSingleSelectionIndicator
+          class="payment-mode-toggle"
+        >
+          <mat-button-toggle value="cash">Cash</mat-button-toggle>
+          <mat-button-toggle value="bank">Bank Account</mat-button-toggle>
+        </mat-button-toggle-group>
+      </div>
+
+      @if (paymentMode() === 'bank' && bankAccountOptions().length > 0) {
+        <app-select-field
+          label="Bank Account"
+          placeholder="Select Bank Account"
+          [options]="bankAccountOptions()"
+          [value]="selectedBankAccountId()"
+          (valueChange)="selectedBankAccountId.set($any($event))"
+        />
+      }
 
       <div class="participants-head">
         <label class="ft-label">Split between</label>
@@ -110,12 +139,24 @@ export interface AddEventExpenseSheetData {
       h2 { margin: 0; font-size: 16px; font-weight: 600; }
       .two { display: flex; gap: 12px; }
       .grow { flex: 1; min-width: 0; }
+      .field-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
       .ft-label {
         display: block;
         font-size: 13px;
         font-weight: 500;
         color: var(--app-ink);
         margin-bottom: 6px;
+      }
+      .payment-mode-toggle {
+        width: 100%;
+        display: flex;
+      }
+      .payment-mode-toggle mat-button-toggle {
+        flex: 1;
       }
       .participants-head {
         display: flex;
@@ -152,6 +193,7 @@ export interface AddEventExpenseSheetData {
 export class AddEventExpenseSheetComponent {
   private readonly ref = inject(MatBottomSheetRef<AddEventExpenseSheetComponent>);
   private readonly eventsService = inject(EventsService);
+  private readonly bankAccountsService = inject(BankAccountsService);
   private readonly snack = inject(MatSnackBar);
   readonly data = inject<AddEventExpenseSheetData>(MAT_BOTTOM_SHEET_DATA);
 
@@ -161,13 +203,54 @@ export class AddEventExpenseSheetComponent {
   readonly submitting = signal(false);
   readonly selectedIds = signal<string[]>(this.data.participants.map((p) => p.id));
 
+  readonly paymentMode = signal<PaymentMode>('cash');
+  readonly selectedBankAccountId = signal<string | null>(null);
+
+  readonly bankAccountOptions = computed<SelectOption[]>(() => {
+    return this.bankAccountsService.bankAccounts().map((acc) => ({
+      value: acc.id,
+      label: acc.is_primary ? `${acc.bank_name} (${acc.account_name}) ★` : `${acc.bank_name} (${acc.account_name})`,
+      icon: 'landmark',
+    }));
+  });
+
+  constructor() {
+    effect(() => {
+      const primary = this.bankAccountsService.primaryAccount();
+      const accounts = this.bankAccountsService.bankAccounts();
+      if (primary && !this.selectedBankAccountId()) {
+        this.selectedBankAccountId.set(primary.id);
+      }
+      if (accounts.length > 0 && this.paymentMode() === 'cash' && !this.userExplicitlySetCash) {
+        this.paymentMode.set('bank');
+        if (primary) {
+          this.selectedBankAccountId.set(primary.id);
+        }
+      }
+    });
+  }
+
+  private userExplicitlySetCash = false;
+
+  setPaymentMode(mode: PaymentMode): void {
+    this.userExplicitlySetCash = mode === 'cash';
+    this.paymentMode.set(mode);
+    if (mode === 'bank' && !this.selectedBankAccountId()) {
+      const primary = this.bankAccountsService.primaryAccount();
+      if (primary) {
+        this.selectedBankAccountId.set(primary.id);
+      }
+    }
+  }
+
   readonly canSave = computed(
     () =>
       this.description().trim().length > 0 &&
       !!this.amount() &&
       this.amount()! > 0 &&
       this.selectedIds().length > 0 &&
-      !!this.paidOn(),
+      !!this.paidOn() &&
+      !(this.paymentMode() === 'bank' && this.bankAccountOptions().length > 0 && !this.selectedBankAccountId()),
   );
 
   readonly perHead = computed(() => {
@@ -203,12 +286,17 @@ export class AddEventExpenseSheetComponent {
     if (!this.canSave() || this.submitting()) return;
     this.submitting.set(true);
     try {
+      const mode = this.paymentMode();
+      const bankId = mode === 'bank' ? this.selectedBankAccountId() : null;
+
       await this.eventsService.addExpense({
         eventId: this.data.eventId,
         description: this.description(),
         amount: Number(this.amount()),
         paid_on: toIsoDate(this.paidOn()!),
         participantIds: this.selectedIds(),
+        payment_mode: mode,
+        bank_account_id: bankId,
       });
       this.snack.open('Expense added to the split.', undefined, { duration: 2000 });
       this.ref.dismiss({ saved: true });

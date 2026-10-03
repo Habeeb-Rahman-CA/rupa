@@ -4,6 +4,7 @@ import {
   EventParticipant,
   EventRecord,
   EventSettlement,
+  PaymentMode,
   Transaction,
 } from '../models/domain.models';
 import { AuthService } from './auth.service';
@@ -54,6 +55,8 @@ export interface AddExpenseInput {
   amount: number;
   paid_on?: string;
   participantIds: string[]; // event_participants.id[]
+  payment_mode?: PaymentMode;
+  bank_account_id?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -316,14 +319,15 @@ export class EventsService {
     const paidOn = input.paid_on ?? todayIso();
 
     // 1. Ledger transaction (out)
-    const tx = await this.insertTransaction({
-      owner_id: ownerId,
+    const tx = await this.txService.create({
       amount: input.amount,
       direction: 'out',
       occurred_on: paidOn,
       notes: `Event expense: ${input.description}`,
       source: 'event',
       source_ref_id: input.eventId,
+      payment_mode: input.payment_mode ?? 'cash',
+      bank_account_id: input.bank_account_id ?? null,
     });
 
     // 2. event_expenses row
@@ -385,8 +389,11 @@ export class EventsService {
 
   // ---------- settlements ---------------------------------------------------
 
-  async settleParticipant(eventParticipantId: string): Promise<void> {
-    const ownerId = this.requireUserId();
+  async settleParticipant(
+    eventParticipantId: string,
+    payment_mode?: PaymentMode,
+    bank_account_id?: string | null,
+  ): Promise<void> {
     const detail = this._currentDetail();
     if (!detail) throw new Error('No event loaded.');
     const p = detail.participants.find((x) => x.id === eventParticipantId);
@@ -397,14 +404,15 @@ export class EventsService {
 
     const paidOn = todayIso();
 
-    const tx = await this.insertTransaction({
-      owner_id: ownerId,
+    const tx = await this.txService.create({
       amount: p.totalShare,
       direction: 'in',
       occurred_on: paidOn,
       notes: `Settlement from ${p.name} for event`,
       source: 'event',
       source_ref_id: detail.event.id,
+      payment_mode: payment_mode ?? 'cash',
+      bank_account_id: bank_account_id ?? null,
     });
 
     const { error } = await this.supabase.client.from('event_settlements').insert({

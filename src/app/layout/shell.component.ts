@@ -76,9 +76,10 @@ export class ShellComponent {
   ];
 
   readonly moreNav: NavItem[] = [
-    { path: '/categories', label: 'Categories', icon: 'tags' },
-    { path: '/people',     label: 'People',     icon: 'users' },
-    { path: '/reports',    label: 'Reports',    icon: 'trending-up' },
+    { path: '/bank-accounts', label: 'Bank Accounts', icon: 'credit-card' },
+    { path: '/categories',    label: 'Categories',    icon: 'tags' },
+    { path: '/people',        label: 'People',        icon: 'users' },
+    { path: '/reports',       label: 'Reports',       icon: 'trending-up' },
   ];
 
   readonly appVersion = APP_VERSION;

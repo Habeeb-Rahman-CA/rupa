@@ -404,7 +404,7 @@ type Range = 'week' | 'month' | 'year';
         gap: 10px;
         overflow-x: auto;
         padding-bottom: 4px;
-        margin: 0 -20px;
+        margin: 0;
         padding-left: 20px;
         padding-right: 20px;
         scroll-snap-type: x mandatory;
@@ -442,7 +442,7 @@ type Range = 'week' | 'month' | 'year';
       /* ---------- Recent transactions ---------------------------------- */
       .tx-list {
         list-style: none;
-        margin: 0;
+        margin: 0 0 18px 0;
         padding: 0;
         display: flex;
         flex-direction: column;

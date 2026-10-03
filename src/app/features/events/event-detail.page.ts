@@ -20,6 +20,7 @@ import {
   SelectOption,
 } from '../../shared/components/select-field.component';
 import { AddEventExpenseSheetComponent } from './add-event-expense-sheet.component';
+import { SettleParticipantDialogComponent } from './settle-participant-dialog.component';
 
 @Component({
   selector: 'app-event-detail-page',
@@ -112,7 +113,7 @@ import { AddEventExpenseSheetComponent } from './add-event-expense-sheet.compone
         }
       </div>
 
-      <ul class="list">
+      <ul class="list-users">
         @for (p of d.participants; track p.id; let last = $last) {
           <li class="row" [class.last]="last">
             <div class="avatar" [style.background]="avatarColor(p.name)">
@@ -295,7 +296,14 @@ import { AddEventExpenseSheetComponent } from './add-event-expense-sheet.compone
 
       .list {
         list-style: none;
-        margin: 0;
+        margin: 0 0 18px 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .list-users {
+        list-style: none;
+        margin: 0 0 18px 0;
         padding: 0;
         display: flex;
         flex-direction: column;
@@ -406,13 +414,11 @@ export class EventDetailPage {
     }
   }
 
-  async settle(p: ParticipantWithMeta): Promise<void> {
-    try {
-      await this.eventsService.settleParticipant(p.id);
-      this.snack.open(`${p.name} is all settled up.`, undefined, { duration: 2000 });
-    } catch (e: unknown) {
-      this.snack.open(errText(e, 'Couldn’t settle — please try again.'), 'Dismiss', { duration: 4000 });
-    }
+  settle(p: ParticipantWithMeta): void {
+    this.dialog.open(SettleParticipantDialogComponent, {
+      width: '400px',
+      data: { participant: p },
+    });
   }
 
   async unsettle(p: ParticipantWithMeta): Promise<void> {

@@ -1,6 +1,6 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { DatePipe } from '@angular/common';
+import { DatePipe, UpperCasePipe } from '@angular/common';
 
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -15,7 +15,8 @@ import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
 import { DebtsService } from '../../core/services/debts.service';
 import { EventsService } from '../../core/services/events.service';
-import { Transaction, isSavingsCategory } from '../../core/models/domain.models';
+import { BankAccountsService } from '../../core/services/bank-accounts.service';
+import { Transaction, isSavingsCategory, BankAccount } from '../../core/models/domain.models';
 
 interface CategoryRow {
   id: string;
@@ -31,12 +32,17 @@ interface DayRow {
   amount: number;
 }
 
+interface BankReportRow extends BankAccount {
+  monthlySpend: number;
+}
+
 @Component({
   selector: 'app-reports-page',
   standalone: true,
   imports: [
     RouterLink,
     DatePipe,
+    UpperCasePipe,
     LucideAngularModule,
     PageHeaderComponent,
     SignedMoneyPipe,
@@ -73,28 +79,25 @@ interface DayRow {
     <!-- Monthly summary hero -->
     <section class="hero app-card">
       <div class="stats">
-        <div class="stat">
+        <div class="stat-card">
           <div class="micro-label">Spent</div>
           <div class="stat-value money-negative">
             {{ monthly().spent | signedMoney: 'out' }}
           </div>
         </div>
-        <div class="v-divider"></div>
-        <div class="stat">
+        <div class="stat-card">
           <div class="micro-label">Received</div>
           <div class="stat-value money-positive">
             {{ monthly().received | signedMoney: 'in' }}
           </div>
         </div>
-        <div class="v-divider"></div>
-        <div class="stat">
+        <div class="stat-card">
           <div class="micro-label">Saved</div>
           <div class="stat-value money-savings">
             {{ monthly().saved | signedMoney }}
           </div>
         </div>
-        <div class="v-divider"></div>
-        <div class="stat">
+        <div class="stat-card">
           <div class="micro-label">Net Cash</div>
           <div
             class="stat-value"
@@ -116,6 +119,117 @@ interface DayRow {
           >
             {{ savingsRate() }}% of income saved
           </span>
+        </div>
+      }
+    </section>
+
+    <!-- Bank & Payment Method Overview -->
+    <div class="section-head">
+      <h2>Payment Methods</h2>
+      <span class="section-hint">Usage breakdown</span>
+    </div>
+
+    <section class="bank-reports-section">
+      <!-- Cash vs Bank Breakdown Card -->
+      <div class="app-card bank-breakdown-card">
+        <div class="bank-card-header">
+          <div class="bank-header-title">
+            <lucide-icon name="wallet" class="head-icon" />
+            <span>Cash vs Bank Spend</span>
+          </div>
+          <span class="section-hint">{{ monthDate() | date: 'MMM y' }}</span>
+        </div>
+
+        <div class="payment-split-bars">
+          <div class="split-bar-track">
+            <div
+              class="split-bar-segment bank-seg"
+              [style.width.%]="bankVsCashMonthly().bankPct"
+              [title]="'Bank: ' + bankVsCashMonthly().bankPct + '%'"
+            ></div>
+            <div
+              class="split-bar-segment cash-seg"
+              [style.width.%]="bankVsCashMonthly().cashPct"
+              [title]="'Cash: ' + bankVsCashMonthly().cashPct + '%'"
+            ></div>
+          </div>
+          <div class="split-legend">
+            <div class="legend-item">
+              <span class="dot bank-dot"></span>
+              <span class="legend-label">Bank Accounts</span>
+              <span class="legend-val">{{ bankVsCashMonthly().bankSpent | signedMoney: 'out' }}</span>
+              <span class="legend-pct">({{ bankVsCashMonthly().bankPct }}%)</span>
+            </div>
+            <div class="legend-item">
+              <span class="dot cash-dot"></span>
+              <span class="legend-label">Cash</span>
+              <span class="legend-val">{{ bankVsCashMonthly().cashSpent | signedMoney: 'out' }}</span>
+              <span class="legend-pct">({{ bankVsCashMonthly().cashPct }}%)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bank Accounts Summary List -->
+      @if (bankAccountRows().length > 0) {
+        <div class="app-card-tight bank-list-card">
+          <div class="bank-card-header card-header-padded">
+            <div class="bank-header-title">
+              <lucide-icon name="building-2" class="head-icon" />
+              <span>Accounts Overview</span>
+            </div>
+            <a routerLink="/cards" class="manage-link">
+              <span>Manage</span>
+              <lucide-icon name="chevron-right" />
+            </a>
+          </div>
+
+          <ul class="bank-accounts-list">
+            @for (acc of bankAccountRows(); track acc.id; let last = $last) {
+              <li class="bank-acc-row" [class.last]="last">
+                <div class="bank-acc-info">
+                  <div class="bank-icon-badge" [attr.data-theme]="acc.theme">
+                    <lucide-icon name="credit-card" />
+                  </div>
+                  <div class="bank-acc-meta">
+                    <div class="bank-name-row">
+                      <span class="bank-title">{{ acc.account_name || acc.bank_name }}</span>
+                      @if (acc.is_primary) {
+                        <span class="primary-badge">PRIMARY</span>
+                      }
+                    </div>
+                    <span class="bank-subtext">
+                      {{ acc.bank_name }} • {{ acc.card_type | uppercase }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="bank-acc-metrics">
+                  <div class="metric-group">
+                    <span class="metric-lbl">Monthly Spend</span>
+                    <span class="metric-val money-negative">
+                      {{ acc.monthlySpend | signedMoney: 'out' }}
+                    </span>
+                  </div>
+                  <div class="metric-group align-right">
+                    <span class="metric-lbl">Current Balance</span>
+                    <span class="metric-val font-semibold">
+                      {{ acc.balance | signedMoney }}
+                    </span>
+                  </div>
+                </div>
+              </li>
+            }
+          </ul>
+        </div>
+      } @else {
+        <div class="app-card placeholder-bank">
+          <lucide-icon name="credit-card" class="placeholder-icon" />
+          <p>No bank accounts linked yet.</p>
+          <a routerLink="/cards" class="btn-primary-sm">
+            <lucide-icon name="plus" />
+            <span>Add Bank Card</span>
+          </a>
         </div>
       }
     </section>
@@ -298,28 +412,36 @@ interface DayRow {
 
       /* ---------- Hero summary --------------------------------------- */
       .hero {
-        padding: 20px;
+        padding: 16px;
       }
       .stats {
         display: grid;
-        grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
-        align-items: center;
-        gap: 8px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
       }
-      .stat { text-align: center; min-width: 0; }
+      @media (min-width: 640px) {
+        .stats {
+          grid-template-columns: repeat(4, 1fr);
+        }
+      }
+      .stat-card {
+        background: var(--app-canvas);
+        border-radius: var(--app-radius-md);
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-width: 0;
+      }
       .stat-value {
         margin-top: 6px;
-        font-size: clamp(12px, 3.4vw, 17px);
+        font-size: clamp(15px, 4vw, 19px);
         font-weight: 700;
         font-variant-numeric: tabular-nums;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .v-divider {
-        width: 1px;
-        height: 30px;
-        background: var(--app-hairline);
+        word-break: break-word;
+        overflow-wrap: break-word;
+        white-space: normal;
+        line-height: 1.25;
       }
       .savings-row {
         margin-top: 14px;
@@ -328,10 +450,266 @@ interface DayRow {
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
       }
       .savings-value {
         font-weight: 700;
         font-variant-numeric: tabular-nums;
+      }
+
+      /* ---------- Bank Reports Section ------------------------------- */
+      .bank-reports-section {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .bank-breakdown-card {
+        padding: 16px;
+      }
+      .bank-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      .card-header-padded {
+        padding: 14px 16px 10px 16px;
+        margin-bottom: 0;
+      }
+      .bank-header-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--app-ink);
+      }
+      .head-icon {
+        width: 18px;
+        height: 18px;
+        color: var(--app-ink-muted);
+      }
+      .manage-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--app-ink);
+        text-decoration: none;
+        padding: 4px 8px;
+        border-radius: 6px;
+        transition: background .15s ease;
+
+        &:hover {
+          background: var(--app-canvas);
+        }
+
+        lucide-icon {
+          width: 14px;
+          height: 14px;
+        }
+      }
+
+      .payment-split-bars {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .split-bar-track {
+        height: 10px;
+        background: var(--app-canvas);
+        border-radius: 999px;
+        display: flex;
+        overflow: hidden;
+      }
+      .split-bar-segment {
+        height: 100%;
+        transition: width .3s ease;
+      }
+      .bank-seg {
+        background: var(--app-ink-dark, #0f172a);
+      }
+      .cash-seg {
+        background: #94a3b8;
+      }
+      .split-legend {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+      .bank-dot { background: var(--app-ink-dark, #0f172a); }
+      .cash-dot { background: #94a3b8; }
+      .legend-label { color: var(--app-ink-muted); }
+      .legend-val { font-weight: 700; color: var(--app-ink); }
+      .legend-pct { font-size: 11px; color: var(--app-ink-subtle); }
+
+      .bank-list-card {
+        padding: 0;
+      }
+      .bank-accounts-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .bank-acc-row {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--app-hairline);
+
+        @media (min-width: 480px) {
+          flex-direction: row;
+          align-items: center;
+          justify-content: space-between;
+        }
+      }
+      .bank-acc-row.last { border-bottom: 0; }
+
+      .bank-acc-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .bank-icon-badge {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        background: linear-gradient(135deg, #1e293b, #0f172a);
+
+        &[data-theme='emerald'] { background: linear-gradient(135deg, #059669, #047857); }
+        &[data-theme='purple'] { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+        &[data-theme='rose'] { background: linear-gradient(135deg, #e11d48, #be123c); }
+        &[data-theme='amber'] { background: linear-gradient(135deg, #d97706, #b45309); }
+        &[data-theme='cyan'] { background: linear-gradient(135deg, #0891b2, #0e7490); }
+        &[data-theme='dark'] { background: linear-gradient(135deg, #27272a, #09090b); }
+
+        lucide-icon {
+          width: 18px;
+          height: 18px;
+        }
+      }
+      .bank-acc-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .bank-name-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .bank-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--app-ink);
+      }
+      .primary-badge {
+        font-size: 9px;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: var(--app-ink-dark, #0f172a);
+        color: #fff;
+        letter-spacing: 0.04em;
+      }
+      .bank-subtext {
+        font-size: 11px;
+        color: var(--app-ink-muted);
+      }
+
+      .bank-acc-metrics {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding-top: 6px;
+        border-top: 1px dashed var(--app-hairline);
+
+        @media (min-width: 480px) {
+          padding-top: 0;
+          border-top: 0;
+          justify-content: flex-end;
+        }
+      }
+      .metric-group {
+        display: flex;
+        flex-direction: column;
+
+        &.align-right {
+          text-align: right;
+        }
+      }
+      .metric-lbl {
+        font-size: 10px;
+        color: var(--app-ink-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .metric-val {
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+      }
+
+      .placeholder-bank {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 16px;
+        text-align: center;
+        gap: 10px;
+
+        .placeholder-icon {
+          width: 32px;
+          height: 32px;
+          color: var(--app-ink-subtle);
+        }
+        p {
+          margin: 0;
+          font-size: 13px;
+          color: var(--app-ink-muted);
+        }
+      }
+
+      .btn-primary-sm {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: var(--app-ink-dark, #0f172a);
+        color: #fff;
+        font-weight: 600;
+        font-size: 13px;
+        text-decoration: none;
+        transition: transform .1s ease, opacity .15s ease;
+
+        &:hover { opacity: 0.9; }
+        &:active { transform: scale(0.97); }
+
+        lucide-icon {
+          width: 14px;
+          height: 14px;
+        }
       }
 
       /* ---------- Section headers ------------------------------------ */
@@ -457,6 +835,7 @@ interface DayRow {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         gap: 12px;
+        margin-bottom: 18px
       }
       .ob-card {
         background: var(--app-surface);
@@ -498,6 +877,7 @@ export class ReportsPage {
   private readonly categoriesService = inject(CategoriesService);
   private readonly debtsService = inject(DebtsService);
   private readonly eventsService = inject(EventsService);
+  private readonly bankAccountsService = inject(BankAccountsService);
 
   // Selected month state — Date pinned to day 1
   readonly monthDate = signal<Date>(startOfMonth(new Date()));
@@ -545,6 +925,54 @@ export class ReportsPage {
       }
     }
     return { spent, received, saved, net: received - spent - saved };
+  });
+
+  readonly bankVsCashMonthly = computed(() => {
+    const { y, m } = ym(this.monthDate());
+    let bankSpent = 0;
+    let cashSpent = 0;
+    let totalSpent = 0;
+
+    for (const t of this.txService.transactions()) {
+      if (t.direction !== 'out') continue;
+      const [ty, tm] = t.occurred_on.split('-').map(Number);
+      if (ty !== y || tm !== m) continue;
+      const amt = Number(t.amount);
+      if (t.payment_mode === 'bank') {
+        bankSpent += amt;
+      } else {
+        cashSpent += amt;
+      }
+      totalSpent += amt;
+    }
+
+    const bankPct = totalSpent > 0 ? Math.round((bankSpent / totalSpent) * 100) : 0;
+    const cashPct = totalSpent > 0 ? Math.round((cashSpent / totalSpent) * 100) : 0;
+
+    return { bankSpent, cashSpent, totalSpent, bankPct, cashPct };
+  });
+
+  readonly bankAccountRows = computed<BankReportRow[]>(() => {
+    const { y, m } = ym(this.monthDate());
+    const accounts = this.bankAccountsService.bankAccounts();
+
+    const accountSpendMap = new Map<string, number>();
+    for (const t of this.txService.transactions()) {
+      if (t.direction !== 'out' || t.payment_mode !== 'bank') continue;
+      const [ty, tm] = t.occurred_on.split('-').map(Number);
+      if (ty !== y || tm !== m) continue;
+      if (t.bank_account_id) {
+        accountSpendMap.set(
+          t.bank_account_id,
+          (accountSpendMap.get(t.bank_account_id) ?? 0) + Number(t.amount)
+        );
+      }
+    }
+
+    return accounts.map((acc) => ({
+      ...acc,
+      monthlySpend: accountSpendMap.get(acc.id) ?? 0,
+    }));
   });
 
   readonly savingsRate = computed<number | null>(() => {
@@ -734,3 +1162,5 @@ function iconForName(name: string): string {
   if (key.includes('income')) return 'trending-up';
   return 'wallet';
 }
+
+

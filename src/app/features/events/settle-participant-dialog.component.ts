@@ -4,61 +4,37 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
-import { DebtsService } from '../../core/services/debts.service';
+import { EventsService, ParticipantWithMeta } from '../../core/services/events.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
-import { Debt, PaymentMode } from '../../core/models/domain.models';
+import { PaymentMode } from '../../core/models/domain.models';
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
-import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
 
-export interface PayDebtDialogData {
-  debt: Debt;
-  personName: string;
+export interface SettleParticipantDialogData {
+  participant: ParticipantWithMeta;
 }
 
 @Component({
-  selector: 'app-pay-debt-dialog',
+  selector: 'app-settle-participant-dialog',
   standalone: true,
   imports: [
     MatDialogModule,
     MatButtonModule,
     MatButtonToggleModule,
     SignedMoneyPipe,
-    TextFieldComponent,
     SelectFieldComponent,
   ],
   template: `
-    <h2 mat-dialog-title>
-      @if (data.debt.direction === 'i_owe') {
-        Pay {{ data.personName }} back
-      } @else {
-        {{ data.personName }} paid you
-      }
-    </h2>
+    <h2 mat-dialog-title>Settle up with {{ data.participant.name }}</h2>
 
     <mat-dialog-content class="content">
-      <p class="outstanding">
-        Outstanding: <strong>{{ +data.debt.outstanding | signedMoney }}</strong>
-      </p>
-
-      <app-text-field
-        label="Amount"
-        placeholder="0.00"
-        type="number"
-        inputmode="decimal"
-        [min]="0"
-        [max]="+data.debt.outstanding"
-        [step]="0.01"
-        [value]="amount()"
-        (valueChange)="amount.set(toNum($event))"
-        (enter)="save()"
-        [autofocus]="true"
-      >
-        <span prefix>₹</span>
-      </app-text-field>
+      <div class="settle-info">
+        <span>Amount to receive:</span>
+        <strong class="money-positive">{{ data.participant.totalShare | signedMoney:'in' }}</strong>
+      </div>
 
       <div class="field-group">
-        <label class="ft-label">Payment Mode</label>
+        <label class="ft-label">Receive Into</label>
         <mat-button-toggle-group
           [value]="paymentMode()"
           (change)="setPaymentMode($event.value)"
@@ -79,14 +55,6 @@ export interface PayDebtDialogData {
           (valueChange)="selectedBankAccountId.set($any($event))"
         />
       }
-
-      <app-text-field
-        label="Note (optional)"
-        placeholder="e.g. Paid via UPI"
-        [maxlength]="120"
-        [value]="notes()"
-        (valueChange)="notes.set($any($event) ?? '')"
-      />
     </mat-dialog-content>
 
     <mat-dialog-actions align="end">
@@ -97,7 +65,7 @@ export interface PayDebtDialogData {
         (click)="save()"
         [disabled]="!canSave() || submitting()"
       >
-        {{ submitting() ? 'Saving…' : 'Save' }}
+        {{ submitting() ? 'Settling…' : 'Settle Up' }}
       </button>
     </mat-dialog-actions>
   `,
@@ -106,12 +74,17 @@ export interface PayDebtDialogData {
       .content {
         display: flex;
         flex-direction: column;
-        gap: 12px;
-        min-width: 300px;
+        gap: 14px;
+        min-width: 310px;
       }
-      .outstanding {
-        margin: 0 0 4px;
-        color: var(--app-ink-muted);
+      .settle-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0;
+        background: var(--app-bg-hover);
+        border-radius: var(--app-radius-md);
+        font-size: 14px;
       }
       .field-group {
         display: flex;
@@ -133,16 +106,14 @@ export interface PayDebtDialogData {
     `,
   ],
 })
-export class PayDebtDialogComponent {
-  private readonly ref = inject(MatDialogRef<PayDebtDialogComponent>);
-  private readonly debtsService = inject(DebtsService);
+export class SettleParticipantDialogComponent {
+  private readonly ref = inject(MatDialogRef<SettleParticipantDialogComponent>);
+  private readonly eventsService = inject(EventsService);
   private readonly bankAccountsService = inject(BankAccountsService);
   private readonly snack = inject(MatSnackBar);
 
-  readonly data = inject<PayDebtDialogData>(MAT_DIALOG_DATA);
+  readonly data = inject<SettleParticipantDialogData>(MAT_DIALOG_DATA);
   readonly submitting = signal(false);
-  readonly amount = signal<number | null>(Number(this.data.debt.outstanding));
-  readonly notes = signal('');
 
   readonly paymentMode = signal<PaymentMode>('cash');
   readonly selectedBankAccountId = signal<string | null>(null);
@@ -185,17 +156,11 @@ export class PayDebtDialogComponent {
   }
 
   readonly canSave = computed(() => {
-    const a = this.amount();
-    if (!a || a <= 0) return false;
     if (this.paymentMode() === 'bank' && this.bankAccountOptions().length > 0 && !this.selectedBankAccountId()) {
       return false;
     }
-    return a <= Number(this.data.debt.outstanding) + 0.001;
+    return true;
   });
-
-  toNum(v: string | number | null): number | null {
-    return typeof v === 'number' ? v : v ? Number(v) : null;
-  }
 
   async save(): Promise<void> {
     if (!this.canSave() || this.submitting()) return;
@@ -204,17 +169,15 @@ export class PayDebtDialogComponent {
       const mode = this.paymentMode();
       const bankId = mode === 'bank' ? this.selectedBankAccountId() : null;
 
-      await this.debtsService.addPayment({
-        debt_id: this.data.debt.id,
-        amount: Number(this.amount()),
-        notes: this.notes() || null,
-        payment_mode: mode,
-        bank_account_id: bankId,
-      });
-      this.snack.open('Payment recorded.', undefined, { duration: 2000 });
+      await this.eventsService.settleParticipant(
+        this.data.participant.id,
+        mode,
+        bankId,
+      );
+      this.snack.open(`${this.data.participant.name} is all settled up.`, undefined, { duration: 2000 });
       this.ref.close({ saved: true });
     } catch (e: unknown) {
-      this.snack.open(errorText(e, 'Couldn’t save — please try again.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(errorText(e, 'Couldn’t settle — please try again.'), 'Dismiss', { duration: 4000 });
       this.submitting.set(false);
     }
   }

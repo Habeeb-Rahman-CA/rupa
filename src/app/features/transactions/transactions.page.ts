@@ -13,6 +13,7 @@ import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
 import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
+import { BankAccountsService } from '../../core/services/bank-accounts.service';
 import { Transaction, isSavingsCategory } from '../../core/models/domain.models';
 
 interface DayGroup {
@@ -68,8 +69,8 @@ interface DayGroup {
                   </div>
                   <div class="tx-mid">
                     <div class="tx-title">{{ labelFor(t) }}</div>
-                    @if (t.notes) {
-                      <div class="tx-sub">{{ t.notes }}</div>
+                    @if (subText(t)) {
+                      <div class="tx-sub">{{ subText(t) }}</div>
                     }
                   </div>
                   <div
@@ -152,6 +153,7 @@ interface DayGroup {
 export class TransactionsPage {
   private readonly service = inject(TransactionsService);
   private readonly categoriesService = inject(CategoriesService);
+  private readonly bankAccountsService = inject(BankAccountsService);
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
 
@@ -182,6 +184,26 @@ export class TransactionsPage {
       this.categoriesService.categories().find((c) => c.id === t.category_id)?.name ??
       (t.direction === 'in' ? 'Income' : 'Expense')
     );
+  }
+
+  paymentInfo(t: Transaction): string {
+    if (t.payment_mode === 'cash') return 'Cash';
+    if (t.payment_mode === 'bank') {
+      if (t.bank_account_id) {
+        const acc = this.bankAccountsService.bankAccounts().find((a) => a.id === t.bank_account_id);
+        if (acc) return acc.bank_name;
+      }
+      return 'Bank';
+    }
+    return '';
+  }
+
+  subText(t: Transaction): string {
+    const parts: string[] = [];
+    if (t.notes) parts.push(t.notes);
+    const mode = this.paymentInfo(t);
+    if (mode) parts.push(mode);
+    return parts.join(' • ');
   }
 
   iconFor(t: Transaction | string): string {

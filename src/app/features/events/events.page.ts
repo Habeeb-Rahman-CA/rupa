@@ -70,9 +70,10 @@ import { CreateEventSheetComponent } from './create-event-sheet.component';
   `,
   styles: [
     `
+      
       .list {
         list-style: none;
-        margin: 0;
+        margin: 0 0 18px 0;
         padding: 0;
         display: flex;
         flex-direction: column;

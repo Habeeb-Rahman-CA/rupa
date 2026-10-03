@@ -6,11 +6,14 @@ import { TransactionsService } from './transactions.service';
 import { DebtsService } from './debts.service';
 import { EventsService } from './events.service';
 
+import { BankAccountsService } from './bank-accounts.service';
+
 @Injectable({ providedIn: 'root' })
 export class DataSyncService {
   private readonly auth = inject(AuthService);
   private readonly categoriesService = inject(CategoriesService);
   private readonly peopleService = inject(PeopleService);
+  private readonly bankAccountsService = inject(BankAccountsService);
   private readonly transactionsService = inject(TransactionsService);
   private readonly debtsService = inject(DebtsService);
   private readonly eventsService = inject(EventsService);
@@ -28,7 +31,7 @@ export class DataSyncService {
 
   /**
    * Coordinated 2-phase data synchronization:
-   * Phase 1: Load lookup data (Categories & People) first
+   * Phase 1: Load lookup data (Categories, People & Bank Accounts) first
    * Phase 2: Load dependent financial records (Transactions, Debts, Events)
    */
   async syncAll(): Promise<void> {
@@ -41,6 +44,7 @@ export class DataSyncService {
         await Promise.all([
           this.categoriesService.load(),
           this.peopleService.load(),
+          this.bankAccountsService.load(),
         ]);
 
         // Phase 2: Relational ledger records

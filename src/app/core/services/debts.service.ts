@@ -1,5 +1,5 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
-import { Debt, DebtDirection, Transaction } from '../models/domain.models';
+import { Debt, DebtDirection, PaymentMode, Transaction } from '../models/domain.models';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { TransactionsService } from './transactions.service';
@@ -13,6 +13,8 @@ export interface CreateDebtInput {
   reason?: string | null;
   opened_on?: string; // ISO
   impact?: DebtTransactionImpact;
+  payment_mode?: PaymentMode;
+  bank_account_id?: string | null;
 }
 
 export interface AddPaymentInput {
@@ -20,6 +22,8 @@ export interface AddPaymentInput {
   amount: number;
   paid_on?: string; // ISO
   notes?: string | null;
+  payment_mode?: PaymentMode;
+  bank_account_id?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -115,13 +119,14 @@ export class DebtsService {
     // 1. Create initial transaction if required
     let tx: Transaction | null = null;
     if (txDirection) {
-      tx = await this.insertTransaction({
-        owner_id: ownerId,
+      tx = await this.txService.create({
         amount: input.amount,
         direction: txDirection,
         occurred_on: openedOn,
         notes: input.reason?.trim() || null,
         source: 'debt',
+        payment_mode: input.payment_mode ?? 'cash',
+        bank_account_id: input.bank_account_id ?? null,
       });
     }
 
@@ -175,19 +180,19 @@ export class DebtsService {
       throw new Error('Payment is larger than the outstanding amount.');
     }
 
-    const ownerId = this.requireUserId();
     const paidOn = input.paid_on ?? todayIso();
 
     // 1. Transaction
     const txDirection = debt.direction === 'i_owe' ? 'out' : 'in';
-    const tx = await this.insertTransaction({
-      owner_id: ownerId,
+    const tx = await this.txService.create({
       amount: input.amount,
       direction: txDirection,
       occurred_on: paidOn,
       notes: input.notes?.trim() || null,
       source: 'debt',
       source_ref_id: debt.id,
+      payment_mode: input.payment_mode ?? 'cash',
+      bank_account_id: input.bank_account_id ?? null,
     });
 
     // 2. debt_payment row

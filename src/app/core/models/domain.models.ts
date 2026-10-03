@@ -54,6 +54,8 @@ export interface Person {
   created_at: string;
 }
 
+export type PaymentMode = 'cash' | 'bank';
+
 export interface Transaction {
   id: string;
   owner_id: string;
@@ -64,6 +66,8 @@ export interface Transaction {
   notes: string | null;
   source: TxSource;
   source_ref_id: string | null;
+  payment_mode?: PaymentMode;
+  bank_account_id?: string | null;
   created_at: string;
 }
 
@@ -129,4 +133,34 @@ export interface EventSettlement {
   event_participant_id: string;
   paid_on: string;
   transaction_id: string;
+}
+
+export type CardType = 'debit' | 'credit' | 'savings' | 'current' | 'prepaid';
+export type PaymentNetwork = 'visa' | 'mastercard' | 'rupay' | 'amex' | 'discover';
+export type CardTheme =
+  | 'blue'
+  | 'purple'
+  | 'dark'
+  | 'emerald'
+  | 'sunset'
+  | 'gold'
+  | 'rose';
+
+export interface BankAccount {
+  id: string;
+  owner_id: string;
+  bank_name: string;
+  account_name: string;
+  card_type: CardType;
+  payment_network: PaymentNetwork;
+  card_number_masked: string;
+  expiry_date: string;
+  cardholder_name: string;
+  account_number_masked?: string;
+  ifsc_code?: string;
+  balance?: number;
+  credit_limit?: number;
+  theme: CardTheme;
+  is_primary?: boolean;
+  created_at: string;
 }

@@ -1,10 +1,11 @@
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
-import { Transaction, TxDirection, isSavingsCategory } from '../models/domain.models';
+import { Transaction, TxDirection, PaymentMode, isSavingsCategory } from '../models/domain.models';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { CategoriesService } from './categories.service';
 import { DebtsService } from './debts.service';
 import { EventsService } from './events.service';
+import { BankAccountsService } from './bank-accounts.service';
 
 export interface CreateTransactionInput {
   amount: number;
@@ -12,6 +13,10 @@ export interface CreateTransactionInput {
   occurred_on?: string; // ISO date; defaults to today
   category_id?: string | null;
   notes?: string | null;
+  payment_mode?: PaymentMode;
+  bank_account_id?: string | null;
+  source?: 'manual' | 'debt' | 'event' | 'opening';
+  source_ref_id?: string | null;
 }
 
 export interface MonthlyStats {
@@ -97,6 +102,46 @@ export class TransactionsService {
         this._openingBalance.set(null);
       }
     });
+
+    effect(() => {
+      try {
+        const bankAccountsService = this.injector.get(BankAccountsService);
+        const primary = bankAccountsService.primaryAccount();
+        if (primary && this._transactions().length > 0) {
+          void this.mapUnassignedTransactionsToPrimary(primary.id);
+        }
+      } catch {}
+    });
+  }
+
+  async mapUnassignedTransactionsToPrimary(bankAccountId: string): Promise<void> {
+    const current = this._transactions();
+    const unassigned = current.filter((t) => !t.bank_account_id);
+    if (unassigned.length === 0) return;
+
+    const updatedList = current.map((t) => {
+      if (!t.bank_account_id) {
+        return {
+          ...t,
+          payment_mode: 'bank' as const,
+          bank_account_id: bankAccountId,
+        };
+      }
+      return t;
+    });
+
+    this._transactions.set(updatedList);
+
+    for (const t of unassigned) {
+      try {
+        await this.supabase.client
+          .from('transactions')
+          .update({ payment_mode: 'bank', bank_account_id: bankAccountId })
+          .eq('id', t.id);
+      } catch {
+        // Fallback for remote schema
+      }
+    }
   }
 
   private refreshPromise: Promise<void> | null = null;
@@ -118,6 +163,13 @@ export class TransactionsService {
           this.loadBalance(),
           this.loadOpeningBalance(),
         ]);
+        try {
+          const bankAccountsService = this.injector.get(BankAccountsService);
+          const primary = bankAccountsService.primaryAccount();
+          if (primary) {
+            void this.mapUnassignedTransactionsToPrimary(primary.id);
+          }
+        } catch {}
       } finally {
         this._isLoading.set(false);
         this.refreshPromise = null;
@@ -159,6 +211,19 @@ export class TransactionsService {
     const ownerId = this.auth.user()?.id;
     if (!ownerId) throw new Error('Not signed in.');
 
+    let targetBankAccountId = input.bank_account_id ?? null;
+    let mode = input.payment_mode ?? 'cash';
+
+    if (mode === 'bank' && !targetBankAccountId) {
+      try {
+        const bankAccountsService = this.injector.get(BankAccountsService);
+        const primary = bankAccountsService.primaryAccount();
+        if (primary) {
+          targetBankAccountId = primary.id;
+        }
+      } catch {}
+    }
+
     const payload = {
       owner_id: ownerId,
       amount: input.amount,
@@ -166,23 +231,67 @@ export class TransactionsService {
       occurred_on: input.occurred_on ?? todayIso(),
       category_id: input.category_id ?? null,
       notes: input.notes?.trim() || null,
-      source: 'manual' as const,
+      source: input.source ?? ('manual' as const),
+      source_ref_id: input.source_ref_id ?? null,
+      payment_mode: mode,
+      bank_account_id: targetBankAccountId,
     };
 
-    const { data, error } = await this.supabase.client
+    let created: Transaction | null = null;
+    let result = await this.supabase.client
       .from('transactions')
       .insert(payload)
       .select()
       .single();
-    if (error) {
-      console.error('Failed to create transaction', error);
-      throw error;
+
+    if (result.error) {
+      // Fallback for Supabase remote schema if payment_mode/bank_account_id column doesn't exist yet
+      const fallbackPayload = {
+        owner_id: ownerId,
+        amount: input.amount,
+        direction: input.direction,
+        occurred_on: input.occurred_on ?? todayIso(),
+        category_id: input.category_id ?? null,
+        notes: input.notes?.trim() || null,
+        source: input.source ?? ('manual' as const),
+        source_ref_id: input.source_ref_id ?? null,
+      };
+
+      const fallbackResult = await this.supabase.client
+        .from('transactions')
+        .insert(fallbackPayload)
+        .select()
+        .single();
+
+      if (fallbackResult.error) {
+        console.error('Failed to create transaction', fallbackResult.error);
+        throw fallbackResult.error;
+      }
+
+      created = {
+        ...(fallbackResult.data as Transaction),
+        payment_mode: input.payment_mode ?? 'cash',
+        bank_account_id: input.bank_account_id ?? null,
+      };
+    } else {
+      created = result.data as Transaction;
     }
 
-    const created = data as Transaction;
-    this._transactions.update((list) => [created, ...list]);
-    this.applyToTotals(created, +1);
-    return created;
+    // Update bank card balance if bank_account_id is provided
+    if (input.bank_account_id && input.payment_mode === 'bank') {
+      try {
+        const bankAccountsService = this.injector.get(BankAccountsService);
+        const card = bankAccountsService.bankAccounts().find((c) => c.id === input.bank_account_id);
+        if (card && card.balance !== undefined) {
+          const delta = input.direction === 'in' ? input.amount : -input.amount;
+          void bankAccountsService.update(card.id, { balance: Math.max(0, card.balance + delta) });
+        }
+      } catch {}
+    }
+
+    this._transactions.update((list) => [created!, ...list]);
+    this.applyToTotals(created!, +1);
+    return created!;
   }
 
   async delete(id: string): Promise<void> {

@@ -12,6 +12,7 @@ import { SwipeableRowComponent } from '../../shared/components/swipeable-row.com
 import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { PeopleService } from '../../core/services/people.service';
 import { Person } from '../../core/models/domain.models';
+import { PersonDialogComponent } from './person-dialog.component';
 
 @Component({
   selector: 'app-people-page',
@@ -21,37 +22,22 @@ import { Person } from '../../core/models/domain.models';
     LucideAngularModule,
     PageHeaderComponent,
     EmptyStateComponent,
-    TextFieldComponent,
     SwipeableRowComponent,
   ],
   template: `
     <app-page-header
       title="People"
       subtitle="Friends and family in your money circle"
-    />
-
-    <section class="add-card app-card">
-      <div class="add-form">
-        <app-text-field
-          class="name"
-          label="Add person"
-          placeholder="e.g. Ahmed"
-          [maxlength]="60"
-          [value]="name()"
-          (valueChange)="name.set($any($event) ?? '')"
-          (enter)="add()"
-        />
-        <button
-          class="add-btn"
-          type="button"
-          (click)="add()"
-          [disabled]="!name().trim() || submitting()"
-          aria-label="Add person"
-        >
-          <lucide-icon name="plus" />
-        </button>
-      </div>
-    </section>
+    >
+      <button
+        class="add-btn"
+        type="button"
+        (click)="openAddDialog()"
+        aria-label="Add person"
+      >
+        <lucide-icon name="plus" />
+      </button>
+    </app-page-header>
 
     @if (people().length === 0) {
       <app-empty-state
@@ -90,11 +76,10 @@ import { Person } from '../../core/models/domain.models';
       .name { flex: 1; min-width: 0; }
       .list {
         list-style: none;
-        margin: 0;
+        margin: 0 0 18px 0;
         padding: 0;
         display: flex;
         flex-direction: column;
-        gap: 8px;
       }
       .row {
         display: grid;
@@ -128,20 +113,11 @@ export class PeoplePage {
 
   readonly people = this.service.people;
   readonly submitting = signal(false);
-  readonly name = signal('');
 
-  async add(): Promise<void> {
-    const val = this.name().trim();
-    if (!val || this.submitting()) return;
-    this.submitting.set(true);
-    try {
-      await this.service.create(val);
-      this.name.set('');
-    } catch (e: unknown) {
-      this.snack.open(errText(e, 'Couldn’t add — please try again.'), 'Dismiss', { duration: 4000 });
-    } finally {
-      this.submitting.set(false);
-    }
+  openAddDialog(): void {
+    this.dialog.open(PersonDialogComponent, {
+      width: '400px',
+    });
   }
 
   async confirmRemove(p: Person): Promise<void> {

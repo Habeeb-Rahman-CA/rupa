@@ -12,7 +12,8 @@ import { PageHeaderComponent } from '../../shared/components/page-header.compone
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { SwipeableRowComponent } from '../../shared/components/swipeable-row.component';
 import { openConfirm } from '../../shared/components/confirm-dialog.component';
-import { Category, CategoryKind, isSavingsCategory } from '../../core/models/domain.models';
+import { Category, isSavingsCategory } from '../../core/models/domain.models';
+import { CategoryDialogComponent } from './category-dialog.component';
 
 @Component({
   selector: 'app-categories-page',
@@ -23,47 +24,22 @@ import { Category, CategoryKind, isSavingsCategory } from '../../core/models/dom
     LucideAngularModule,
     PageHeaderComponent,
     EmptyStateComponent,
-    TextFieldComponent,
     SwipeableRowComponent,
   ],
   template: `
-    <app-page-header title="Categories" subtitle="Organize your expenses, income, and savings" />
-
-    <section class="add-card app-card">
-      <div class="add-form">
-        <app-text-field
-          class="name"
-          label="New category"
-          placeholder="e.g. Emergency Fund"
-          [maxlength]="40"
-          [value]="name()"
-          (valueChange)="name.set($any($event) ?? '')"
-          (enter)="add()"
-        />
-
-        <div class="right">
-          <mat-button-toggle-group
-            [value]="kind()"
-            (change)="kind.set($event.value)"
-            hideSingleSelectionIndicator
-          >
-            <mat-button-toggle value="expense">Expense</mat-button-toggle>
-            <mat-button-toggle value="income">Income</mat-button-toggle>
-            <mat-button-toggle value="savings">Savings</mat-button-toggle>
-          </mat-button-toggle-group>
-
-          <button
-            class="add-btn"
-            type="button"
-            (click)="add()"
-            [disabled]="!name().trim() || submitting()"
-            aria-label="Add category"
-          >
-            <lucide-icon name="plus" />
-          </button>
-        </div>
-      </div>
-    </section>
+    <app-page-header
+      title="Categories"
+      subtitle="Organize your expenses, income, and savings"
+    >
+      <button
+        class="add-btn"
+        type="button"
+        (click)="openAddDialog()"
+        aria-label="Add category"
+      >
+        <lucide-icon name="plus" />
+      </button>
+    </app-page-header>
 
     @if (categories().length === 0) {
       <app-empty-state
@@ -259,7 +235,6 @@ import { Category, CategoryKind, isSavingsCategory } from '../../core/models/dom
         padding: 0;
         display: flex;
         flex-direction: column;
-        gap: 8px;
       }
       .row {
         display: grid;
@@ -315,21 +290,11 @@ export class CategoriesPage {
   );
 
   readonly submitting = signal(false);
-  readonly name = signal('');
-  readonly kind = signal<CategoryKind>('expense');
 
-  async add(): Promise<void> {
-    const val = this.name().trim();
-    if (!val || this.submitting()) return;
-    this.submitting.set(true);
-    try {
-      await this.service.create(val, this.kind());
-      this.name.set('');
-    } catch (e: unknown) {
-      this.snack.open(errText(e, 'Couldn’t add — please try again.'), 'Dismiss', { duration: 4000 });
-    } finally {
-      this.submitting.set(false);
-    }
+  openAddDialog(): void {
+    this.dialog.open(CategoryDialogComponent, {
+      width: '420px',
+    });
   }
 
   async confirmRemove(c: Category): Promise<void> {

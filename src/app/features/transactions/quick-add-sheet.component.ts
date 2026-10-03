@@ -1,6 +1,7 @@
 import {
   Component,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -15,11 +16,14 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatChipsModule } from '@angular/material/chips';
 import { LucideAngularModule } from 'lucide-angular';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Router } from '@angular/router';
 
 import { CategoriesService } from '../../core/services/categories.service';
 import { TransactionsService } from '../../core/services/transactions.service';
-import { Category, CategoryKind, TxDirection, isSavingsCategory } from '../../core/models/domain.models';
+import { BankAccountsService } from '../../core/services/bank-accounts.service';
+import { Category, CategoryKind, PaymentMode, TxDirection, isSavingsCategory } from '../../core/models/domain.models';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
+import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
 import { SetOpeningBalanceSheetComponent } from '../dashboard/set-opening-balance-sheet.component';
 
 const NEW_CATEGORY = '__new__';
@@ -38,6 +42,7 @@ export interface QuickAddSheetData {
     MatChipsModule,
     LucideAngularModule,
     TextFieldComponent,
+    SelectFieldComponent,
   ],
   template: `
     <div class="sheet">
@@ -75,6 +80,36 @@ export interface QuickAddSheetData {
       >
         <span prefix>₹</span>
       </app-text-field>
+
+      <div class="field-group">
+        <label class="ft-label">Payment Mode</label>
+        <mat-button-toggle-group
+          [value]="paymentMode()"
+          (change)="setPaymentMode($event.value)"
+          hideSingleSelectionIndicator
+          class="payment-mode-toggle"
+        >
+          <mat-button-toggle value="cash">Cash</mat-button-toggle>
+          <mat-button-toggle value="bank">Bank Account</mat-button-toggle>
+        </mat-button-toggle-group>
+      </div>
+
+      @if (paymentMode() === 'bank') {
+        @if (bankAccountOptions().length > 0) {
+          <app-select-field
+            label="Select Bank Account"
+            placeholder="Choose account"
+            [options]="bankAccountOptions()"
+            [value]="selectedBankAccountId()"
+            (valueChange)="selectedBankAccountId.set($any($event))"
+          />
+        } @else {
+          <div class="no-bank-notice">
+            <span>No bank accounts found.</span>
+            <button type="button" class="link-btn" (click)="openBankAccounts()">Add Bank Account</button>
+          </div>
+        }
+      }
 
       <div>
         <div class="micro-label cat-label">Category</div>
@@ -151,6 +186,33 @@ export interface QuickAddSheetData {
         font-size: 16px;
         font-weight: 600;
       }
+      .field-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .ft-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--app-ink);
+      }
+      .payment-mode-toggle {
+        width: 100%;
+        display: flex;
+      }
+      .payment-mode-toggle mat-button-toggle {
+        flex: 1;
+      }
+      .no-bank-notice {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        background: var(--app-bg-hover);
+        border-radius: var(--app-radius-md);
+        font-size: 13px;
+        color: var(--app-ink-muted);
+      }
       .cat-label { margin-bottom: 8px; }
       .starting-balance-link {
         font-size: 12px;
@@ -188,6 +250,8 @@ export class QuickAddSheetComponent {
   private readonly sheetData = inject<QuickAddSheetData | null>(MAT_BOTTOM_SHEET_DATA, { optional: true });
   private readonly categoriesService = inject(CategoriesService);
   private readonly transactionsService = inject(TransactionsService);
+  private readonly bankAccountsService = inject(BankAccountsService);
+  private readonly router = inject(Router);
   private readonly snack = inject(MatSnackBar);
 
   readonly txKind = signal<CategoryKind>(this.sheetData?.defaultKind ?? 'expense');
@@ -196,6 +260,46 @@ export class QuickAddSheetComponent {
   readonly selectedCategoryId = signal<string | null>(null);
   readonly newCategoryName = signal('');
   readonly notes = signal('');
+
+  readonly paymentMode = signal<PaymentMode>('cash');
+  readonly selectedBankAccountId = signal<string | null>(null);
+
+  readonly bankAccountOptions = computed<SelectOption[]>(() => {
+    return this.bankAccountsService.bankAccounts().map((acc) => ({
+      value: acc.id,
+      label: acc.is_primary ? `${acc.bank_name} (${acc.account_name}) ★` : `${acc.bank_name} (${acc.account_name})`,
+      icon: 'landmark',
+    }));
+  });
+
+  constructor() {
+    effect(() => {
+      const primary = this.bankAccountsService.primaryAccount();
+      const accounts = this.bankAccountsService.bankAccounts();
+      if (primary && !this.selectedBankAccountId()) {
+        this.selectedBankAccountId.set(primary.id);
+      }
+      if (accounts.length > 0 && this.paymentMode() === 'cash' && !this.userExplicitlySetCash) {
+        this.paymentMode.set('bank');
+        if (primary) {
+          this.selectedBankAccountId.set(primary.id);
+        }
+      }
+    });
+  }
+
+  private userExplicitlySetCash = false;
+
+  setPaymentMode(mode: PaymentMode): void {
+    this.userExplicitlySetCash = mode === 'cash';
+    this.paymentMode.set(mode);
+    if (mode === 'bank' && !this.selectedBankAccountId()) {
+      const primary = this.bankAccountsService.primaryAccount();
+      if (primary) {
+        this.selectedBankAccountId.set(primary.id);
+      }
+    }
+  }
 
   readonly relevantCategories = computed<Category[]>(() => {
     const kind = this.txKind();
@@ -211,6 +315,9 @@ export class QuickAddSheetComponent {
     const amt = this.amount();
     if (!amt || amt <= 0) return false;
     if (this.selectedCategoryId() === NEW_CATEGORY && !this.newCategoryName().trim()) {
+      return false;
+    }
+    if (this.paymentMode() === 'bank' && this.bankAccountOptions().length > 0 && !this.selectedBankAccountId()) {
       return false;
     }
     return true;
@@ -243,12 +350,16 @@ export class QuickAddSheetComponent {
       }
 
       const direction: TxDirection = this.txKind() === 'income' ? 'in' : 'out';
+      const mode = this.paymentMode();
+      const bankAccountId = mode === 'bank' ? this.selectedBankAccountId() : null;
 
       await this.transactionsService.create({
         amount: Number(this.amount()),
         direction,
         category_id: categoryId,
         notes: this.notes(),
+        payment_mode: mode,
+        bank_account_id: bankAccountId,
       });
 
       const message =
@@ -273,6 +384,11 @@ export class QuickAddSheetComponent {
     this.bottomSheet.open(SetOpeningBalanceSheetComponent);
   }
 
+  openBankAccounts(): void {
+    this.ref.dismiss();
+    void this.router.navigate(['/bank-accounts']);
+  }
+
   close(): void {
     this.ref.dismiss();
   }
@@ -284,3 +400,4 @@ function errorText(err: unknown, fallback: string): string {
   }
   return fallback;
 }
+
