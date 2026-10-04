@@ -345,7 +345,7 @@ export class EventsService {
       .single();
     if (expErr) {
       console.error('Failed to create event expense', expErr);
-      await this.txService.delete(tx.id).catch(() => undefined);
+      await this.safeDeleteTx(tx.id);
       throw expErr;
     }
     const expense = expRow as EventExpense;
@@ -359,7 +359,11 @@ export class EventsService {
       .from('event_expense_participants')
       .insert(partRows);
     if (linkErr) {
-      console.error('Failed to link expense participants', linkErr);
+      console.error('Failed to link expense participants, rolling back expense & transaction', linkErr);
+      try {
+        await this.supabase.client.from('event_expenses').delete().eq('id', expense.id);
+      } catch {}
+      await this.safeDeleteTx(tx.id);
       throw linkErr;
     }
 
@@ -428,8 +432,8 @@ export class EventsService {
       transaction_id: tx.id,
     });
     if (error) {
-      console.error('Failed to record settlement', error);
-      await this.txService.delete(tx.id).catch(() => undefined);
+      console.error('Failed to record settlement, rolling back transaction', error);
+      await this.safeDeleteTx(tx.id);
       throw error;
     }
 
@@ -549,6 +553,20 @@ export class EventsService {
       totalSpent,
       totalOutstanding,
     };
+  }
+
+  private async safeDeleteTx(txId: string): Promise<void> {
+    try {
+      await this.txService.delete(txId);
+    } catch (err) {
+      console.error(`Rollback warning: Failed to delete transaction ${txId} via service, attempting direct DB cleanup`, err);
+      try {
+        await this.supabase.client.from('transactions').delete().eq('id', txId);
+        await this.txService.refresh();
+      } catch (fallbackErr) {
+        console.error(`Rollback error: Final fallback cleanup for transaction ${txId} failed`, fallbackErr);
+      }
+    }
   }
 
   private requireUserId(): string {

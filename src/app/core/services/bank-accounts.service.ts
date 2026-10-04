@@ -56,17 +56,22 @@ export class BankAccountsService {
             (c) => !c.id.startsWith('demo_card_') && !c.id.startsWith('sample_card_')
           );
 
-          if (remoteList.length > 0) {
-            this._bankAccounts.set(remoteList);
-            this.saveToLocal(remoteList);
+          const localCards = this.getLocalCards();
+          const unsynced = localCards.filter(
+            (lc) => !remoteList.some((rc) => rc.id === lc.id)
+          );
+
+          if (unsynced.length > 0) {
+            const merged = [...unsynced, ...remoteList];
+            this._bankAccounts.set(merged);
+            this.saveToLocal(merged);
+            void this.syncLocalCardsToSupabase(unsynced);
             return;
           }
 
-          // If Supabase table is empty, check if user has local cards to upload
-          const localCards = this.getLocalCards();
-          if (localCards.length > 0) {
-            this._bankAccounts.set(localCards);
-            void this.syncLocalCardsToSupabase(localCards);
+          if (remoteList.length > 0) {
+            this._bankAccounts.set(remoteList);
+            this.saveToLocal(remoteList);
             return;
           }
 

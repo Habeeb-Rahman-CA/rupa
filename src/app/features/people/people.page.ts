@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -54,8 +54,8 @@ import { errText } from '../../shared/utils/error-utils';
           class="search-input"
           placeholder="Search people…"
           leadIcon="search"
-          [value]="searchQuery()"
-          (valueChange)="searchQuery.set($any($event) ?? '')"
+          [value]="rawSearchQuery()"
+          (valueChange)="onSearchChange($any($event))"
         />
 
         <button
@@ -186,12 +186,31 @@ export class PeoplePage {
   private readonly service = inject(PeopleService);
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly people = this.service.people;
   readonly submitting = signal(false);
 
+  readonly rawSearchQuery = signal('');
   readonly searchQuery = signal('');
   readonly sortOrder = signal<'asc' | 'desc'>('asc');
+
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    });
+  }
+
+  onSearchChange(val: string): void {
+    const text = val ?? '';
+    this.rawSearchQuery.set(text);
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => {
+      this.searchQuery.set(text);
+    }, 150);
+  }
 
   readonly filteredPeople = computed(() => {
     const q = this.searchQuery().trim().toLowerCase();

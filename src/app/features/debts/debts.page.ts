@@ -71,7 +71,7 @@ import { errText } from '../../shared/utils/error-utils';
                   <div class="title">{{ nameFor(d) }}</div>
                   <div class="sub">
                     @if (d.reason) { {{ d.reason }} Â· }
-                    Opened {{ d.opened_on | date: 'MMM d' }}
+                    Opened {{ d.opened_on | date: 'MMM d' : 'UTC' }}
                   </div>
                 </div>
                 <div class="amount money-positive">
@@ -114,7 +114,7 @@ import { errText } from '../../shared/utils/error-utils';
                   <div class="title">{{ nameFor(d) }}</div>
                   <div class="sub">
                     @if (d.reason) { {{ d.reason }} Â· }
-                    Opened {{ d.opened_on | date: 'MMM d' }}
+                    Opened {{ d.opened_on | date: 'MMM d' : 'UTC' }}
                   </div>
                 </div>
                 <div class="amount money-negative">

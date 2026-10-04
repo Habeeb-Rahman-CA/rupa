@@ -337,7 +337,7 @@ interface BankReportRow extends BankAccount {
         <ul class="day-list">
           @for (d of topDays(); track d.date; let last = $last) {
             <li class="day-row" [class.last]="last">
-              <div class="day-label">{{ d.date | date: 'EEE, MMM d' }}</div>
+              <div class="day-label">{{ d.date | date: 'EEE, MMM d' : 'UTC' }}</div>
               <div class="day-amount money-negative">
                 {{ d.amount | signedMoney: 'out' }}
               </div>

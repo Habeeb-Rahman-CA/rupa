@@ -129,6 +129,7 @@ export class SwipeableRowComponent {
   private isHorizontal = false;
   private activeTimer: ReturnType<typeof setTimeout> | null = null;
   private isDestroyed = false;
+  private hasEmittedDelete = false;
 
   constructor() {
     this.destroyRef.onDestroy(() => {
@@ -151,6 +152,13 @@ export class SwipeableRowComponent {
         this.reset();
       }
     }, delayMs);
+  }
+
+  private emitDeleteOnce(): void {
+    if (this.hasEmittedDelete) return;
+    this.hasEmittedDelete = true;
+    this.delete.emit();
+    this.scheduleReset(300);
   }
 
   transformStyle(): string {
@@ -205,8 +213,7 @@ export class SwipeableRowComponent {
     const currentX = this.translateX();
     if (currentX < -60) {
       this.translateX.set(-80);
-      this.delete.emit();
-      this.scheduleReset(300);
+      this.emitDeleteOnce();
     } else {
       this.reset();
     }
@@ -214,13 +221,13 @@ export class SwipeableRowComponent {
 
   onDeleteClick(e: MouseEvent): void {
     e.stopPropagation();
-    this.delete.emit();
-    this.scheduleReset(300);
+    this.emitDeleteOnce();
   }
 
   reset(): void {
     this.clearTimer();
     if (this.isDestroyed) return;
+    this.hasEmittedDelete = false;
     this.animating.set(true);
     this.translateX.set(0);
   }

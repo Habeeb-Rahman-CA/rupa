@@ -148,7 +148,7 @@ export class DebtsService {
     if (error) {
       console.error('Failed to create debt', error);
       if (tx) {
-        await this.txService.delete(tx.id).catch(() => undefined);
+        await this.safeDeleteTx(tx.id);
       }
       throw error;
     }
@@ -162,8 +162,10 @@ export class DebtsService {
         .eq('id', tx.id);
       if (linkErr) {
         console.error('Failed to link transaction to debt, rolling back', linkErr);
-        await this.supabase.client.from('debts').delete().eq('id', debt.id);
-        await this.txService.delete(tx.id).catch(() => undefined);
+        try {
+          await this.supabase.client.from('debts').delete().eq('id', debt.id);
+        } catch {}
+        await this.safeDeleteTx(tx.id);
         throw linkErr;
       }
     }
@@ -211,8 +213,8 @@ export class DebtsService {
       notes: input.notes?.trim() || null,
     });
     if (payErr) {
-      console.error('Failed to record debt payment', payErr);
-      await this.txService.delete(tx.id).catch(() => undefined);
+      console.error('Failed to record debt payment, rolling back transaction', payErr);
+      await this.safeDeleteTx(tx.id);
       throw payErr;
     }
 
@@ -228,7 +230,11 @@ export class DebtsService {
       .select()
       .single();
     if (updErr) {
-      console.error('Failed to update debt outstanding', updErr);
+      console.error('Failed to update debt outstanding, rolling back payment & transaction', updErr);
+      try {
+        await this.supabase.client.from('debt_payments').delete().eq('transaction_id', tx.id);
+      } catch {}
+      await this.safeDeleteTx(tx.id);
       throw updErr;
     }
 
@@ -286,6 +292,20 @@ export class DebtsService {
     }
 
     await this.txService.refresh();
+  }
+
+  private async safeDeleteTx(txId: string): Promise<void> {
+    try {
+      await this.txService.delete(txId);
+    } catch (err) {
+      console.error(`Rollback warning: Failed to delete transaction ${txId} via service, attempting direct DB cleanup`, err);
+      try {
+        await this.supabase.client.from('transactions').delete().eq('id', txId);
+        await this.txService.refresh();
+      } catch (fallbackErr) {
+        console.error(`Rollback error: Final fallback cleanup for transaction ${txId} failed`, fallbackErr);
+      }
+    }
   }
 
   private requireUserId(): string {

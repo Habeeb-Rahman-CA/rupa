@@ -214,7 +214,7 @@ type Range = 'week' | 'month' | 'year';
             <div class="tx-mid">
               <div class="tx-title">{{ t.label }}</div>
               <div class="tx-sub">
-                {{ t.occurred_on | date: 'MMM d' }}
+                {{ t.occurred_on | date: 'MMM d' : 'UTC' }}
                 @if (t.notes) { · {{ t.notes }} }
               </div>
             </div>
@@ -775,7 +775,7 @@ export class DashboardPage {
       if (t.category_id && catsMap.get(t.category_id) === 'savings') continue;
       const [ty, tm, td] = t.occurred_on.split('-').map(Number);
       const d = new Date(ty, tm - 1, td);
-      const diff = Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+      const diff = Math.round((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
       if (diff < 0 || diff >= days) continue;
       const idx = days - 1 - diff;
       buckets[idx].value += Number(t.amount);

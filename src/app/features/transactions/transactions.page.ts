@@ -60,7 +60,7 @@ export interface DayGroup {
       @for (g of groups(); track g.date) {
         <section class="day">
           <div class="day-head">
-            <span class="day-date">{{ g.date | date: 'EEE, MMM d' }}</span>
+            <span class="day-date">{{ g.date | date: 'EEE, MMM d' : 'UTC' }}</span>
             <span
               class="day-total"
               [class.money-negative]="g.dayTotal < 0"

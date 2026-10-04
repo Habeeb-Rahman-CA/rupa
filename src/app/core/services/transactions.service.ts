@@ -6,6 +6,7 @@ import { CategoriesService } from './categories.service';
 import { DebtsService } from './debts.service';
 import { EventsService } from './events.service';
 import { BankAccountsService } from './bank-accounts.service';
+import { roundCurrency } from '../../shared/utils/currency-utils';
 
 export interface CreateTransactionInput {
   amount: number;
@@ -300,7 +301,7 @@ export class TransactionsService {
         const card = bankAccountsService.bankAccounts().find((c) => c.id === input.bank_account_id);
         if (card && card.balance !== undefined) {
           const delta = input.direction === 'in' ? input.amount : -input.amount;
-          await bankAccountsService.update(card.id, { balance: Math.max(0, card.balance + delta) });
+          await bankAccountsService.update(card.id, { balance: Math.max(0, roundCurrency(card.balance + delta)) });
         }
       } catch (err) {
         console.error('Failed to update bank account balance', err);
@@ -382,6 +383,21 @@ export class TransactionsService {
         }
       }
 
+      // Revert bank card balance if transaction was linked to a bank account
+      if (removed.payment_mode === 'bank' && removed.bank_account_id) {
+        try {
+          const bankAccountsService = this.injector.get(BankAccountsService);
+          const card = bankAccountsService.bankAccounts().find((c) => c.id === removed.bank_account_id);
+          if (card && card.balance !== undefined) {
+            const revertDelta = removed.direction === 'in' ? -Number(removed.amount) : Number(removed.amount);
+            const newBalance = Math.max(0, roundCurrency(card.balance + revertDelta));
+            await bankAccountsService.update(card.id, { balance: newBalance });
+          }
+        } catch (err) {
+          console.error('Failed to revert bank account balance on transaction deletion', err);
+        }
+      }
+
       // Delete transaction row
       const { error } = await this.supabase.client
         .from('transactions')
@@ -415,16 +431,17 @@ export class TransactionsService {
       return;
     }
 
-    const { data } = await this.supabase.client
+    const { data, error } = await this.supabase.client
       .from('transactions')
       .select('amount, direction')
       .eq('owner_id', ownerId)
-      .eq('source', 'opening')
-      .maybeSingle();
+      .or('source.eq.opening,notes.eq.Opening balance')
+      .order('created_at', { ascending: false });
 
-    if (data) {
-      const amt = Number(data.amount);
-      this._openingBalance.set(data.direction === 'in' ? amt : -amt);
+    if (!error && data && data.length > 0) {
+      const primary = data[0];
+      const amt = Number(primary.amount);
+      this._openingBalance.set(primary.direction === 'in' ? amt : -amt);
     } else {
       this._openingBalance.set(null);
     }
@@ -434,44 +451,56 @@ export class TransactionsService {
     const ownerId = this.auth.user()?.id;
     if (!ownerId) throw new Error('Not signed in.');
 
-    const { data: existing } = await this.supabase.client
+    // Query all matching opening balance transactions without .maybeSingle() to prevent PGRST116 exceptions
+    const { data: matches, error: findErr } = await this.supabase.client
       .from('transactions')
       .select('id')
       .eq('owner_id', ownerId)
-      .eq('source', 'opening')
-      .maybeSingle();
+      .or('source.eq.opening,notes.eq.Opening balance')
+      .order('created_at', { ascending: false });
+
+    if (findErr) throw findErr;
 
     const direction: TxDirection = amount >= 0 ? 'in' : 'out';
     const absAmount = Math.abs(amount);
+    const existingList = matches ?? [];
 
-    if (existing) {
+    if (existingList.length > 0) {
+      const primaryId = existingList[0].id;
+
+      // Clean up any extra duplicate opening balance records if user rapidly clicked or previous duplicates existed
+      if (existingList.length > 1) {
+        const extraIds = existingList.slice(1).map((r) => r.id);
+        await this.supabase.client.from('transactions').delete().in('id', extraIds);
+      }
+
       if (absAmount === 0 && amount === 0) {
-        await this.supabase.client.from('transactions').delete().eq('id', existing.id);
+        await this.supabase.client.from('transactions').delete().eq('id', primaryId);
       } else {
-        const { error } = await this.supabase.client
+        const { error: updErr } = await this.supabase.client
           .from('transactions')
           .update({
             amount: absAmount,
             direction,
             occurred_on: '2000-01-01',
-          })
-          .eq('id', existing.id);
-        if (error) throw error;
-      }
-    } else {
-      if (absAmount > 0) {
-        const { error } = await this.supabase.client
-          .from('transactions')
-          .insert({
-            owner_id: ownerId,
-            amount: absAmount,
-            direction,
-            occurred_on: '2000-01-01',
-            notes: 'Opening balance',
             source: 'opening',
-          });
-        if (error) throw error;
+            notes: 'Opening balance',
+          })
+          .eq('id', primaryId);
+        if (updErr) throw updErr;
       }
+    } else if (absAmount > 0) {
+      const { error: insErr } = await this.supabase.client
+        .from('transactions')
+        .insert({
+          owner_id: ownerId,
+          amount: absAmount,
+          direction,
+          occurred_on: '2000-01-01',
+          notes: 'Opening balance',
+          source: 'opening',
+        });
+      if (insErr) throw insErr;
     }
 
     await this.refresh();

@@ -1,5 +1,5 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
-import { Category, CategoryKind, markAsSavingsCategory } from '../models/domain.models';
+import { Category, CategoryKind, isSavingsCategory, markAsSavingsCategory } from '../models/domain.models';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 
@@ -61,7 +61,13 @@ export class CategoriesService {
           console.error('Failed to load categories', error);
           return;
         }
-        this._categories.set((data ?? []) as Category[]);
+        const categories = ((data ?? []) as Category[]).map((c) => {
+          if (isSavingsCategory(c)) {
+            return { ...c, kind: 'savings' as const };
+          }
+          return c;
+        });
+        this._categories.set(categories);
       } finally {
         this._isLoading.set(false);
         this.loadPromise = null;
@@ -97,7 +103,11 @@ export class CategoriesService {
       throw result.error;
     }
 
-    const created = result.data as Category;
+    const created = {
+      ...(result.data as Category),
+      kind, // Enforce domain model consistency for savings categories
+    };
+
     if (kind === 'savings') {
       markAsSavingsCategory(created.id);
     }

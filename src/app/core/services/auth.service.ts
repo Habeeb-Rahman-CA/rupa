@@ -29,19 +29,18 @@ export class AuthService {
       .getSession()
       .then(({ data, error }) => {
         if (error) {
-          console.warn('Failed to restore Supabase session', error.message);
-          const status = error.status;
+          console.warn('Failed to restore Supabase session:', error.message);
           const msg = error.message?.toLowerCase() ?? '';
-          const isNetwork =
-            status === 0 ||
-            status === 502 ||
-            status === 503 ||
-            status === 504 ||
-            msg.includes('fetch') ||
-            msg.includes('network') ||
-            (typeof navigator !== 'undefined' && !navigator.onLine);
+          const status = error.status;
+          const isInvalidRefreshToken =
+            (status === 400 || status === 401) &&
+            (msg.includes('invalid') ||
+              msg.includes('grant') ||
+              msg.includes('revoked') ||
+              msg.includes('not found') ||
+              msg.includes('expired'));
 
-          if (!isNetwork) {
+          if (isInvalidRefreshToken) {
             void this.signOut();
           }
         } else {
@@ -49,7 +48,7 @@ export class AuthService {
         }
       })
       .catch((err) => {
-        console.error('Failed to restore Supabase session', err);
+        console.error('Failed to restore Supabase session:', err);
       })
       .finally(() => {
         this._ready.set(true);
@@ -87,52 +86,56 @@ export class AuthService {
 
   /**
    * Ask Supabase to refresh the access token using the persisted refresh
-   * token. If the refresh token itself has expired or is invalid (HTTP 400),
-   * sign out cleanly so the user can log in again. Offline network failures
-   * leave the existing session intact.
+   * token. If the refresh token itself has expired or is invalid (HTTP 400/401),
+   * sign out cleanly so the user can log in again. Transient mobile network
+   * disconnects leave the existing session 100% intact.
    */
-  async refreshIfPossible(): Promise<void> {
-    if (!this._session()) return;
+  async refreshIfPossible(maxAttempts = 2): Promise<void> {
+    const currentSession = this._session();
+    if (!currentSession) return;
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
-    try {
-      const { error } = await this.supabase.client.auth.refreshSession();
-      if (error) {
-        const msg = error.message?.toLowerCase() ?? '';
-        const status = error.status;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const { data, error } = await this.supabase.client.auth.refreshSession();
+        if (error) {
+          const msg = error.message?.toLowerCase() ?? '';
+          const status = error.status;
 
-        const isNetworkError =
-          status === 0 ||
-          status === 502 ||
-          status === 503 ||
-          status === 504 ||
-          msg.includes('fetch') ||
-          msg.includes('network') ||
-          msg.includes('offline');
+          // Check if error is an explicit invalid/revoked refresh token error
+          const isInvalidRefreshToken =
+            (status === 400 || status === 401) &&
+            (msg.includes('invalid') ||
+              msg.includes('grant') ||
+              msg.includes('revoked') ||
+              msg.includes('not found') ||
+              msg.includes('expired'));
 
-        if (isNetworkError) {
-          console.warn('Session refresh postponed due to network unavailability:', error.message);
+          if (isInvalidRefreshToken) {
+            if (attempt < maxAttempts) {
+              await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+              continue;
+            }
+            console.warn('Session refresh failed with invalid refresh token after retries, logging out:', error.message);
+            await this.signOut();
+            return;
+          } else {
+            // Any network, DNS, timeout, or server error leaves existing session intact
+            console.warn('Transient session refresh issue, keeping session intact:', error.message);
+            return;
+          }
+        } else if (data?.session) {
+          this._session.set(data.session);
           return;
         }
-
-        // Only sign out if the refresh token is explicitly invalid, expired, or revoked
-        console.warn('Session refresh failed with invalid token:', error.message);
-        await this.signOut();
-      }
-    } catch (err: any) {
-      const msg = String(err?.message || err).toLowerCase();
-      const isNetworkError =
-        msg.includes('fetch') ||
-        msg.includes('network') ||
-        msg.includes('offline') ||
-        (typeof navigator !== 'undefined' && !navigator.onLine);
-
-      if (isNetworkError) {
-        console.warn('Session refresh network error, keeping session intact:', err);
+      } catch (err: unknown) {
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+          continue;
+        }
+        console.warn('Transient session refresh network error, keeping session intact:', err);
         return;
       }
-      console.error('Fatal session refresh error:', err);
-      await this.signOut();
     }
   }
 
