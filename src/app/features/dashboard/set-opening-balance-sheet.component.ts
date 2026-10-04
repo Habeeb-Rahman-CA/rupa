@@ -7,6 +7,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { TransactionsService } from '../../core/services/transactions.service';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
+import { errorText } from '../../shared/utils/error-utils';
 
 @Component({
   selector: 'app-set-opening-balance-sheet',
@@ -151,11 +152,4 @@ export class SetOpeningBalanceSheetComponent {
   close(): void {
     this.ref.dismiss();
   }
-}
-
-function errorText(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message) || fallback;
-  }
-  return fallback;
 }

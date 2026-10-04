@@ -16,8 +16,9 @@ import {
 import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
 import { DebtsService } from '../../core/services/debts.service';
-import { CategoryKind, Transaction, isSavingsCategory } from '../../core/models/domain.models';
+import { Category, CategoryKind, Transaction, isSavingsCategory } from '../../core/models/domain.models';
 import { SetOpeningBalanceSheetComponent } from './set-opening-balance-sheet.component';
+import { getCategoryColor, getCategoryIcon } from '../../shared/utils/category-utils';
 import { QuickAddSheetComponent } from '../transactions/quick-add-sheet.component';
 
 interface CategorySpend {
@@ -203,15 +204,15 @@ type Range = 'week' | 'month' | 'year';
       <a routerLink="/transactions" class="see-all">See all</a>
     </div>
 
-    @if (recent().length > 0) {
+    @if (recentEnriched().length > 0) {
       <ul class="tx-list">
-        @for (t of recent(); track t.id; let last = $last) {
+        @for (t of recentEnriched(); track t.id; let last = $last) {
           <li class="tx-row" [class.last]="last">
-            <div class="tx-icon" [style.background]="tileColor(txLabel(t))">
-              <lucide-icon [name]="iconFor(txLabel(t))" />
+            <div class="tx-icon" [style.background]="tileColor(t.label)">
+              <lucide-icon [name]="iconFor(t.label)" />
             </div>
             <div class="tx-mid">
-              <div class="tx-title">{{ txLabel(t) }}</div>
+              <div class="tx-title">{{ t.label }}</div>
               <div class="tx-sub">
                 {{ t.occurred_on | date: 'MMM d' }}
                 @if (t.notes) { · {{ t.notes }} }
@@ -219,11 +220,11 @@ type Range = 'week' | 'month' | 'year';
             </div>
             <div
               class="tx-amount"
-              [class.money-negative]="t.direction === 'out' && !isSavingsTx(t)"
-              [class.money-savings]="isSavingsTx(t)"
-              [class.money-positive]="t.direction === 'in' && !isSavingsTx(t)"
+              [class.money-negative]="t.direction === 'out' && !t.isSavings"
+              [class.money-savings]="t.isSavings"
+              [class.money-positive]="t.direction === 'in' && !t.isSavings"
             >
-              {{ t.amount | signedMoney: (isSavingsTx(t) ? 'out' : t.direction) }}
+              {{ t.amount | signedMoney: (t.isSavings ? 'out' : t.direction) }}
             </div>
           </li>
         }
@@ -556,7 +557,24 @@ export class DashboardPage {
   readonly monthly = this.txService.monthly;
   readonly openingBalance = this.txService.openingBalance;
   readonly totalSavings = this.txService.totalSavings;
-  readonly recent = computed(() => this.txService.transactions().slice(0, 6));
+  readonly categoryMap = computed(() => {
+    const map = new Map<string, Category>();
+    for (const c of this.categoriesService.categories()) {
+      map.set(c.id, c);
+    }
+    return map;
+  });
+
+  readonly recentEnriched = computed(() => {
+    const catMap = this.categoryMap();
+    return this.txService.transactions().slice(0, 6).map((t) => {
+      const cat = t.category_id ? catMap.get(t.category_id) : undefined;
+      const isSavings = isSavingsCategory(cat);
+      const label = cat?.name ?? (t.direction === 'in' ? 'Income' : 'Expense');
+      return { ...t, label, isSavings };
+    });
+  });
+
   readonly theyOweTotal = this.debtsService.theyOweYouTotal;
   readonly youOweTotal = this.debtsService.youOweTotal;
 
@@ -573,7 +591,7 @@ export class DashboardPage {
 
   readonly periodStats = computed(() => {
     const txs = this.txService.transactions();
-    const categories = this.categoriesService.categories();
+    const catMap = this.categoryMap();
     const range = this.range();
     const now = new Date();
 
@@ -598,7 +616,7 @@ export class DashboardPage {
       if (txDate < startDate) continue;
 
       const amt = Number(t.amount);
-      const cat = t.category_id ? categories.find((c) => c.id === t.category_id) : null;
+      const cat = t.category_id ? catMap.get(t.category_id) : null;
       const isSavings = isSavingsCategory(cat);
 
       if (isSavings) {
@@ -621,7 +639,7 @@ export class DashboardPage {
         if (txDate < past30) continue;
 
         const amt = Number(t.amount);
-        const cat = t.category_id ? categories.find((c) => c.id === t.category_id) : null;
+        const cat = t.category_id ? catMap.get(t.category_id) : null;
         const isSavings = isSavingsCategory(cat);
 
         if (isSavings) {
@@ -693,7 +711,7 @@ export class DashboardPage {
     }).format(v);
 
   readonly topCategories = computed<CategorySpend[]>(() => {
-    const cats = this.categoriesService.categories();
+    const catMap = this.categoryMap();
     const txs = this.txService.transactions();
     const now = new Date();
     const y = now.getFullYear();
@@ -702,7 +720,7 @@ export class DashboardPage {
     const totals = new Map<string, number>();
     for (const t of txs) {
       if (t.direction !== 'out' || !t.category_id) continue;
-      const cat = cats.find((c) => c.id === t.category_id);
+      const cat = catMap.get(t.category_id);
       if (cat?.kind === 'savings') continue; // Exclude savings from spending top tiles
       const [ty, tm] = t.occurred_on.split('-').map(Number);
       if (ty !== y || tm !== m) continue;
@@ -711,7 +729,7 @@ export class DashboardPage {
     return [...totals.entries()]
       .map(([id, amount]) => ({
         id,
-        name: cats.find((c) => c.id === id)?.name ?? 'Other',
+        name: catMap.get(id)?.name ?? 'Other',
         amount,
       }))
       .sort((a, b) => b.amount - a.amount)
@@ -729,27 +747,8 @@ export class DashboardPage {
     return t.direction === 'in' ? 'Income' : 'Expense';
   }
 
-  iconFor(name: string): string {
-    const key = name.toLowerCase();
-    if (key.includes('food') || key.includes('groc')) return 'utensils-crossed';
-    if (key.includes('fuel') || key.includes('petrol') || key.includes('transport')) return 'fuel';
-    if (key.includes('rent') || key.includes('home')) return 'home';
-    if (key.includes('salary')) return 'briefcase';
-    if (key.includes('pf') || key.includes('invest') || key.includes('savin') || key.includes('fund') || key.includes('gold')) return 'piggy-bank';
-    if (key.includes('bill') || key.includes('util')) return 'receipt';
-    if (key.includes('shop')) return 'shopping-bag';
-    if (key.includes('travel') || key.includes('trip')) return 'plane';
-    if (key.includes('health') || key.includes('med')) return 'stethoscope';
-    if (key.includes('income')) return 'trending-up';
-    return 'wallet';
-  }
-
-  tileColor(name: string): string {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0xffffffff;
-    const palette = ['#ef4444','#f97316','#f59e0b','#22c55e','#10b981','#14b8a6','#0ea5e9','#ec4899','#475569'];
-    return palette[Math.abs(hash) % palette.length];
-  }
+  readonly iconFor = getCategoryIcon;
+  readonly tileColor = getCategoryColor;
 
   // -------- chart bucketing helpers ----------------------------------------
 

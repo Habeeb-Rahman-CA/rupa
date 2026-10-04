@@ -8,6 +8,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { CategoryKind } from '../../core/models/domain.models';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { CategoriesService } from '../../core/services/categories.service';
+import { errorText } from '../../shared/utils/error-utils';
 
 @Component({
   selector: 'app-category-dialog',
@@ -171,11 +172,4 @@ export class CategoryDialogComponent {
   close(): void {
     this.ref.close();
   }
-}
-
-function errorText(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message) || fallback;
-  }
-  return fallback;
 }

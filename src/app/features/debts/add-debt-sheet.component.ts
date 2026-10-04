@@ -25,6 +25,7 @@ import {
   SelectFieldComponent,
   SelectOption,
 } from '../../shared/components/select-field.component';
+import { errorText } from '../../shared/utils/error-utils';
 
 const NEW_PERSON = '__new__';
 
@@ -384,11 +385,4 @@ export class AddDebtSheetComponent {
     this.ref.dismiss();
     void this.router.navigate(['/bank-accounts']);
   }
-}
-
-function errorText(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message) || fallback;
-  }
-  return fallback;
 }

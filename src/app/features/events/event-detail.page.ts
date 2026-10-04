@@ -1,10 +1,11 @@
-import { Component, computed, effect, inject, input } from '@angular/core';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { LucideAngularModule } from 'lucide-angular';
 import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { MatDialog } from '@angular/material/dialog';
@@ -15,12 +16,15 @@ import { PeopleService } from '../../core/services/people.service';
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
 import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { SwipeableRowComponent } from '../../shared/components/swipeable-row.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import {
   SelectFieldComponent,
   SelectOption,
 } from '../../shared/components/select-field.component';
 import { AddEventExpenseSheetComponent } from './add-event-expense-sheet.component';
 import { SettleParticipantDialogComponent } from './settle-participant-dialog.component';
+import { getAvatarColor, getInitial } from '../../shared/utils/avatar-utils';
+import { errText } from '../../shared/utils/error-utils';
 
 @Component({
   selector: 'app-event-detail-page',
@@ -31,15 +35,38 @@ import { SettleParticipantDialogComponent } from './settle-participant-dialog.co
     FormsModule,
     MatButtonModule,
     MatMenuModule,
+    MatProgressSpinnerModule,
     LucideAngularModule,
     SignedMoneyPipe,
     SelectFieldComponent,
     SwipeableRowComponent,
+    EmptyStateComponent,
   ],
   template: `
     @let d = detail();
-    @if (!d) {
-      <div class="loading">Loading…</div>
+    @if (error()) {
+      <div class="error-container">
+        <app-empty-state
+          icon="alert-triangle"
+          title="Could not load event split"
+          [message]="error()!"
+        />
+        <div class="error-actions">
+          <button mat-flat-button color="primary" (click)="loadDetail(id())">
+            <lucide-icon name="refresh-cw" />
+            <span>Try Again</span>
+          </button>
+          <a mat-button routerLink="/events" class="back-link">
+            <lucide-icon name="arrow-left" />
+            <span>Back to splits</span>
+          </a>
+        </div>
+      </div>
+    } @else if (!d) {
+      <div class="loading app-card">
+        <mat-spinner diameter="32" />
+        <span>Loading event details…</span>
+      </div>
     } @else {
       <header class="detail-header">
         <a mat-icon-button routerLink="/events" aria-label="Back">
@@ -355,6 +382,34 @@ import { SettleParticipantDialogComponent } from './settle-participant-dialog.co
         text-align: center;
         font-size: 14px;
       }
+      .loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 48px 20px;
+        color: var(--app-ink-muted);
+        font-weight: 500;
+        font-size: 14px;
+      }
+      .error-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        padding: 24px 0;
+      }
+      .error-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .error-actions button, .error-actions a {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: var(--app-radius-md);
+      }
     `,
   ],
 })
@@ -368,6 +423,7 @@ export class EventDetailPage {
 
   readonly id = input.required<string>();
   readonly detail = this.eventsService.currentDetail;
+  readonly error = signal<string | null>(null);
 
   readonly availableToAdd = computed(() => {
     const d = this.detail();
@@ -383,8 +439,20 @@ export class EventDetailPage {
   constructor() {
     effect(() => {
       const id = this.id();
-      if (id) void this.eventsService.loadDetail(id);
+      if (id) void this.loadDetail(id);
     });
+  }
+
+  async loadDetail(id: string): Promise<void> {
+    this.error.set(null);
+    try {
+      await this.eventsService.loadDetail(id);
+      if (!this.detail()) {
+        this.error.set('Event split not found or may have been deleted.');
+      }
+    } catch (e: unknown) {
+      this.error.set(errText(e, 'Failed to load event details.'));
+    }
   }
 
   openAddExpense(): void {
@@ -490,21 +558,6 @@ export class EventDetailPage {
     }
   }
 
-  initial(name: string): string {
-    return (name.trim()[0] ?? '?').toUpperCase();
-  }
-
-  avatarColor(name: string): string {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0xffffffff;
-    const palette = ['#ef4444','#f97316','#f59e0b','#22c55e','#10b981','#14b8a6','#0ea5e9','#ec4899','#475569'];
-    return palette[Math.abs(hash) % palette.length];
-  }
-}
-
-function errText(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message) || fallback;
-  }
-  return fallback;
+  readonly initial = getInitial;
+  readonly avatarColor = getAvatarColor;
 }

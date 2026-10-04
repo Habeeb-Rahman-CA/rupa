@@ -6,6 +6,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { PeopleService } from '../../core/services/people.service';
+import { errorText } from '../../shared/utils/error-utils';
 
 @Component({
   selector: 'app-person-dialog',
@@ -135,11 +136,4 @@ export class PersonDialogComponent {
   close(): void {
     this.ref.close();
   }
-}
-
-function errorText(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message) || fallback;
-  }
-  return fallback;
 }

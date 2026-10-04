@@ -1,4 +1,4 @@
-import { Component, Inject, signal } from '@angular/core';
+import { Component, Inject, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -127,6 +127,8 @@ export interface BankAccountDialogData {
               leadIcon="building-2"
               [value]="bankName()"
               (valueChange)="bankName.set($any($event) ?? '')"
+              [invalid]="touched() && !bankNameValid()"
+              [hint]="touched() && !bankNameValid() ? 'Bank name is required' : undefined"
             />
           </div>
 
@@ -165,9 +167,12 @@ export interface BankAccountDialogData {
             <app-text-field
               label="Last 4 Digits"
               placeholder="e.g. 4329"
+              inputmode="numeric"
               [maxlength]="4"
               [value]="last4Digits()"
               (valueChange)="last4Digits.set($any($event) ?? '')"
+              [invalid]="touched() && !last4Valid()"
+              [hint]="touched() && !last4Valid() ? 'Must be 4 digits' : undefined"
             />
           </div>
 
@@ -178,6 +183,8 @@ export interface BankAccountDialogData {
               [maxlength]="5"
               [value]="expiryDate()"
               (valueChange)="expiryDate.set($any($event) ?? '')"
+              [invalid]="touched() && !expiryValid()"
+              [hint]="touched() && !expiryValid() ? 'Must be MM/YY format' : undefined"
             />
           </div>
 
@@ -263,7 +270,7 @@ export interface BankAccountDialogData {
           color="primary"
           type="button"
           (click)="save()"
-          [disabled]="!bankName().trim()"
+          [disabled]="touched() && !canSave()"
           class="save-btn"
         >
           {{ isEdit ? 'Save Changes' : 'Add Card' }}
@@ -683,6 +690,23 @@ export class BankAccountDialogComponent {
   creditLimit = signal<number | undefined>(undefined);
   theme = signal<CardTheme>('blue');
   isPrimary = signal(false);
+  touched = signal(false);
+
+  readonly bankNameValid = computed(() => this.bankName().trim().length > 0);
+
+  readonly last4Valid = computed(() => {
+    const v = this.last4Digits().trim();
+    return /^\d{4}$/.test(v);
+  });
+
+  readonly expiryValid = computed(() => {
+    const v = this.expiryDate().trim();
+    return /^(0[1-9]|1[0-2])\/\d{2}$/.test(v);
+  });
+
+  readonly canSave = computed(() => {
+    return this.bankNameValid() && this.last4Valid() && this.expiryValid();
+  });
 
   constructor(
     private dialogRef: MatDialogRef<BankAccountDialogComponent>,
@@ -730,15 +754,16 @@ export class BankAccountDialogComponent {
   }
 
   save(): void {
-    if (!this.bankName().trim()) return;
+    this.touched.set(true);
+    if (!this.canSave()) return;
 
     const result: Partial<BankAccount> = {
       bank_name: this.bankName().trim(),
       account_name: this.accountName().trim() || `${this.bankName().trim()} Card`,
       card_type: this.cardType(),
       payment_network: this.paymentNetwork(),
-      card_number_masked: this.last4Digits().trim() || '4329',
-      expiry_date: this.expiryDate().trim() || '09/28',
+      card_number_masked: this.last4Digits().trim(),
+      expiry_date: this.expiryDate().trim(),
       cardholder_name: this.cardholderName().trim().toUpperCase() || 'PRIMARY HOLDER',
       balance: this.balance() ?? (this.isFirstCard ? this.currentBalance : 0),
       credit_limit: this.cardType() === 'credit' ? (this.creditLimit() ?? 100000) : undefined,

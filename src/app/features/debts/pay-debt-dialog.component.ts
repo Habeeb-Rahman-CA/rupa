@@ -12,6 +12,8 @@ import { Debt, PaymentMode } from '../../core/models/domain.models';
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
+import { errorText } from '../../shared/utils/error-utils';
+import { isLessOrEqualCurrency } from '../../shared/utils/currency-utils';
 
 export interface PayDebtDialogData {
   debt: Debt;
@@ -286,7 +288,7 @@ export class PayDebtDialogComponent {
     if (this.paymentMode() === 'bank' && this.bankAccountOptions().length > 0 && !this.selectedBankAccountId()) {
       return false;
     }
-    return a <= Number(this.data.debt.outstanding) + 0.001;
+    return isLessOrEqualCurrency(a, Number(this.data.debt.outstanding));
   });
 
   toNum(v: string | number | null): number | null {
@@ -323,11 +325,4 @@ export class PayDebtDialogComponent {
     this.ref.close();
     void this.router.navigate(['/bank-accounts']);
   }
-}
-
-function errorText(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message) || fallback;
-  }
-  return fallback;
 }

@@ -13,6 +13,8 @@ import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { PeopleService } from '../../core/services/people.service';
 import { Person } from '../../core/models/domain.models';
 import { PersonDialogComponent } from './person-dialog.component';
+import { getAvatarColor, getInitial } from '../../shared/utils/avatar-utils';
+import { errText } from '../../shared/utils/error-utils';
 
 @Component({
   selector: 'app-people-page',
@@ -154,7 +156,6 @@ import { PersonDialogComponent } from './person-dialog.component';
         padding: 0;
         display: flex;
         flex-direction: column;
-        gap: 8px;
       }
       .row {
         display: grid;
@@ -238,21 +239,6 @@ export class PeoplePage {
     }
   }
 
-  initial(n: string): string {
-    return (n.trim()[0] ?? '?').toUpperCase();
-  }
-
-  avatarColor(n: string): string {
-    let hash = 0;
-    for (let i = 0; i < n.length; i++) hash = (hash * 31 + n.charCodeAt(i)) & 0xffffffff;
-    const palette = ['#ef4444','#f97316','#f59e0b','#22c55e','#10b981','#14b8a6','#0ea5e9','#ec4899','#475569'];
-    return palette[Math.abs(hash) % palette.length];
-  }
-}
-
-function errText(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message) || fallback;
-  }
-  return fallback;
+  readonly initial = getInitial;
+  readonly avatarColor = getAvatarColor;
 }

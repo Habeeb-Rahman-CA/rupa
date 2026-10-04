@@ -14,6 +14,8 @@ import { SwipeableRowComponent } from '../../shared/components/swipeable-row.com
 import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { Category, isSavingsCategory } from '../../core/models/domain.models';
 import { CategoryDialogComponent } from './category-dialog.component';
+import { errText } from '../../shared/utils/error-utils';
+import { colorFor, iconFor } from '../../shared/utils/category-utils';
 
 @Component({
   selector: 'app-categories-page',
@@ -363,32 +365,6 @@ export class CategoriesPage {
     }
   }
 
-  iconFor(n: string): string {
-    const key = n.toLowerCase();
-    if (key.includes('food') || key.includes('groc')) return 'utensils-crossed';
-    if (key.includes('fuel') || key.includes('petrol') || key.includes('transport')) return 'fuel';
-    if (key.includes('rent') || key.includes('home')) return 'home';
-    if (key.includes('salary')) return 'briefcase';
-    if (key.includes('pf') || key.includes('invest') || key.includes('savin') || key.includes('fund') || key.includes('gold')) return 'piggy-bank';
-    if (key.includes('bill') || key.includes('util')) return 'receipt';
-    if (key.includes('shop')) return 'shopping-bag';
-    if (key.includes('travel') || key.includes('trip')) return 'plane';
-    if (key.includes('health') || key.includes('med')) return 'stethoscope';
-    if (key.includes('income')) return 'trending-up';
-    return 'wallet';
-  }
-
-  colorFor(n: string): string {
-    let hash = 0;
-    for (let i = 0; i < n.length; i++) hash = (hash * 31 + n.charCodeAt(i)) & 0xffffffff;
-    const palette = ['#ef4444','#f97316','#f59e0b','#22c55e','#10b981','#14b8a6','#0ea5e9','#ec4899','#475569'];
-    return palette[Math.abs(hash) % palette.length];
-  }
-}
-
-function errText(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message) || fallback;
-  }
-  return fallback;
+  readonly iconFor = iconFor;
+  readonly colorFor = colorFor;
 }

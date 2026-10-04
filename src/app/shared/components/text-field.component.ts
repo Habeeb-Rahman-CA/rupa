@@ -167,7 +167,7 @@ export class TextFieldComponent {
   readonly name = input<string>('');
   readonly autofocus = input<boolean>(false);
   readonly invalid = input<boolean>(false);
-  readonly hint = input<string>('');
+  readonly hint = input<string | undefined | null>('');
 
   readonly value = input<string | number | null>(null);
   readonly valueChange = output<string | number | null>();

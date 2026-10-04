@@ -19,6 +19,8 @@ import { Debt } from '../../core/models/domain.models';
 
 import { AddDebtSheetComponent } from './add-debt-sheet.component';
 import { PayDebtDialogComponent } from './pay-debt-dialog.component';
+import { getAvatarColor, getInitial } from '../../shared/utils/avatar-utils';
+import { errText } from '../../shared/utils/error-utils';
 
 @Component({
   selector: 'app-debts-page',
@@ -224,16 +226,8 @@ export class DebtsPage {
     );
   }
 
-  initial(name: string): string {
-    return (name.trim()[0] ?? '?').toUpperCase();
-  }
-
-  avatarColor(name: string): string {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0xffffffff;
-    const palette = ['#ef4444','#f97316','#f59e0b','#22c55e','#10b981','#14b8a6','#0ea5e9','#ec4899','#475569'];
-    return palette[Math.abs(hash) % palette.length];
-  }
+  readonly initial = getInitial;
+  readonly avatarColor = getAvatarColor;
 
   openAdd(): void {
     this.bottomSheet.open(AddDebtSheetComponent);
@@ -269,11 +263,4 @@ export class DebtsPage {
       });
     }
   }
-}
-
-function errText(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message) || fallback;
-  }
-  return fallback;
 }

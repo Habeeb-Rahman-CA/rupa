@@ -11,6 +11,7 @@ import { BankAccountsService } from '../../core/services/bank-accounts.service';
 import { PaymentMode } from '../../core/models/domain.models';
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
 import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
+import { errorText } from '../../shared/utils/error-utils';
 
 export interface SettleParticipantDialogData {
   participant: ParticipantWithMeta;
@@ -285,11 +286,4 @@ export class SettleParticipantDialogComponent {
     this.ref.close();
     void this.router.navigate(['/bank-accounts']);
   }
-}
-
-function errorText(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message) || fallback;
-  }
-  return fallback;
 }

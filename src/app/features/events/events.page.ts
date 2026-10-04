@@ -10,6 +10,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header.compone
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { EventsService } from '../../core/services/events.service';
 import { CreateEventSheetComponent } from './create-event-sheet.component';
+import { colorFor } from '../../shared/utils/category-utils';
 
 @Component({
   selector: 'app-events-page',
@@ -132,10 +133,5 @@ export class EventsPage {
     this.bottomSheet.open(CreateEventSheetComponent);
   }
 
-  colorFor(name: string): string {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0xffffffff;
-    const palette = ['#ef4444','#f97316','#f59e0b','#22c55e','#10b981','#14b8a6','#0ea5e9','#ec4899','#475569'];
-    return palette[Math.abs(hash) % palette.length];
-  }
+  readonly colorFor = colorFor;
 }

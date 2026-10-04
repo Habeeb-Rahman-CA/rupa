@@ -526,5 +526,6 @@ export class LoginPage {
 }
 
 function isEmail(v: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  // Enforces valid username chars, domain name, and at least 2-char TLD without spaces or invalid symbols
+  return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(v.trim());
 }

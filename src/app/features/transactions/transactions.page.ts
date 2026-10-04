@@ -14,11 +14,21 @@ import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
 import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
-import { Transaction, isSavingsCategory } from '../../core/models/domain.models';
+import { BankAccount, Category, Transaction, isSavingsCategory } from '../../core/models/domain.models';
+import { getCategoryColor, getCategoryIcon } from '../../shared/utils/category-utils';
+import { errText } from '../../shared/utils/error-utils';
 
-interface DayGroup {
+export interface EnrichedTransaction extends Transaction {
+  label: string;
+  subText: string;
+  icon: string;
+  color: string;
+  isSavings: boolean;
+}
+
+export interface DayGroup {
   date: string;
-  items: Transaction[];
+  items: EnrichedTransaction[];
   dayTotal: number;
 }
 
@@ -64,22 +74,22 @@ interface DayGroup {
             @for (t of g.items; track t.id) {
               <app-swipeable-row (delete)="confirmRemove(t)">
                 <div class="tx-row">
-                  <div class="tx-icon" [style.background]="tileColor(t)">
-                    <lucide-icon [name]="iconFor(t)" />
+                  <div class="tx-icon" [style.background]="t.color">
+                    <lucide-icon [name]="t.icon" />
                   </div>
                   <div class="tx-mid">
-                    <div class="tx-title">{{ labelFor(t) }}</div>
-                    @if (subText(t)) {
-                      <div class="tx-sub">{{ subText(t) }}</div>
+                    <div class="tx-title">{{ t.label }}</div>
+                    @if (t.subText) {
+                      <div class="tx-sub">{{ t.subText }}</div>
                     }
                   </div>
                   <div
                     class="tx-amount"
-                    [class.money-negative]="t.direction === 'out' && !isSavingsTx(t)"
-                    [class.money-savings]="isSavingsTx(t)"
-                    [class.money-positive]="t.direction === 'in' && !isSavingsTx(t)"
+                    [class.money-negative]="t.direction === 'out' && !t.isSavings"
+                    [class.money-savings]="t.isSavings"
+                    [class.money-positive]="t.direction === 'in' && !t.isSavings"
                   >
-                    {{ t.amount | signedMoney: (isSavingsTx(t) ? 'out' : t.direction) }}
+                    {{ t.amount | signedMoney: (t.isSavings ? 'out' : t.direction) }}
                   </div>
                 </div>
               </app-swipeable-row>
@@ -157,85 +167,76 @@ export class TransactionsPage {
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
 
+  readonly categoryMap = computed(() => {
+    const map = new Map<string, Category>();
+    for (const c of this.categoriesService.categories()) {
+      map.set(c.id, c);
+    }
+    return map;
+  });
+
+  readonly bankAccountMap = computed(() => {
+    const map = new Map<string, BankAccount>();
+    for (const b of this.bankAccountsService.bankAccounts()) {
+      map.set(b.id, b);
+    }
+    return map;
+  });
+
   readonly groups = computed<DayGroup[]>(() => {
     const list = this.service.transactions();
-    const map = new Map<string, DayGroup>();
+    const catMap = this.categoryMap();
+    const bankMap = this.bankAccountMap();
+
+    const groupMap = new Map<string, DayGroup>();
+
     for (const t of list) {
+      const cat = t.category_id ? catMap.get(t.category_id) : undefined;
+      const isSavings = isSavingsCategory(cat);
+      const label = cat?.name ?? (t.direction === 'in' ? 'Income' : 'Expense');
+
+      let bankName = '';
+      if (t.payment_mode === 'cash') bankName = 'Cash';
+      else if (t.payment_mode === 'bank') {
+        const acc = t.bank_account_id ? bankMap.get(t.bank_account_id) : undefined;
+        bankName = acc?.bank_name ?? 'Bank';
+      }
+
+      const parts: string[] = [];
+      if (t.notes) parts.push(t.notes);
+      if (bankName) parts.push(bankName);
+      const subText = parts.join(' • ');
+
+      const icon = isSavings ? 'piggy-bank' : getCategoryIcon(label);
+      const color = isSavings ? '#0ea5e9' : getCategoryColor(label);
+
+      const enriched: EnrichedTransaction = {
+        ...t,
+        label,
+        subText,
+        icon,
+        color,
+        isSavings,
+      };
+
       const key = t.occurred_on;
-      let group = map.get(key);
+      let group = groupMap.get(key);
       if (!group) {
         group = { date: key, items: [], dayTotal: 0 };
-        map.set(key, group);
+        groupMap.set(key, group);
       }
-      group.items.push(t);
+      group.items.push(enriched);
       const amt = Number(t.amount);
       group.dayTotal += t.direction === 'in' ? amt : -amt;
     }
-    return Array.from(map.values());
+
+    return Array.from(groupMap.values());
   });
 
-  isSavingsTx(t: Transaction): boolean {
-    const cat = this.categoriesService.categories().find((c) => c.id === t.category_id);
-    return isSavingsCategory(cat);
-  }
-
-  labelFor(t: Transaction): string {
-    return (
-      this.categoriesService.categories().find((c) => c.id === t.category_id)?.name ??
-      (t.direction === 'in' ? 'Income' : 'Expense')
-    );
-  }
-
-  paymentInfo(t: Transaction): string {
-    if (t.payment_mode === 'cash') return 'Cash';
-    if (t.payment_mode === 'bank') {
-      if (t.bank_account_id) {
-        const acc = this.bankAccountsService.bankAccounts().find((a) => a.id === t.bank_account_id);
-        if (acc) return acc.bank_name;
-      }
-      return 'Bank';
-    }
-    return '';
-  }
-
-  subText(t: Transaction): string {
-    const parts: string[] = [];
-    if (t.notes) parts.push(t.notes);
-    const mode = this.paymentInfo(t);
-    if (mode) parts.push(mode);
-    return parts.join(' • ');
-  }
-
-  iconFor(t: Transaction | string): string {
-    const name = typeof t === 'string' ? t : this.labelFor(t);
-    if (typeof t !== 'string' && this.isSavingsTx(t)) return 'piggy-bank';
-    const key = name.toLowerCase();
-    if (key.includes('food') || key.includes('groc')) return 'utensils-crossed';
-    if (key.includes('fuel') || key.includes('petrol') || key.includes('transport')) return 'fuel';
-    if (key.includes('rent') || key.includes('home')) return 'home';
-    if (key.includes('salary')) return 'briefcase';
-    if (key.includes('pf') || key.includes('invest') || key.includes('savin') || key.includes('fund') || key.includes('gold') || key.includes('fd') || key.includes('sip')) return 'piggy-bank';
-    if (key.includes('bill') || key.includes('util')) return 'receipt';
-    if (key.includes('shop')) return 'shopping-bag';
-    if (key.includes('travel') || key.includes('trip')) return 'plane';
-    if (key.includes('health') || key.includes('med')) return 'stethoscope';
-    if (key.includes('income')) return 'trending-up';
-    return 'wallet';
-  }
-
-  tileColor(t: Transaction | string): string {
-    if (typeof t !== 'string' && this.isSavingsTx(t)) return '#0ea5e9';
-    const name = typeof t === 'string' ? t : this.labelFor(t);
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0xffffffff;
-    const palette = ['#ef4444','#f97316','#f59e0b','#22c55e','#10b981','#14b8a6','#0ea5e9','#ec4899','#475569'];
-    return palette[Math.abs(hash) % palette.length];
-  }
-
-  async confirmRemove(t: Transaction): Promise<void> {
+  async confirmRemove(t: EnrichedTransaction): Promise<void> {
     const ok = await openConfirm(this.dialog, {
       title: 'Delete transaction?',
-      message: `Are you sure you want to delete ${this.labelFor(t)} entry of ₹${t.amount}?`,
+      message: `Are you sure you want to delete ${t.label} entry of ₹${t.amount}?`,
       confirmLabel: 'Delete',
       destructive: true,
       icon: 'trash-2',
@@ -253,11 +254,4 @@ export class TransactionsPage {
       this.snack.open(errText(e, 'Could not delete.'), 'Dismiss', { duration: 4000 });
     }
   }
-}
-
-function errText(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message) || fallback;
-  }
-  return fallback;
 }

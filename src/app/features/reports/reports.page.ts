@@ -16,7 +16,8 @@ import { CategoriesService } from '../../core/services/categories.service';
 import { DebtsService } from '../../core/services/debts.service';
 import { EventsService } from '../../core/services/events.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
-import { Transaction, isSavingsCategory, BankAccount } from '../../core/models/domain.models';
+import { Category, Transaction, isSavingsCategory, BankAccount } from '../../core/models/domain.models';
+import { getCategoryColor, getCategoryIcon } from '../../shared/utils/category-utils';
 
 interface CategoryRow {
   id: string;
@@ -1023,16 +1024,24 @@ export class ReportsPage {
       maximumFractionDigits: 0,
     }).format(v);
 
+  readonly categoryMap = computed(() => {
+    const map = new Map<string, Category>();
+    for (const c of this.categoriesService.categories()) {
+      map.set(c.id, c);
+    }
+    return map;
+  });
+
   readonly savingsCategoryRows = computed<CategoryRow[]>(() => {
     const { y, m } = ym(this.monthDate());
-    const cats = this.categoriesService.categories();
+    const prefix = `${y}-${String(m).padStart(2, '0')}`;
+    const catMap = this.categoryMap();
     const totals = new Map<string, number>();
     let sum = 0;
 
     for (const t of this.txService.transactions()) {
-      const [ty, tm] = t.occurred_on.split('-').map(Number);
-      if (ty !== y || tm !== m) continue;
-      const cat = cats.find((c) => c.id === t.category_id);
+      if (!t.occurred_on || !t.occurred_on.startsWith(prefix)) continue;
+      const cat = t.category_id ? catMap.get(t.category_id) : undefined;
       if (!isSavingsCategory(cat)) continue;
       const key = t.category_id ?? '__savings__';
       const amt = Number(t.amount);
@@ -1043,15 +1052,15 @@ export class ReportsPage {
 
     return [...totals.entries()]
       .map(([id, amount]) => {
-        const cat = cats.find((c) => c.id === id);
+        const cat = catMap.get(id);
         const name = cat?.name ?? 'Savings';
         return {
           id,
           name,
           amount,
           percent: Math.round((amount / sum) * 100),
-          color: colorForName(name),
-          icon: iconForName(name),
+          color: getCategoryColor(name),
+          icon: getCategoryIcon(name),
         };
       })
       .sort((a, b) => b.amount - a.amount);
@@ -1059,16 +1068,15 @@ export class ReportsPage {
 
   readonly categoryRows = computed<CategoryRow[]>(() => {
     const { y, m } = ym(this.monthDate());
-    const cats = this.categoriesService.categories();
+    const prefix = `${y}-${String(m).padStart(2, '0')}`;
+    const catMap = this.categoryMap();
     const totals = new Map<string, number>();
     let sum = 0;
 
     for (const t of this.txService.transactions()) {
-      if (t.direction !== 'out') continue;
-      const cat = cats.find((c) => c.id === t.category_id);
+      if (t.direction !== 'out' || !t.occurred_on || !t.occurred_on.startsWith(prefix)) continue;
+      const cat = t.category_id ? catMap.get(t.category_id) : undefined;
       if (isSavingsCategory(cat)) continue;
-      const [ty, tm] = t.occurred_on.split('-').map(Number);
-      if (ty !== y || tm !== m) continue;
       const key = t.category_id ?? '__uncategorized__';
       const amt = Number(t.amount);
       totals.set(key, (totals.get(key) ?? 0) + amt);
@@ -1078,15 +1086,15 @@ export class ReportsPage {
 
     return [...totals.entries()]
       .map(([id, amount]) => {
-        const cat = cats.find((c) => c.id === id);
+        const cat = catMap.get(id);
         const name = cat?.name ?? 'Uncategorized';
         return {
           id,
           name,
           amount,
           percent: Math.round((amount / sum) * 100),
-          color: colorForName(name),
-          icon: iconForName(name),
+          color: getCategoryColor(name),
+          icon: getCategoryIcon(name),
         };
       })
       .sort((a, b) => b.amount - a.amount);
@@ -1094,15 +1102,13 @@ export class ReportsPage {
 
   readonly topDays = computed<DayRow[]>(() => {
     const { y, m } = ym(this.monthDate());
-    const catsMap = new Map(
-      this.categoriesService.categories().map((c) => [c.id, c.kind]),
-    );
+    const prefix = `${y}-${String(m).padStart(2, '0')}`;
+    const catMap = this.categoryMap();
     const byDay = new Map<string, number>();
     for (const t of this.txService.transactions()) {
-      if (t.direction !== 'out') continue;
-      if (t.category_id && catsMap.get(t.category_id) === 'savings') continue;
-      const [ty, tm] = t.occurred_on.split('-').map(Number);
-      if (ty !== y || tm !== m) continue;
+      if (t.direction !== 'out' || !t.occurred_on || !t.occurred_on.startsWith(prefix)) continue;
+      const cat = t.category_id ? catMap.get(t.category_id) : undefined;
+      if (cat?.kind === 'savings') continue;
       byDay.set(t.occurred_on, (byDay.get(t.occurred_on) ?? 0) + Number(t.amount));
     }
     return [...byDay.entries()]
@@ -1139,28 +1145,6 @@ function startOfMonth(d: Date): Date {
 
 function ym(d: Date): { y: number; m: number } {
   return { y: d.getFullYear(), m: d.getMonth() + 1 };
-}
-
-function colorForName(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) & 0xffffffff;
-  const palette = ['#ef4444','#f97316','#f59e0b','#22c55e','#10b981','#14b8a6','#0ea5e9','#ec4899','#475569'];
-  return palette[Math.abs(hash) % palette.length];
-}
-
-function iconForName(name: string): string {
-  const key = name.toLowerCase();
-  if (key.includes('food') || key.includes('groc')) return 'utensils-crossed';
-  if (key.includes('fuel') || key.includes('petrol') || key.includes('transport')) return 'fuel';
-  if (key.includes('rent') || key.includes('home')) return 'home';
-  if (key.includes('salary')) return 'briefcase';
-  if (key.includes('pf') || key.includes('invest') || key.includes('savin') || key.includes('fund') || key.includes('gold')) return 'piggy-bank';
-  if (key.includes('bill') || key.includes('util')) return 'receipt';
-  if (key.includes('shop')) return 'shopping-bag';
-  if (key.includes('travel') || key.includes('trip')) return 'plane';
-  if (key.includes('health') || key.includes('med')) return 'stethoscope';
-  if (key.includes('income')) return 'trending-up';
-  return 'wallet';
 }
 
 

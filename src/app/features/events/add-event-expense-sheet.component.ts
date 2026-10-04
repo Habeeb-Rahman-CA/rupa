@@ -14,6 +14,7 @@ import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { DateFieldComponent } from '../../shared/components/date-field.component';
 import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
+import { errorText } from '../../shared/utils/error-utils';
 
 export interface AddEventExpenseSheetData {
   eventId: string;
@@ -363,11 +364,4 @@ function toIsoDate(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
-}
-
-function errorText(err: unknown, fallback: string): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message) || fallback;
-  }
-  return fallback;
 }

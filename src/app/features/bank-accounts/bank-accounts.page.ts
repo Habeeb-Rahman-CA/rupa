@@ -1,4 +1,5 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -14,6 +15,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header.compone
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { BankAccountDialogComponent } from './bank-account-dialog.component';
+import { BankAccountDetailsDialogComponent } from './bank-account-details-dialog.component';
 
 @Component({
   selector: 'app-bank-accounts-page',
@@ -71,6 +73,18 @@ import { BankAccountDialogComponent } from './bank-account-dialog.component';
         <button mat-flat-button color="primary" (click)="openAddDialog()" class="primary-action-btn">
           <lucide-icon name="plus" />
           Add Your First Card
+        </button>
+      </div>
+    } @else if (filteredCards().length === 0) {
+      <app-empty-state
+        icon="credit-card"
+        [title]="'No ' + filterLabel() + 's found'"
+        message="You haven't added any cards matching this category filter."
+      />
+      <div class="empty-actions-wrap">
+        <button mat-flat-button color="primary" (click)="openAddDialog()" class="primary-action-btn">
+          <lucide-icon name="plus" />
+          Add New Card
         </button>
       </div>
     } @else {
@@ -530,6 +544,7 @@ export class BankAccountsPage {
   private readonly transactionsService = inject(TransactionsService);
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly cards = this.bankAccountsService.bankAccounts;
   readonly filterType = signal<'all' | CardType>('all');
@@ -538,8 +553,6 @@ export class BankAccountsPage {
   readonly creditCount = computed(() => this.cards().filter((c) => c.card_type === 'credit').length);
   readonly savingsCount = computed(() => this.cards().filter((c) => c.card_type === 'savings' || c.card_type === 'current').length);
 
-
-
   readonly filteredCards = computed(() => {
     const type = this.filterType();
     if (type === 'all') return this.cards();
@@ -547,6 +560,15 @@ export class BankAccountsPage {
       return this.cards().filter((c) => c.card_type === 'savings' || c.card_type === 'current');
     }
     return this.cards().filter((c) => c.card_type === type);
+  });
+
+  readonly filterLabel = computed(() => {
+    switch (this.filterType()) {
+      case 'debit': return 'debit card';
+      case 'credit': return 'credit card';
+      case 'savings': return 'savings account';
+      default: return 'card';
+    }
   });
 
   openAddDialog(): void {
@@ -558,7 +580,7 @@ export class BankAccountsPage {
       data: { isFirstCard, currentBalance },
     });
 
-    ref.afterClosed().subscribe(async (result) => {
+    ref.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(async (result) => {
       if (result) {
         try {
           await this.bankAccountsService.create(result);
@@ -580,7 +602,7 @@ export class BankAccountsPage {
       data: { account: card },
     });
 
-    ref.afterClosed().subscribe(async (result) => {
+    ref.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(async (result) => {
       if (result) {
         try {
           await this.bankAccountsService.update(card.id, result);
@@ -621,20 +643,16 @@ export class BankAccountsPage {
   }
 
   viewDetails(card: BankAccount): void {
-    const details = [
-      `Bank: ${card.bank_name}`,
-      `Account / Nickname: ${card.account_name}`,
-      `Type: ${card.card_type.toUpperCase()}`,
-      `Network: ${card.payment_network.toUpperCase()}`,
-      `Masked Card No: •••• •••• •••• ${card.card_number_masked}`,
-      `Expiry: ${card.expiry_date}`,
-      `Holder: ${card.cardholder_name}`,
-      card.balance !== undefined ? `Card Balance: ₹${card.balance.toLocaleString()}` : null,
-      card.credit_limit ? `Credit Limit: ₹${card.credit_limit.toLocaleString()}` : null,
-    ]
-      .filter(Boolean)
-      .join('\n');
+    const dialogRef = this.dialog.open(BankAccountDetailsDialogComponent, {
+      data: { card },
+      maxWidth: '480px',
+      width: '100%',
+    });
 
-    alert(`💳 ${card.bank_name} (${card.account_name})\n\n${details}`);
+    dialogRef.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((res) => {
+      if (res?.edit) {
+        this.openEditDialog(card);
+      }
+    });
   }
 }

@@ -3,6 +3,7 @@ import { Debt, DebtDirection, PaymentMode, Transaction } from '../models/domain.
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { TransactionsService } from './transactions.service';
+import { isGreaterCurrency } from '../../shared/utils/currency-utils';
 
 export type DebtTransactionImpact = 'default' | 'income' | 'expense' | 'none';
 
@@ -182,7 +183,7 @@ export class DebtsService {
     if (!(input.amount > 0)) throw new Error('Payment must be greater than zero.');
     const debt = this._debts().find((d) => d.id === input.debt_id);
     if (!debt) throw new Error('Debt not found.');
-    if (input.amount > Number(debt.outstanding) + 0.001) {
+    if (isGreaterCurrency(input.amount, Number(debt.outstanding))) {
       throw new Error('Payment is larger than the outstanding amount.');
     }
 
