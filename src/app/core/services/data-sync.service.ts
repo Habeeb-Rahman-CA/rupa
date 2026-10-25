@@ -5,6 +5,7 @@ import { PeopleService } from './people.service';
 import { TransactionsService } from './transactions.service';
 import { DebtsService } from './debts.service';
 import { EventsService } from './events.service';
+import { AppSettingsService } from './app-settings.service';
 
 import { BankAccountsService } from './bank-accounts.service';
 
@@ -17,6 +18,9 @@ export class DataSyncService {
   private readonly transactionsService = inject(TransactionsService);
   private readonly debtsService = inject(DebtsService);
   private readonly eventsService = inject(EventsService);
+  // Instantiate settings during the authenticated shell bootstrap so legacy
+  // localStorage settings are migrated even before bill scanning is opened.
+  private readonly appSettingsService = inject(AppSettingsService);
 
   private syncPromise: Promise<void> | null = null;
 

@@ -39,15 +39,7 @@ export class BillScannerService {
   private readonly appSettings = inject(AppSettingsService);
 
   private getApiKey(): string {
-    const fromSettings = this.appSettings.openRouterApiKey();
-    if (fromSettings) {
-      return fromSettings;
-    }
-    if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem('rupa_openrouter_api_key') || localStorage.getItem('openrouter_api_key');
-      if (stored) return stored;
-    }
-    return '';
+    return this.appSettings.openRouterApiKey();
   }
 
   /**

@@ -120,20 +120,20 @@ export class TransactionsService {
     });
   }
 
-  private schemaSupportsBankAccounts = true;
-
   async mapUnassignedTransactionsToPrimary(bankAccountId: string): Promise<void> {
-    if (!this.schemaSupportsBankAccounts) return;
-
     const current = this._transactions();
-    const unassigned = current.filter((t) => !t.bank_account_id);
+    // Only bank-mode transactions are eligible for migration. Older cash
+    // transactions have no bank_account_id by design and must not be silently
+    // reassigned to a newly-created primary account.
+    const unassigned = current.filter(
+      (t) => t.payment_mode === 'bank' && !t.bank_account_id,
+    );
     if (unassigned.length === 0) return;
 
     const updatedList = current.map((t) => {
-      if (!t.bank_account_id) {
+      if (t.payment_mode === 'bank' && !t.bank_account_id) {
         return {
           ...t,
-          payment_mode: 'bank' as const,
           bank_account_id: bankAccountId,
         };
       }
@@ -150,14 +150,10 @@ export class TransactionsService {
         .in('id', unassignedIds);
 
       if (res.error) {
-        // PGRST204 or missing column error
-        if (res.error.code === 'PGRST204' || res.error.message?.includes('bank_account_id')) {
-          this.schemaSupportsBankAccounts = false;
-          console.warn('Supabase transactions table is missing bank_account_id column. Disabling auto-mapping sync.');
-        }
+        console.error('Failed to map bank transactions to the primary account', res.error);
       }
     } catch {
-      this.schemaSupportsBankAccounts = false;
+      console.error('Failed to map bank transactions to the primary account');
     }
   }
 
@@ -254,54 +250,29 @@ export class TransactionsService {
       bank_account_id: targetBankAccountId,
     };
 
-    let created: Transaction | null = null;
-    let result = await this.supabase.client
+    const { data, error } = await this.supabase.client
       .from('transactions')
       .insert(payload)
       .select()
       .single();
 
-    if (result.error) {
-      // Fallback for Supabase remote schema if payment_mode/bank_account_id column doesn't exist yet
-      const fallbackPayload = {
-        owner_id: ownerId,
-        amount: input.amount,
-        direction: input.direction,
-        occurred_on: input.occurred_on ?? todayIso(),
-        category_id: input.category_id ?? null,
-        notes: input.notes?.trim() || null,
-        source: input.source ?? ('manual' as const),
-        source_ref_id: input.source_ref_id ?? null,
-      };
-
-      const fallbackResult = await this.supabase.client
-        .from('transactions')
-        .insert(fallbackPayload)
-        .select()
-        .single();
-
-      if (fallbackResult.error) {
-        console.error('Failed to create transaction', fallbackResult.error);
-        throw fallbackResult.error;
-      }
-
-      created = {
-        ...(fallbackResult.data as Transaction),
-        payment_mode: input.payment_mode ?? 'cash',
-        bank_account_id: input.bank_account_id ?? null,
-      };
-    } else {
-      created = result.data as Transaction;
+    if (error) {
+      console.error('Failed to create transaction', error);
+      throw error;
     }
 
+    const created = data as Transaction;
+
     // Update bank card balance if bank_account_id is provided
-    if (input.bank_account_id && input.payment_mode === 'bank') {
+    if (targetBankAccountId && mode === 'bank') {
       try {
         const bankAccountsService = this.injector.get(BankAccountsService);
-        const card = bankAccountsService.bankAccounts().find((c) => c.id === input.bank_account_id);
+        const card = bankAccountsService.bankAccounts().find((c) => c.id === targetBankAccountId);
         if (card && card.balance !== undefined) {
           const delta = input.direction === 'in' ? input.amount : -input.amount;
-          await bankAccountsService.update(card.id, { balance: Math.max(0, roundCurrency(card.balance + delta)) });
+          await bankAccountsService.update(card.id, {
+            balance: roundCurrency(card.balance + delta),
+          });
         }
       } catch (err) {
         console.error('Failed to update bank account balance', err);

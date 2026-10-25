@@ -10,13 +10,21 @@
    - **Plan:** Free
 3. Wait ~1 minute for the project to provision.
 
-## 2. Run the schema migration
+## 2. Run the database migrations
 
 1. In the Supabase dashboard, open **SQL Editor** (left sidebar).
 2. Click **New query**.
-3. Open `db/migrations/0001_init.sql` from this repo, copy the entire contents, paste into the editor.
-4. Click **Run**. You should see `Success. No rows returned`.
-5. Open **Table Editor** to confirm the tables were created (categories, people, transactions, debts, events, etc.).
+3. Run every file in `db/migrations/` in numeric order, from `0001_init.sql` through the latest migration.
+   Apply each file as a separate query so a failure identifies the exact migration that needs attention.
+4. Click **Run** for each file. You should see `Success. No rows returned`.
+5. Open **Table Editor** to confirm the tables were created, including `bank_accounts` and `app_settings`.
+
+The migrations are additive. Applying a newer migration to an existing project
+does not delete existing transactions, debts, events, categories, people, or
+bank-account rows. After migration `0006` is applied, the app imports legacy
+bank-account and OpenRouter settings data from the browser on the next
+authenticated load, then clears the old localStorage copy only after Supabase
+confirms that it was written and can be read back.
 
 ## 3. Enable email/password auth
 
@@ -49,7 +57,7 @@
 npm start
 ```
 
-Open http://localhost:4200 — you should see the default Angular Material starter page.
+Open http://localhost:4200 — you should see the rūpa login page.
 
 ## 7. Next: build features
 
