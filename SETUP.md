@@ -21,10 +21,15 @@
 
 The migrations are additive. Applying a newer migration to an existing project
 does not delete existing transactions, debts, events, categories, people, or
-bank-account rows. After migration `0006` is applied, the app imports legacy
+bank-account rows. After migrations `0006` and `0007` are applied, the app imports legacy
 bank-account and OpenRouter settings data from the browser on the next
 authenticated load, then clears the old localStorage copy only after Supabase
 confirms that it was written and can be read back.
+
+Migration `0007` also repairs older projects that already have an
+`app_settings` key/value table with a unique `key_name` column. It renames that
+old table to `app_settings_legacy` instead of deleting it, then creates the
+owner-scoped table used by the current app.
 
 ## 3. Enable email/password auth
 
