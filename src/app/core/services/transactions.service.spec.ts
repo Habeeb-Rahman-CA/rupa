@@ -26,17 +26,16 @@ describe('TransactionsService', () => {
       update: jasmine.createSpy().and.resolveTo({ id: 'bank_1', balance: 600 }),
     };
 
-    const mockQueryBuilder = {
-      select: jasmine.createSpy().and.returnThis(),
-      insert: jasmine.createSpy().and.returnThis(),
-      update: jasmine.createSpy().and.returnThis(),
-      delete: jasmine.createSpy().and.returnThis(),
-      eq: jasmine.createSpy().and.returnThis(),
-      maybeSingle: jasmine.createSpy().and.resolveTo({ data: null, error: null }),
-      single: jasmine.createSpy().and.resolveTo({ data: { id: 'tx_1', amount: 100, direction: 'in' }, error: null }),
-      order: jasmine.createSpy().and.returnThis(),
-      limit: jasmine.createSpy().and.resolveTo({ data: [], error: null }),
-    };
+    const mockQueryBuilder: any = {};
+    mockQueryBuilder.select = jasmine.createSpy().and.returnValue(mockQueryBuilder);
+    mockQueryBuilder.insert = jasmine.createSpy().and.returnValue(mockQueryBuilder);
+    mockQueryBuilder.update = jasmine.createSpy().and.returnValue(mockQueryBuilder);
+    mockQueryBuilder.delete = jasmine.createSpy().and.returnValue(mockQueryBuilder);
+    mockQueryBuilder.eq = jasmine.createSpy().and.returnValue(mockQueryBuilder);
+    mockQueryBuilder.maybeSingle = jasmine.createSpy().and.resolveTo({ data: null, error: null });
+    mockQueryBuilder.single = jasmine.createSpy().and.resolveTo({ data: { id: 'tx_1', amount: 100, direction: 'in' }, error: null });
+    mockQueryBuilder.order = jasmine.createSpy().and.returnValue(mockQueryBuilder);
+    mockQueryBuilder.limit = jasmine.createSpy().and.resolveTo({ data: [], error: null });
 
     mockSupabase = {
       client: {

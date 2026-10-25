@@ -35,16 +35,6 @@ export const routes: Routes = [
           import('./features/debts/debts.page').then((m) => m.DebtsPage),
       },
       {
-        path: 'events',
-        loadComponent: () =>
-          import('./features/events/events.page').then((m) => m.EventsPage),
-      },
-      {
-        path: 'events/:id',
-        loadComponent: () =>
-          import('./features/events/event-detail.page').then((m) => m.EventDetailPage),
-      },
-      {
         path: 'bank-accounts',
         loadComponent: () =>
           import('./features/bank-accounts/bank-accounts.page').then((m) => m.BankAccountsPage),

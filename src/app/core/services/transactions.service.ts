@@ -4,7 +4,6 @@ import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { CategoriesService } from './categories.service';
 import { DebtsService } from './debts.service';
-import { EventsService } from './events.service';
 import { BankAccountsService } from './bank-accounts.service';
 import { roundCurrency } from '../../shared/utils/currency-utils';
 
@@ -377,14 +376,10 @@ export class TransactionsService {
 
       if (error) throw error;
 
-      // Refresh DebtsService & EventsService if present
+      // Refresh DebtsService if present
       try {
         const debtsService = this.injector.get(DebtsService);
         void debtsService.load();
-      } catch {}
-      try {
-        const eventsService = this.injector.get(EventsService);
-        void eventsService.loadList();
       } catch {}
     } catch (error) {
       console.error('Failed to delete transaction', error);

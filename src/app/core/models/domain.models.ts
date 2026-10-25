@@ -1,8 +1,7 @@
 export type TxDirection = 'in' | 'out';
-export type TxSource = 'manual' | 'debt' | 'event' | 'opening';
+export type TxSource = 'manual' | 'debt' | 'opening' | 'event';
 export type CategoryKind = 'income' | 'expense' | 'savings';
 export type DebtDirection = 'i_owe' | 'they_owe';
-export type EventStatus = 'open' | 'settled';
 
 export interface Category {
   id: string;
@@ -115,48 +114,6 @@ export interface DebtPayment {
   paid_on: string;
   transaction_id: string;
   notes: string | null;
-}
-
-export interface EventRecord {
-  id: string;
-  owner_id: string;
-  name: string;
-  kind: string | null;
-  starts_on: string;
-  ends_on: string | null;
-  notes: string | null;
-  status: EventStatus;
-  created_at: string;
-}
-
-export interface EventParticipant {
-  id: string;
-  event_id: string;
-  person_id: string | null;
-  is_you: boolean;
-}
-
-export interface EventExpense {
-  id: string;
-  event_id: string;
-  description: string;
-  amount: number;
-  paid_on: string;
-  transaction_id: string;
-}
-
-export interface EventExpenseParticipant {
-  id: string;
-  event_expense_id: string;
-  event_participant_id: string;
-}
-
-export interface EventSettlement {
-  id: string;
-  event_id: string;
-  event_participant_id: string;
-  paid_on: string;
-  transaction_id: string;
 }
 
 export type CardType = 'debit' | 'credit' | 'savings' | 'current' | 'prepaid';

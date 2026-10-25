@@ -14,7 +14,6 @@ import {
 import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
 import { DebtsService } from '../../core/services/debts.service';
-import { EventsService } from '../../core/services/events.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
 import { Category, Transaction, isSavingsCategory, BankAccount } from '../../core/models/domain.models';
 import { getCategoryColor, getCategoryIcon } from '../../shared/utils/category-utils';
@@ -366,13 +365,6 @@ interface BankReportRow extends BankAccount {
           {{ youOweTotal() | signedMoney: 'out' }}
         </div>
         <div class="ob-hint">Money you need to pay back</div>
-      </a>
-      <a class="ob-card" routerLink="/events">
-        <div class="micro-label">Splits open</div>
-        <div class="ob-value">{{ openSplitsCount() }}</div>
-        <div class="ob-hint">
-          {{ splitOutstanding() | signedMoney }} unsettled
-        </div>
       </a>
     </section>
   `,
@@ -877,7 +869,6 @@ export class ReportsPage {
   private readonly txService = inject(TransactionsService);
   private readonly categoriesService = inject(CategoriesService);
   private readonly debtsService = inject(DebtsService);
-  private readonly eventsService = inject(EventsService);
   private readonly bankAccountsService = inject(BankAccountsService);
 
   // Selected month state — Date pinned to day 1
@@ -1119,14 +1110,6 @@ export class ReportsPage {
 
   readonly theyOweTotal = this.debtsService.theyOweYouTotal;
   readonly youOweTotal = this.debtsService.youOweTotal;
-
-  readonly openSplitsCount = computed(
-    () => this.eventsService.events().filter((e) => e.status === 'open').length,
-  );
-
-  readonly splitOutstanding = computed(() => {
-    return 0;
-  });
 
   shiftMonth(delta: number): void {
     const cur = this.monthDate();

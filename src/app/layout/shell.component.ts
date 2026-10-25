@@ -18,7 +18,6 @@ import { PwaUpdateService } from '../core/services/pwa-update.service';
 import { TransactionsService } from '../core/services/transactions.service';
 import { CategoriesService } from '../core/services/categories.service';
 import { DebtsService } from '../core/services/debts.service';
-import { EventsService } from '../core/services/events.service';
 import { PeopleService } from '../core/services/people.service';
 import { APP_VERSION } from '../core/app-version';
 import { QuickAddSheetComponent } from '../features/transactions/quick-add-sheet.component';
@@ -57,7 +56,6 @@ export class ShellComponent implements AfterViewInit {
   private readonly transactionsService = inject(TransactionsService);
   private readonly categoriesService = inject(CategoriesService);
   private readonly debtsService = inject(DebtsService);
-  private readonly eventsService = inject(EventsService);
   private readonly peopleService = inject(PeopleService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -76,25 +74,23 @@ export class ShellComponent implements AfterViewInit {
   );
 
   readonly navLeft: NavItem[] = [
-    { path: '/dashboard',    label: 'Home',   icon: 'home' },
-    { path: '/transactions', label: 'Txns',   icon: 'receipt' },
+    { path: '/dashboard',    label: 'Home', icon: 'home' },
+    { path: '/transactions', label: 'Txns', icon: 'receipt' },
   ];
   readonly navRight: NavItem[] = [
-    { path: '/debts',  label: 'Owed',   icon: 'handshake' },
-    { path: '/events', label: 'Splits', icon: 'split' },
+    { path: '/debts',         label: 'Owed', icon: 'handshake' },
+    { path: '/bank-accounts', label: 'Bank', icon: 'credit-card' },
   ];
 
   readonly settingsNav: NavItem[] = [
-    { path: '/bank-accounts', label: 'Bank Accounts', icon: 'credit-card' },
-    { path: '/categories',    label: 'Categories',    icon: 'tags' },
-    { path: '/people',        label: 'People',        icon: 'users' },
+    { path: '/categories', label: 'Categories', icon: 'tags' },
+    { path: '/people',     label: 'People',     icon: 'users' },
   ];
 
   readonly moreNav: NavItem[] = [
-    { path: '/reports',       label: 'Reports',       icon: 'trending-up' },
-    { path: '/bank-accounts', label: 'Bank Accounts', icon: 'credit-card' },
-    { path: '/categories',    label: 'Categories',    icon: 'tags' },
-    { path: '/people',        label: 'People',        icon: 'users' },
+    { path: '/reports',    label: 'Reports',    icon: 'trending-up' },
+    { path: '/categories', label: 'Categories', icon: 'tags' },
+    { path: '/people',     label: 'People',     icon: 'users' },
   ];
 
   readonly appVersion = APP_VERSION;

@@ -19,15 +19,14 @@ describe('BankAccountsService', () => {
       user: signal(null),
     };
 
-    const mockQueryBuilder = {
-      select: jasmine.createSpy().and.returnThis(),
-      order: jasmine.createSpy().and.returnThis(),
-      insert: jasmine.createSpy().and.resolveTo({ data: null, error: null }),
-      update: jasmine.createSpy().and.returnThis(),
-      delete: jasmine.createSpy().and.returnThis(),
-      eq: jasmine.createSpy().and.returnThis(),
-      neq: jasmine.createSpy().and.resolveTo({ data: null, error: null }),
-    };
+    const mockQueryBuilder: any = {};
+    mockQueryBuilder.select = jasmine.createSpy().and.returnValue(mockQueryBuilder);
+    mockQueryBuilder.order = jasmine.createSpy().and.returnValue(mockQueryBuilder);
+    mockQueryBuilder.insert = jasmine.createSpy().and.resolveTo({ data: null, error: null });
+    mockQueryBuilder.update = jasmine.createSpy().and.returnValue(mockQueryBuilder);
+    mockQueryBuilder.delete = jasmine.createSpy().and.returnValue(mockQueryBuilder);
+    mockQueryBuilder.eq = jasmine.createSpy().and.returnValue(mockQueryBuilder);
+    mockQueryBuilder.neq = jasmine.createSpy().and.resolveTo({ data: null, error: null });
 
     mockSupabase = {
       client: {

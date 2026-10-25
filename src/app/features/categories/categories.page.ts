@@ -61,12 +61,12 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
           [value]="activeFilter()"
           (change)="activeFilter.set($event.value)"
           hideSingleSelectionIndicator
-          class="filter-toggle"
+          class="app-toggle-group"
         >
-          <mat-button-toggle value="all">All</mat-button-toggle>
-          <mat-button-toggle value="savings">Savings</mat-button-toggle>
-          <mat-button-toggle value="expense">Expense</mat-button-toggle>
-          <mat-button-toggle value="income">Income</mat-button-toggle>
+          <mat-button-toggle value="all">All ({{ categories().length }})</mat-button-toggle>
+          <mat-button-toggle value="savings">Savings ({{ savings().length }})</mat-button-toggle>
+          <mat-button-toggle value="expense">Expense ({{ expenses().length }})</mat-button-toggle>
+          <mat-button-toggle value="income">Income ({{ incomes().length }})</mat-button-toggle>
         </mat-button-toggle-group>
       </div>
 
@@ -183,13 +183,46 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
     `
       .filter-bar {
         margin-bottom: 20px;
-      }
-      .filter-toggle {
         width: 100%;
         display: flex;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding: 2px 0 4px;
       }
-      .filter-toggle mat-button-toggle {
-        flex: 1;
+      .filter-bar::-webkit-scrollbar {
+        display: none;
+      }
+      .app-toggle-group {
+        display: inline-flex;
+        width: 100%;
+        min-width: max-content;
+        border-radius: 999px !important;
+        background: var(--app-canvas) !important;
+        border: 1px solid var(--app-hairline) !important;
+        padding: 3px !important;
+      }
+      .app-toggle-group mat-button-toggle {
+        flex: 1 0 auto;
+        border-radius: 999px !important;
+        border: 0 !important;
+      }
+      ::ng-deep .app-toggle-group .mat-button-toggle-label-content {
+        white-space: nowrap !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        padding: 0 16px !important;
+        line-height: 36px !important;
+      }
+      @media (max-width: 600px) {
+        .app-toggle-group {
+          width: auto;
+        }
+        ::ng-deep .app-toggle-group .mat-button-toggle-label-content {
+          font-size: 12px !important;
+          padding: 0 12px !important;
+          line-height: 34px !important;
+        }
       }
       .add-card { margin-bottom: 20px; padding: 16px; }
       .add-form {

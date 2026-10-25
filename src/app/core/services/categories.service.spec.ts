@@ -25,14 +25,15 @@ describe('CategoriesService', () => {
       user: signal({ id: 'u1' }),
     };
 
+    const mockQueryBuilder: any = {};
+    mockQueryBuilder.select = jasmine.createSpy().and.returnValue(mockQueryBuilder);
+    mockQueryBuilder.order = jasmine.createSpy().and.returnValue(mockQueryBuilder);
+    mockQueryBuilder.delete = jasmine.createSpy().and.returnValue(mockQueryBuilder);
+    mockQueryBuilder.eq = jasmine.createSpy().and.resolveTo({ error: new Error('Delete failed') });
+
     mockSupabase = {
       client: {
-        from: jasmine.createSpy().and.returnValue({
-          select: jasmine.createSpy().and.returnThis(),
-          order: jasmine.createSpy().and.returnThis(),
-          delete: jasmine.createSpy().and.returnThis(),
-          eq: jasmine.createSpy().and.resolveTo({ error: new Error('Delete failed') }),
-        }),
+        from: jasmine.createSpy().and.returnValue(mockQueryBuilder),
       },
     };
 

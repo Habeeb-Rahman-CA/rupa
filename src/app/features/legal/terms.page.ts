@@ -35,8 +35,8 @@ import { APP_VERSION } from '../../core/app-version';
         <h2>1. What rūpa is</h2>
         <p>
           rūpa is a personal expense tracker. It lets you record your own
-          financial activity — transactions, balances, money owed to and by
-          you, and shared expenses across trips or events. rūpa is a tool
+          financial activity — transactions, balances, and money owed to and by
+          you. rūpa is a tool
           for personal use; it is not a bank, a payment processor, or a
           licensed financial advisor.
         </p>

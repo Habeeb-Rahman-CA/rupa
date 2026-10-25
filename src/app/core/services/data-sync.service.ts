@@ -4,7 +4,6 @@ import { CategoriesService } from './categories.service';
 import { PeopleService } from './people.service';
 import { TransactionsService } from './transactions.service';
 import { DebtsService } from './debts.service';
-import { EventsService } from './events.service';
 import { AppSettingsService } from './app-settings.service';
 
 import { BankAccountsService } from './bank-accounts.service';
@@ -17,7 +16,6 @@ export class DataSyncService {
   private readonly bankAccountsService = inject(BankAccountsService);
   private readonly transactionsService = inject(TransactionsService);
   private readonly debtsService = inject(DebtsService);
-  private readonly eventsService = inject(EventsService);
   // Instantiate settings during the authenticated shell bootstrap so legacy
   // localStorage settings are migrated even before bill scanning is opened.
   private readonly appSettingsService = inject(AppSettingsService);
@@ -36,7 +34,7 @@ export class DataSyncService {
   /**
    * Coordinated 2-phase data synchronization:
    * Phase 1: Load lookup data (Categories, People & Bank Accounts) first
-   * Phase 2: Load dependent financial records (Transactions, Debts, Events)
+   * Phase 2: Load dependent financial records (Transactions, Debts)
    */
   async syncAll(): Promise<void> {
     if (!this.auth.isAuthenticated()) return;
@@ -52,12 +50,9 @@ export class DataSyncService {
         ]);
 
         // Phase 2: Relational ledger records
-        const detailId = this.eventsService.currentDetail()?.event.id;
         await Promise.all([
           this.transactionsService.refresh(),
           this.debtsService.load(),
-          this.eventsService.loadList(),
-          detailId ? this.eventsService.loadDetail(detailId) : Promise.resolve(),
         ]);
       } catch (err) {
         console.error('Coordinated data sync failed', err);

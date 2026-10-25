@@ -46,7 +46,7 @@ import { errText } from '../../shared/utils/error-utils';
       <app-empty-state
         icon="users"
         title="No one added yet"
-        message="Add someone before you record a loan or start a split."
+        message="Add someone before you record a loan or debt."
       />
     } @else {
       <div class="toolbar">
