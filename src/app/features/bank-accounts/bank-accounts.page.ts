@@ -13,6 +13,7 @@ import { TransactionsService } from '../../core/services/transactions.service';
 import { BankAccount, CardType } from '../../core/models/domain.models';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { LoadingStateComponent } from '../../shared/components/loading-state.component';
 import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { BankAccountDialogComponent } from './bank-account-dialog.component';
 import { BankAccountDetailsDialogComponent } from './bank-account-details-dialog.component';
@@ -28,6 +29,7 @@ import { BankAccountDetailsDialogComponent } from './bank-account-details-dialog
     LucideAngularModule,
     PageHeaderComponent,
     EmptyStateComponent,
+    LoadingStateComponent,
   ],
   template: `
     <!-- Top Page Header matching system standards -->
@@ -63,7 +65,9 @@ import { BankAccountDetailsDialogComponent } from './bank-account-details-dialog
     }
 
     <!-- Cards Display Grid -->
-    @if (cards().length === 0) {
+    @if (isLoading() && cards().length === 0) {
+      <app-loading-state label="Loading bank accounts…" />
+    } @else if (cards().length === 0) {
       <app-empty-state
         icon="credit-card"
         title="No bank accounts or cards yet"
@@ -547,6 +551,7 @@ export class BankAccountsPage {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly cards = this.bankAccountsService.bankAccounts;
+  readonly isLoading = this.bankAccountsService.isLoading;
   readonly filterType = signal<'all' | CardType>('all');
 
   readonly debitCount = computed(() => this.cards().filter((c) => c.card_type === 'debit').length);

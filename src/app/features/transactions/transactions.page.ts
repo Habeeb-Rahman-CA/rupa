@@ -8,6 +8,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { LoadingStateComponent } from '../../shared/components/loading-state.component';
 import { SwipeableRowComponent } from '../../shared/components/swipeable-row.component';
 import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
@@ -48,6 +49,7 @@ export interface DayGroup {
     LucideAngularModule,
     PageHeaderComponent,
     EmptyStateComponent,
+    LoadingStateComponent,
     SwipeableRowComponent,
     SignedMoneyPipe,
     DateFieldComponent,
@@ -146,7 +148,9 @@ export interface DayGroup {
       </section>
     }
 
-    @if (groups().length === 0) {
+    @if (isLoading() && transactions().length === 0) {
+      <app-loading-state label="Loading transactions…" />
+    } @else if (groups().length === 0) {
       <app-empty-state
         icon="receipt"
         [title]="filtersActive() ? 'No matching transactions' : 'No transactions yet'"
@@ -408,6 +412,7 @@ export class TransactionsPage {
   });
 
   readonly transactions = this.service.transactions;
+  readonly isLoading = this.service.isLoading;
 
   readonly categoryOptions = computed<SelectOption<string>[]>(() => [
     { value: '', label: 'All categories', icon: 'layers-3' },

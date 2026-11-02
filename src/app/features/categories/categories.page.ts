@@ -8,6 +8,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { CategoriesService } from '../../core/services/categories.service';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { LoadingStateComponent } from '../../shared/components/loading-state.component';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { SwipeableRowComponent } from '../../shared/components/swipeable-row.component';
@@ -26,6 +27,7 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
     LucideAngularModule,
     PageHeaderComponent,
     EmptyStateComponent,
+    LoadingStateComponent,
     SwipeableRowComponent,
   ],
   template: `
@@ -43,7 +45,9 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
       </button>
     </app-page-header>
 
-    @if (categories().length === 0) {
+    @if (isLoading() && categories().length === 0) {
+      <app-loading-state label="Loading categories…" />
+    } @else if (categories().length === 0) {
       <app-empty-state
         icon="tags"
         title="Start with a few categories"
@@ -346,6 +350,7 @@ export class CategoriesPage {
   readonly activeFilter = signal<'all' | 'savings' | 'expense' | 'income'>('all');
 
   readonly categories = this.service.categories;
+  readonly isLoading = this.service.isLoading;
   readonly savings = computed(() =>
     this.categories().filter((c) => isSavingsCategory(c)),
   );

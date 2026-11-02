@@ -7,6 +7,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
+import { LoadingStateComponent } from '../../shared/components/loading-state.component';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { SwipeableRowComponent } from '../../shared/components/swipeable-row.component';
 import { openConfirm } from '../../shared/components/confirm-dialog.component';
@@ -24,6 +25,7 @@ import { errText } from '../../shared/utils/error-utils';
     LucideAngularModule,
     PageHeaderComponent,
     EmptyStateComponent,
+    LoadingStateComponent,
     TextFieldComponent,
     SwipeableRowComponent,
   ],
@@ -42,7 +44,9 @@ import { errText } from '../../shared/utils/error-utils';
       </button>
     </app-page-header>
 
-    @if (people().length === 0 && !searchQuery()) {
+    @if (isLoading() && people().length === 0) {
+      <app-loading-state label="Loading people…" />
+    } @else if (people().length === 0 && !searchQuery().trim()) {
       <app-empty-state
         icon="users"
         title="No one added yet"
@@ -189,6 +193,7 @@ export class PeoplePage {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly people = this.service.people;
+  readonly isLoading = this.service.isLoading;
   readonly submitting = signal(false);
 
   readonly rawSearchQuery = signal('');

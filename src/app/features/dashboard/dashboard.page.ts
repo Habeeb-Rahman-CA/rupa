@@ -16,6 +16,7 @@ import {
 import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
 import { DebtsService } from '../../core/services/debts.service';
+import { MoneyHeldService } from '../../core/services/money-held.service';
 import { Category, CategoryKind, Transaction, isSavingsCategory } from '../../core/models/domain.models';
 import { SetOpeningBalanceSheetComponent } from './set-opening-balance-sheet.component';
 import { getCategoryColor, getCategoryIcon } from '../../shared/utils/category-utils';
@@ -174,6 +175,51 @@ type Range = 'week' | 'month' | 'year';
           <div class="micro-label">You owe</div>
           <div class="owed-value money-negative">{{ youOweTotal() | signedMoney: 'out' }}</div>
         </a>
+      </section>
+    }
+
+    <!-- MONEY HELD FOR OTHERS -->
+    @if (moneyHeldAvailable()) {
+      <section class="held-card app-card">
+      <div class="held-card-head">
+        <div class="held-title-wrap">
+          <div class="held-badge"><lucide-icon name="wallet" /></div>
+          <div>
+            <div class="section-kicker">Money held</div>
+            <h2>For other people</h2>
+          </div>
+        </div>
+        <a routerLink="/money-held" class="see-all">Manage</a>
+      </div>
+
+      <div class="held-summary">
+        <div>
+          <div class="micro-label">Total held</div>
+          <div class="held-total">{{ moneyHeldTotal() | signedMoney }}</div>
+        </div>
+        <div class="held-people-count">
+          <strong>{{ moneyHeldPeopleCount() }}</strong>
+          <span>{{ moneyHeldPeopleCount() === 1 ? 'person' : 'people' }}</span>
+        </div>
+      </div>
+
+      @if (moneyHeldBalances().length > 0) {
+        <ul class="held-people-list">
+          @for (person of moneyHeldBalances(); track person.id) {
+            <li class="held-person-row">
+              <span class="held-person-name">{{ person.name }}</span>
+              <span class="held-person-balance" [class.settled]="person.outstanding <= 0">
+                {{ person.outstanding | signedMoney }}
+              </span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <a routerLink="/money-held" class="held-empty-link">
+          <lucide-icon name="plus" />
+          Track money held for someone
+        </a>
+      }
       </section>
     }
 
@@ -379,6 +425,48 @@ type Range = 'week' | 'month' | 'year';
         text-overflow: ellipsis;
       }
 
+      /* ---------- Money held -------------------------------------------- */
+      .held-card {
+        margin-top: 16px;
+        padding: 16px 20px;
+      }
+      .held-card-head, .held-title-wrap, .held-summary {
+        display: flex;
+        align-items: center;
+      }
+      .held-card-head, .held-summary { justify-content: space-between; gap: 12px; }
+      .held-title-wrap { gap: 10px; min-width: 0; }
+      .held-badge {
+        display: grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 11px;
+        background: var(--app-accent-soft);
+        color: var(--app-accent);
+      }
+      .held-badge lucide-icon { width: 19px; height: 19px; }
+      .section-kicker {
+        color: var(--app-ink-muted);
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+      }
+      .held-card h2 { margin: 1px 0 0; color: var(--app-ink); font-size: 15px; font-weight: 600; }
+      .held-summary { margin-top: 16px; padding: 12px 0; border-top: 1px solid var(--app-hairline); border-bottom: 1px solid var(--app-hairline); }
+      .held-total { margin-top: 2px; color: var(--app-ink); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .held-people-count { display: flex; flex-direction: column; align-items: flex-end; color: var(--app-ink-muted); font-size: 11px; }
+      .held-people-count strong { color: var(--app-ink); font-size: 18px; }
+      .held-people-list { list-style: none; margin: 0; padding: 0; }
+      .held-person-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--app-hairline); }
+      .held-person-row:last-child { border-bottom: 0; padding-bottom: 0; }
+      .held-person-name { min-width: 0; overflow: hidden; color: var(--app-ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+      .held-person-balance { color: var(--app-positive); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .held-person-balance.settled { color: var(--app-ink-muted); }
+      .held-empty-link { display: flex; align-items: center; justify-content: center; gap: 6px; padding-top: 14px; color: var(--app-accent); font-size: 13px; font-weight: 600; text-decoration: none; }
+      .held-empty-link lucide-icon { width: 16px; height: 16px; }
+
       /* ---------- Section headers -------------------------------------- */
       .section-head {
         display: flex;
@@ -551,6 +639,7 @@ export class DashboardPage {
   private readonly txService = inject(TransactionsService);
   private readonly categoriesService = inject(CategoriesService);
   private readonly debtsService = inject(DebtsService);
+  private readonly moneyHeldService = inject(MoneyHeldService);
   private readonly bottomSheet = inject(MatBottomSheet);
 
   readonly balance = this.txService.balance;
@@ -577,6 +666,10 @@ export class DashboardPage {
 
   readonly theyOweTotal = this.debtsService.theyOweYouTotal;
   readonly youOweTotal = this.debtsService.youOweTotal;
+  readonly moneyHeldTotal = this.moneyHeldService.totalHeld;
+  readonly moneyHeldPeopleCount = this.moneyHeldService.peopleCount;
+  readonly moneyHeldBalances = this.moneyHeldService.balances;
+  readonly moneyHeldAvailable = this.moneyHeldService.isAvailable;
 
   readonly bannerDismissed = signal(
     typeof localStorage !== 'undefined' &&

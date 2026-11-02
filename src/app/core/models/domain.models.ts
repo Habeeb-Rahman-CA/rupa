@@ -79,6 +79,28 @@ export interface Person {
 
 export type PaymentMode = 'cash' | 'bank';
 
+export type MoneyHeldDirection = 'received' | 'returned';
+
+export interface MoneyHeldPerson {
+  id: string;
+  owner_id: string;
+  person_id: string;
+  created_at: string;
+}
+
+export interface MoneyHeldTransaction {
+  id: string;
+  owner_id: string;
+  held_person_id: string;
+  direction: MoneyHeldDirection;
+  amount: number;
+  occurred_on: string;
+  payment_mode: PaymentMode;
+  bank_account_id: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface Transaction {
   id: string;
   owner_id: string;
