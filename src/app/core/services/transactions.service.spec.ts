@@ -59,14 +59,14 @@ describe('TransactionsService', () => {
   it('should identify opening balance by source: opening', async () => {
     mockSupabase.client.from.and.returnValue({
       select: () => ({
-        eq: (col: string, val: string) => {
-          if (col === 'source' && val === 'opening') {
-            return {
-              maybeSingle: () => Promise.resolve({ data: { amount: 250, direction: 'in' }, error: null }),
-            };
-          }
-          return { maybeSingle: () => Promise.resolve({ data: null, error: null }) };
-        },
+        eq: () => ({
+          or: () => ({
+            order: () => Promise.resolve({
+              data: [{ amount: 250, direction: 'in' }],
+              error: null,
+            }),
+          }),
+        }),
       }),
     });
 
@@ -83,5 +83,29 @@ describe('TransactionsService', () => {
     });
 
     expect(mockBankAccountsService.update).toHaveBeenCalledWith('bank_1', { balance: 600 });
+  });
+
+  it('should keep wallet spending under wallet history management', async () => {
+    (service as any)._transactions.set([
+      {
+        id: 'wallet-spend-1',
+        owner_id: 'u1',
+        occurred_on: '2026-11-03',
+        amount: 40,
+        direction: 'out',
+        category_id: 'food',
+        notes: null,
+        source: 'wallet_spend',
+        source_ref_id: 'wallet-entry-1',
+        payment_mode: 'cash',
+        bank_account_id: null,
+        wallet_id: 'wallet-1',
+        created_at: '2026-11-03T00:00:00.000Z',
+      },
+    ]);
+
+    await expectAsync(service.delete('wallet-spend-1')).toBeRejectedWithError(
+      'Linked entries must be managed from their dedicated screen.',
+    );
   });
 });

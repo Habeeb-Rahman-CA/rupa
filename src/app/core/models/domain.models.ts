@@ -1,5 +1,12 @@
 export type TxDirection = 'in' | 'out';
-export type TxSource = 'manual' | 'debt' | 'opening' | 'event' | 'transfer';
+export type TxSource =
+  | 'manual'
+  | 'debt'
+  | 'opening'
+  | 'event'
+  | 'transfer'
+  | 'wallet_recharge'
+  | 'wallet_spend';
 export type CategoryKind = 'income' | 'expense' | 'savings';
 export type DebtDirection = 'i_owe' | 'they_owe';
 
@@ -113,6 +120,7 @@ export interface Transaction {
   source_ref_id: string | null;
   payment_mode?: PaymentMode;
   bank_account_id?: string | null;
+  wallet_id?: string | null;
   created_at: string;
 }
 
@@ -126,6 +134,35 @@ export interface AccountTransfer {
   notes: string | null;
   debit_transaction_id: string;
   credit_transaction_id: string;
+  created_at: string;
+}
+
+export interface Wallet {
+  id: string;
+  owner_id: string;
+  name: string;
+  theme: CardTheme;
+  initial_balance: number;
+  balance: number;
+  minimum_balance: number;
+  created_at: string;
+}
+
+export type WalletTransactionKind = 'recharge' | 'spend';
+
+export interface WalletTransaction {
+  id: string;
+  owner_id: string;
+  wallet_id: string;
+  kind: WalletTransactionKind;
+  amount: number;
+  occurred_on: string;
+  category_id: string | null;
+  funding_mode: PaymentMode | null;
+  bank_account_id: string | null;
+  notes: string | null;
+  debit_transaction_id: string;
+  credit_transaction_id: string | null;
   created_at: string;
 }
 

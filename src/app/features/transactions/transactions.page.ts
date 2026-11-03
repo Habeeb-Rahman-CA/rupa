@@ -22,6 +22,7 @@ import { getCategoryColor, getCategoryIcon } from '../../shared/utils/category-u
 import { errText } from '../../shared/utils/error-utils';
 import {
   filterTransactions,
+  WALLET_CATEGORY_ID,
   summarizeTransactions,
   toIsoDate,
 } from './transaction-filters';
@@ -416,6 +417,7 @@ export class TransactionsPage {
 
   readonly categoryOptions = computed<SelectOption<string>[]>(() => [
     { value: '', label: 'All categories', icon: 'layers-3' },
+    { value: WALLET_CATEGORY_ID, label: 'Wallet spending', icon: 'wallet' },
     ...this.categoriesService.categories()
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -467,6 +469,8 @@ export class TransactionsPage {
       const label =
         t.source === 'transfer'
           ? (t.direction === 'in' ? 'Transfer in' : 'Transfer out')
+          : t.source === 'wallet_spend'
+            ? 'Wallet spending'
           : (cat?.name ?? (t.direction === 'in' ? 'Income' : 'Expense'));
 
       let bankName = '';
@@ -481,8 +485,12 @@ export class TransactionsPage {
       if (bankName) parts.push(bankName);
       const subText = parts.join(' • ');
 
-      const icon = t.source === 'transfer' ? 'arrow-left-right' : (isSavings ? 'piggy-bank' : getCategoryIcon(label));
-      const color = t.source === 'transfer' ? '#6366f1' : (isSavings ? '#0ea5e9' : getCategoryColor(label));
+      const icon = t.source === 'transfer'
+        ? 'arrow-left-right'
+        : (t.source === 'wallet_spend' ? 'wallet' : (isSavings ? 'piggy-bank' : getCategoryIcon(label)));
+      const color = t.source === 'transfer'
+        ? '#6366f1'
+        : (t.source === 'wallet_spend' ? '#475569' : (isSavings ? '#0ea5e9' : getCategoryColor(label)));
 
       const enriched: EnrichedTransaction = {
         ...t,
@@ -501,7 +509,7 @@ export class TransactionsPage {
       }
       group.items.push(enriched);
       const amt = Number(t.amount);
-      if (t.source !== 'transfer') {
+      if (t.source !== 'transfer' && t.source !== 'wallet_recharge') {
         group.dayTotal += t.direction === 'in' ? amt : -amt;
       }
     }
@@ -520,8 +528,12 @@ export class TransactionsPage {
   }
 
   async confirmRemove(t: EnrichedTransaction): Promise<void> {
-    if (t.source === 'transfer') {
-      this.snack.open('Edit or delete transfers from the Transfers screen.', undefined, { duration: 3000 });
+    if (
+      t.source === 'transfer' ||
+      t.source === 'wallet_recharge' ||
+      t.source === 'wallet_spend'
+    ) {
+      this.snack.open('This linked entry must be managed from its dedicated screen.', undefined, { duration: 3000 });
       return;
     }
     const ok = await openConfirm(this.dialog, {

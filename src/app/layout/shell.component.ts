@@ -79,7 +79,7 @@ export class ShellComponent implements AfterViewInit {
   ];
   readonly navRight: NavItem[] = [
     { path: '/debts',         label: 'Owed', icon: 'handshake' },
-    { path: '/bank-accounts', label: 'Bank', icon: 'credit-card' },
+    { path: '/bank-accounts', label: 'Cards', icon: 'credit-card' },
   ];
 
   readonly settingsNav: NavItem[] = [

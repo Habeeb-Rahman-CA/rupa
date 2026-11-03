@@ -1,5 +1,7 @@
 import { Transaction } from '../../core/models/domain.models';
 
+export const WALLET_CATEGORY_ID = '__wallet_spending__';
+
 export interface TransactionFilter {
   categoryId: string | null;
   fromDate: string | null;
@@ -21,6 +23,10 @@ export function filterTransactions(
   }
 
   return transactions.filter((transaction) => {
+    if (transaction.source === 'wallet_recharge') return false;
+    if (filter.categoryId === WALLET_CATEGORY_ID) {
+      return transaction.source === 'wallet_spend';
+    }
     if (filter.categoryId && transaction.category_id !== filter.categoryId) {
       return false;
     }
@@ -40,7 +46,7 @@ export function summarizeTransactions(
 ): TransactionSummary {
   return transactions.reduce<TransactionSummary>(
     (summary, transaction) => {
-      if (transaction.source === 'transfer') return summary;
+      if (transaction.source === 'transfer' || transaction.source === 'wallet_recharge') return summary;
       const amount = Number(transaction.amount);
       const isSavings =
         transaction.category_id !== null && savingsCategoryIds.has(transaction.category_id);

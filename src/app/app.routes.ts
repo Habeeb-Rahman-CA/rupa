@@ -50,6 +50,11 @@ export const routes: Routes = [
           import('./features/transfers/transfers.page').then((m) => m.TransfersPage),
       },
       {
+        path: 'wallets',
+        loadComponent: () =>
+          import('./features/wallets/wallets.page').then((m) => m.WalletsPage),
+      },
+      {
         path: 'categories',
         loadComponent: () =>
           import('./features/categories/categories.page').then((m) => m.CategoriesPage),

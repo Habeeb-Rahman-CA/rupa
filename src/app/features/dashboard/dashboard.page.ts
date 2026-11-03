@@ -656,17 +656,19 @@ export class DashboardPage {
 
   readonly recentEnriched = computed(() => {
     const catMap = this.categoryMap();
-    return this.txService.transactions().slice(0, 6).map((t) => {
+    return this.txService.transactions().filter((t) => t.source !== 'wallet_recharge').slice(0, 6).map((t) => {
       const cat = t.category_id ? catMap.get(t.category_id) : undefined;
       const isSavings = isSavingsCategory(cat);
       const isTransfer = t.source === 'transfer';
-      const label = isTransfer ? (t.direction === 'in' ? 'Transfer in' : 'Transfer out') : (cat?.name ?? (t.direction === 'in' ? 'Income' : 'Expense'));
+       const label = isTransfer
+         ? (t.direction === 'in' ? 'Transfer in' : 'Transfer out')
+         : (t.source === 'wallet_spend' ? 'Wallet spending' : (cat?.name ?? (t.direction === 'in' ? 'Income' : 'Expense')));
       return {
         ...t,
         label,
         isSavings,
-        icon: isTransfer ? 'arrow-left-right' : getCategoryIcon(label),
-        color: isTransfer ? '#6366f1' : getCategoryColor(label),
+         icon: isTransfer ? 'arrow-left-right' : (t.source === 'wallet_spend' ? 'wallet' : getCategoryIcon(label)),
+         color: isTransfer ? '#6366f1' : (t.source === 'wallet_spend' ? '#475569' : getCategoryColor(label)),
       };
     });
   });
@@ -709,7 +711,7 @@ export class DashboardPage {
     let saved = 0;
 
     for (const t of txs) {
-      if (t.source === 'transfer') continue;
+      if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (!t.occurred_on) continue;
       const [ty, tm, td] = t.occurred_on.split('-').map(Number);
       const txDate = new Date(ty, tm - 1, td);
@@ -734,7 +736,7 @@ export class DashboardPage {
     if (range === 'month' && spent === 0 && received === 0 && saved === 0 && txs.length > 0) {
       const past30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
       for (const t of txs) {
-        if (t.source === 'transfer') continue;
+        if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
         if (!t.occurred_on) continue;
         const [ty, tm, td] = t.occurred_on.split('-').map(Number);
         const txDate = new Date(ty, tm - 1, td);
@@ -821,8 +823,14 @@ export class DashboardPage {
 
     const totals = new Map<string, number>();
     for (const t of txs) {
-      if (t.source === 'transfer') continue;
-      if (t.direction !== 'out' || !t.category_id) continue;
+      if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
+       if (t.direction !== 'out') continue;
+       if (t.source === 'wallet_spend') {
+         const walletId = '__wallet_spending__';
+         totals.set(walletId, (totals.get(walletId) ?? 0) + Number(t.amount));
+         continue;
+       }
+       if (!t.category_id) continue;
       const cat = catMap.get(t.category_id);
       if (cat?.kind === 'savings') continue; // Exclude savings from spending top tiles
       const [ty, tm] = t.occurred_on.split('-').map(Number);
@@ -832,7 +840,7 @@ export class DashboardPage {
     return [...totals.entries()]
       .map(([id, amount]) => ({
         id,
-        name: catMap.get(id)?.name ?? 'Other',
+         name: id === '__wallet_spending__' ? 'Wallet spending' : (catMap.get(id)?.name ?? 'Other'),
         amount,
       }))
       .sort((a, b) => b.amount - a.amount)
@@ -848,6 +856,7 @@ export class DashboardPage {
     const cat = this.categoriesService.categories().find((c) => c.id === t.category_id);
     if (cat) return cat.name;
     if (t.source === 'transfer') return t.direction === 'in' ? 'Transfer in' : 'Transfer out';
+    if (t.source === 'wallet_spend') return 'Wallet spending';
     return t.direction === 'in' ? 'Income' : 'Expense';
   }
 
@@ -875,7 +884,7 @@ export class DashboardPage {
     }
 
     for (const t of txs) {
-      if (t.source === 'transfer') continue;
+      if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (t.direction !== 'out') continue;
       if (t.category_id && catsMap.get(t.category_id) === 'savings') continue;
       const [ty, tm, td] = t.occurred_on.split('-').map(Number);
@@ -906,7 +915,7 @@ export class DashboardPage {
     const startY = today.getFullYear();
     const startM = today.getMonth() - (months - 1);
     for (const t of txs) {
-      if (t.source === 'transfer') continue;
+      if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (t.direction !== 'out') continue;
       if (t.category_id && catsMap.get(t.category_id) === 'savings') continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);

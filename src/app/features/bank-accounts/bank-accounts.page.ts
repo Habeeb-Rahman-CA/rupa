@@ -1,9 +1,8 @@
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -11,13 +10,14 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
 import { TransactionsService } from '../../core/services/transactions.service';
-import { BankAccount, CardType } from '../../core/models/domain.models';
+import { BankAccount } from '../../core/models/domain.models';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { LoadingStateComponent } from '../../shared/components/loading-state.component';
 import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { BankAccountDialogComponent } from './bank-account-dialog.component';
 import { BankAccountDetailsDialogComponent } from './bank-account-details-dialog.component';
+import { CardsTabsComponent } from '../../shared/components/cards-tabs.component';
 
 @Component({
   selector: 'app-bank-accounts-page',
@@ -26,18 +26,18 @@ import { BankAccountDetailsDialogComponent } from './bank-account-details-dialog
     CommonModule,
     RouterLink,
     MatButtonModule,
-    MatButtonToggleModule,
     MatTooltipModule,
     LucideAngularModule,
     PageHeaderComponent,
     EmptyStateComponent,
     LoadingStateComponent,
+    CardsTabsComponent,
   ],
   template: `
     <!-- Top Page Header matching system standards -->
     <app-page-header
-      title="My Cards"
-      subtitle="Manage your bank accounts and cards"
+      title="Cards"
+      subtitle="Manage your cards, accounts, and wallets"
     >
       @if (cards().length > 1) {
         <a class="transfer-link" routerLink="/transfers">
@@ -55,22 +55,7 @@ import { BankAccountDetailsDialogComponent } from './bank-account-details-dialog
       </button>
     </app-page-header>
 
-    <!-- Filter Toggle Bar -->
-    @if (cards().length > 0) {
-      <div class="filter-bar">
-        <mat-button-toggle-group
-          [value]="filterType()"
-          (change)="filterType.set($event.value)"
-          hideSingleSelectionIndicator
-          class="app-toggle-group"
-        >
-          <mat-button-toggle value="all">All Cards ({{ cards().length }})</mat-button-toggle>
-          <mat-button-toggle value="debit">Debit ({{ debitCount() }})</mat-button-toggle>
-          <mat-button-toggle value="credit">Credit ({{ creditCount() }})</mat-button-toggle>
-          <mat-button-toggle value="savings">Accounts ({{ savingsCount() }})</mat-button-toggle>
-        </mat-button-toggle-group>
-      </div>
-    }
+    <app-cards-tabs />
 
     <!-- Cards Display Grid -->
     @if (isLoading() && cards().length === 0) {
@@ -87,21 +72,9 @@ import { BankAccountDetailsDialogComponent } from './bank-account-details-dialog
           Add Your First Card
         </button>
       </div>
-    } @else if (filteredCards().length === 0) {
-      <app-empty-state
-        icon="credit-card"
-        [title]="'No ' + filterLabel() + 's found'"
-        message="You haven't added any cards matching this category filter."
-      />
-      <div class="empty-actions-wrap">
-        <button mat-flat-button color="primary" (click)="openAddDialog()" class="primary-action-btn">
-          <lucide-icon name="plus" />
-          Add New Card
-        </button>
-      </div>
     } @else {
       <div class="cards-grid">
-        @for (card of filteredCards(); track card.id) {
+        @for (card of cards(); track card.id) {
           <div class="card-wrapper">
             <!-- Physical Card Container -->
             <div
@@ -223,51 +196,6 @@ import { BankAccountDetailsDialogComponent } from './bank-account-details-dialog
   `,
   styles: [
     `
-      /* Filter Toggle Bar - Mobile Responsive */
-      .filter-bar {
-        margin-bottom: 20px;
-        width: 100%;
-        display: flex;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-        padding: 2px 0 4px;
-      }
-      .filter-bar::-webkit-scrollbar {
-        display: none;
-      }
-      .app-toggle-group {
-        display: inline-flex;
-        width: 100%;
-        min-width: max-content;
-        border-radius: 999px !important;
-        background: var(--app-canvas) !important;
-        border: 1px solid var(--app-hairline) !important;
-        padding: 3px !important;
-      }
-      .app-toggle-group mat-button-toggle {
-        flex: 1 0 auto;
-        border-radius: 999px !important;
-        border: 0 !important;
-      }
-      ::ng-deep .app-toggle-group .mat-button-toggle-label-content {
-        white-space: nowrap !important;
-        font-size: 13px !important;
-        font-weight: 600 !important;
-        padding: 0 16px !important;
-        line-height: 36px !important;
-      }
-      @media (max-width: 600px) {
-        .app-toggle-group {
-          width: auto;
-        }
-        ::ng-deep .app-toggle-group .mat-button-toggle-label-content {
-          font-size: 12px !important;
-          padding: 0 12px !important;
-          line-height: 34px !important;
-        }
-      }
-
       /* Empty Actions Wrap */
       .transfer-link {
         display: inline-flex;
@@ -578,29 +506,6 @@ export class BankAccountsPage {
 
   readonly cards = this.bankAccountsService.bankAccounts;
   readonly isLoading = this.bankAccountsService.isLoading;
-  readonly filterType = signal<'all' | CardType>('all');
-
-  readonly debitCount = computed(() => this.cards().filter((c) => c.card_type === 'debit').length);
-  readonly creditCount = computed(() => this.cards().filter((c) => c.card_type === 'credit').length);
-  readonly savingsCount = computed(() => this.cards().filter((c) => c.card_type === 'savings' || c.card_type === 'current').length);
-
-  readonly filteredCards = computed(() => {
-    const type = this.filterType();
-    if (type === 'all') return this.cards();
-    if (type === 'savings') {
-      return this.cards().filter((c) => c.card_type === 'savings' || c.card_type === 'current');
-    }
-    return this.cards().filter((c) => c.card_type === type);
-  });
-
-  readonly filterLabel = computed(() => {
-    switch (this.filterType()) {
-      case 'debit': return 'debit card';
-      case 'credit': return 'credit card';
-      case 'savings': return 'savings account';
-      default: return 'card';
-    }
-  });
 
   openAddDialog(): void {
     const isFirstCard = this.cards().length === 0;

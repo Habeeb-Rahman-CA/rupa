@@ -10,13 +10,13 @@ describe('BankAccountsService', () => {
   let mockSupabase: any;
   let mockAuth: any;
   let mockTxService: any;
-  const isAuthSignal = signal(false);
+  const isAuthSignal = signal(true);
 
   beforeEach(() => {
-    isAuthSignal.set(false);
+    isAuthSignal.set(true);
     mockAuth = {
       isAuthenticated: isAuthSignal,
-      user: signal(null),
+      user: signal({ id: 'u1' }),
     };
 
     const mockQueryBuilder: any = {};

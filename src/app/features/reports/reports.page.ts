@@ -901,7 +901,7 @@ export class ReportsPage {
     let received = 0;
     let saved = 0;
     for (const t of this.txService.transactions()) {
-      if (t.source === 'transfer') continue;
+      if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);
       if (ty !== y || tm !== m) continue;
       const amt = Number(t.amount);
@@ -927,7 +927,7 @@ export class ReportsPage {
     let totalSpent = 0;
 
     for (const t of this.txService.transactions()) {
-      if (t.source === 'transfer') continue;
+      if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (t.direction !== 'out') continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);
       if (ty !== y || tm !== m) continue;
@@ -952,7 +952,7 @@ export class ReportsPage {
 
     const accountSpendMap = new Map<string, number>();
     for (const t of this.txService.transactions()) {
-      if (t.source === 'transfer') continue;
+      if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (t.direction !== 'out' || t.payment_mode !== 'bank') continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);
       if (ty !== y || tm !== m) continue;
@@ -995,7 +995,7 @@ export class ReportsPage {
     const startM = anchor.getMonth() - 11;
 
     for (const t of this.txService.transactions()) {
-      if (t.source === 'transfer') continue;
+      if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (t.direction !== 'out') continue;
       if (t.category_id && catsMap.get(t.category_id) === 'savings') continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);
@@ -1035,7 +1035,7 @@ export class ReportsPage {
     let sum = 0;
 
     for (const t of this.txService.transactions()) {
-      if (t.source === 'transfer') continue;
+      if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (!t.occurred_on || !t.occurred_on.startsWith(prefix)) continue;
       const cat = t.category_id ? catMap.get(t.category_id) : undefined;
       if (!isSavingsCategory(cat)) continue;
@@ -1070,11 +1070,13 @@ export class ReportsPage {
     let sum = 0;
 
     for (const t of this.txService.transactions()) {
-      if (t.source === 'transfer') continue;
+      if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (t.direction !== 'out' || !t.occurred_on || !t.occurred_on.startsWith(prefix)) continue;
       const cat = t.category_id ? catMap.get(t.category_id) : undefined;
       if (isSavingsCategory(cat)) continue;
-      const key = t.category_id ?? '__uncategorized__';
+       const key = t.source === 'wallet_spend'
+         ? '__wallet_spending__'
+         : (t.category_id ?? '__uncategorized__');
       const amt = Number(t.amount);
       totals.set(key, (totals.get(key) ?? 0) + amt);
       sum += amt;
@@ -1084,7 +1086,7 @@ export class ReportsPage {
     return [...totals.entries()]
       .map(([id, amount]) => {
         const cat = catMap.get(id);
-        const name = cat?.name ?? 'Uncategorized';
+         const name = id === '__wallet_spending__' ? 'Wallet spending' : (cat?.name ?? 'Uncategorized');
         return {
           id,
           name,
@@ -1103,7 +1105,7 @@ export class ReportsPage {
     const catMap = this.categoryMap();
     const byDay = new Map<string, number>();
     for (const t of this.txService.transactions()) {
-      if (t.source === 'transfer') continue;
+      if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (t.direction !== 'out' || !t.occurred_on || !t.occurred_on.startsWith(prefix)) continue;
       const cat = t.category_id ? catMap.get(t.category_id) : undefined;
       if (cat?.kind === 'savings') continue;
@@ -1136,4 +1138,3 @@ function startOfMonth(d: Date): Date {
 function ym(d: Date): { y: number; m: number } {
   return { y: d.getFullYear(), m: d.getMonth() + 1 };
 }
-

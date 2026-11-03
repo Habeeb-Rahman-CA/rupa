@@ -1,5 +1,5 @@
 import { Transaction } from '../../core/models/domain.models';
-import { filterTransactions, summarizeTransactions, toIsoDate } from './transaction-filters';
+import { filterTransactions, summarizeTransactions, toIsoDate, WALLET_CATEGORY_ID } from './transaction-filters';
 
 describe('transaction filters', () => {
   const transactions: Transaction[] = [
@@ -52,6 +52,12 @@ describe('transaction filters', () => {
           direction: 'out',
           source: 'transfer',
         }),
+        makeTransaction({
+          id: 'wallet-recharge-1',
+          amount: 300,
+          direction: 'out',
+          source: 'wallet_recharge',
+        }),
       ],
       new Set(['savings']),
     );
@@ -67,6 +73,18 @@ describe('transaction filters', () => {
     });
 
     expect(result).toEqual([]);
+  });
+
+  it('filters wallet spending through its built-in wallet category', () => {
+    const result = filterTransactions(
+      [
+        ...transactions,
+        makeTransaction({ id: 'wallet-spend-1', source: 'wallet_spend', wallet_id: 'wallet-1' }),
+      ],
+      { categoryId: WALLET_CATEGORY_ID, fromDate: null, toDate: null },
+    );
+
+    expect(result.map((transaction) => transaction.id)).toEqual(['wallet-spend-1']);
   });
 
   it('converts local dates to ISO dates without timezone shifting', () => {
