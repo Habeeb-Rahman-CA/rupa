@@ -45,6 +45,11 @@ export const routes: Routes = [
           import('./features/bank-accounts/bank-accounts.page').then((m) => m.BankAccountsPage),
       },
       {
+        path: 'transfers',
+        loadComponent: () =>
+          import('./features/transfers/transfers.page').then((m) => m.TransfersPage),
+      },
+      {
         path: 'categories',
         loadComponent: () =>
           import('./features/categories/categories.page').then((m) => m.CategoriesPage),

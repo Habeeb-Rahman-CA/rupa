@@ -1,6 +1,7 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialog } from '@angular/material/dialog';
@@ -23,6 +24,7 @@ import { BankAccountDetailsDialogComponent } from './bank-account-details-dialog
   standalone: true,
   imports: [
     CommonModule,
+    RouterLink,
     MatButtonModule,
     MatButtonToggleModule,
     MatTooltipModule,
@@ -37,6 +39,12 @@ import { BankAccountDetailsDialogComponent } from './bank-account-details-dialog
       title="My Cards"
       subtitle="Manage your bank accounts and cards"
     >
+      @if (cards().length > 1) {
+        <a class="transfer-link" routerLink="/transfers">
+          <lucide-icon name="arrow-left-right" />
+          <span>Transfer</span>
+        </a>
+      }
       <button
         class="add-btn"
         type="button"
@@ -261,6 +269,24 @@ import { BankAccountDetailsDialogComponent } from './bank-account-details-dialog
       }
 
       /* Empty Actions Wrap */
+      .transfer-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 40px;
+        padding: 0 13px;
+        border-radius: 999px;
+        background: var(--app-accent-soft);
+        color: var(--app-accent);
+        font-size: 13px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .transfer-link lucide-icon { width: 17px; height: 17px; }
+      @media (max-width: 480px) {
+        .transfer-link span { display: none; }
+        .transfer-link { width: 40px; justify-content: center; padding: 0; }
+      }
       .empty-actions-wrap {
         display: flex;
         justify-content: center;

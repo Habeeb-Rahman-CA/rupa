@@ -1,5 +1,5 @@
 export type TxDirection = 'in' | 'out';
-export type TxSource = 'manual' | 'debt' | 'opening' | 'event';
+export type TxSource = 'manual' | 'debt' | 'opening' | 'event' | 'transfer';
 export type CategoryKind = 'income' | 'expense' | 'savings';
 export type DebtDirection = 'i_owe' | 'they_owe';
 
@@ -113,6 +113,19 @@ export interface Transaction {
   source_ref_id: string | null;
   payment_mode?: PaymentMode;
   bank_account_id?: string | null;
+  created_at: string;
+}
+
+export interface AccountTransfer {
+  id: string;
+  owner_id: string;
+  source_account_id: string;
+  destination_account_id: string;
+  amount: number;
+  occurred_on: string;
+  notes: string | null;
+  debit_transaction_id: string;
+  credit_transaction_id: string;
   created_at: string;
 }
 

@@ -70,15 +70,11 @@ begin
     and id <> coalesce(new.id, old.id);
 
   if target_direction = 'received' then
-    if tg_op = 'DELETE' then
-      received_total := received_total - target_amount;
-    else
+    if tg_op <> 'DELETE' then
       received_total := received_total + target_amount;
     end if;
   else
-    if tg_op = 'DELETE' then
-      returned_total := returned_total - target_amount;
-    else
+    if tg_op <> 'DELETE' then
       returned_total := returned_total + target_amount;
     end if;
   end if;

@@ -40,6 +40,7 @@ export function summarizeTransactions(
 ): TransactionSummary {
   return transactions.reduce<TransactionSummary>(
     (summary, transaction) => {
+      if (transaction.source === 'transfer') return summary;
       const amount = Number(transaction.amount);
       const isSavings =
         transaction.category_id !== null && savingsCategoryIds.has(transaction.category_id);

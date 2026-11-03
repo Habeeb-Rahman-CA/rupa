@@ -254,8 +254,8 @@ type Range = 'week' | 'month' | 'year';
       <ul class="tx-list">
         @for (t of recentEnriched(); track t.id; let last = $last) {
           <li class="tx-row" [class.last]="last">
-            <div class="tx-icon" [style.background]="tileColor(t.label)">
-              <lucide-icon [name]="iconFor(t.label)" />
+            <div class="tx-icon" [style.background]="t.color">
+              <lucide-icon [name]="t.icon" />
             </div>
             <div class="tx-mid">
               <div class="tx-title">{{ t.label }}</div>
@@ -659,8 +659,15 @@ export class DashboardPage {
     return this.txService.transactions().slice(0, 6).map((t) => {
       const cat = t.category_id ? catMap.get(t.category_id) : undefined;
       const isSavings = isSavingsCategory(cat);
-      const label = cat?.name ?? (t.direction === 'in' ? 'Income' : 'Expense');
-      return { ...t, label, isSavings };
+      const isTransfer = t.source === 'transfer';
+      const label = isTransfer ? (t.direction === 'in' ? 'Transfer in' : 'Transfer out') : (cat?.name ?? (t.direction === 'in' ? 'Income' : 'Expense'));
+      return {
+        ...t,
+        label,
+        isSavings,
+        icon: isTransfer ? 'arrow-left-right' : getCategoryIcon(label),
+        color: isTransfer ? '#6366f1' : getCategoryColor(label),
+      };
     });
   });
 
@@ -702,6 +709,7 @@ export class DashboardPage {
     let saved = 0;
 
     for (const t of txs) {
+      if (t.source === 'transfer') continue;
       if (!t.occurred_on) continue;
       const [ty, tm, td] = t.occurred_on.split('-').map(Number);
       const txDate = new Date(ty, tm - 1, td);
@@ -726,6 +734,7 @@ export class DashboardPage {
     if (range === 'month' && spent === 0 && received === 0 && saved === 0 && txs.length > 0) {
       const past30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
       for (const t of txs) {
+        if (t.source === 'transfer') continue;
         if (!t.occurred_on) continue;
         const [ty, tm, td] = t.occurred_on.split('-').map(Number);
         const txDate = new Date(ty, tm - 1, td);
@@ -812,6 +821,7 @@ export class DashboardPage {
 
     const totals = new Map<string, number>();
     for (const t of txs) {
+      if (t.source === 'transfer') continue;
       if (t.direction !== 'out' || !t.category_id) continue;
       const cat = catMap.get(t.category_id);
       if (cat?.kind === 'savings') continue; // Exclude savings from spending top tiles
@@ -837,6 +847,7 @@ export class DashboardPage {
   txLabel(t: Transaction): string {
     const cat = this.categoriesService.categories().find((c) => c.id === t.category_id);
     if (cat) return cat.name;
+    if (t.source === 'transfer') return t.direction === 'in' ? 'Transfer in' : 'Transfer out';
     return t.direction === 'in' ? 'Income' : 'Expense';
   }
 
@@ -864,6 +875,7 @@ export class DashboardPage {
     }
 
     for (const t of txs) {
+      if (t.source === 'transfer') continue;
       if (t.direction !== 'out') continue;
       if (t.category_id && catsMap.get(t.category_id) === 'savings') continue;
       const [ty, tm, td] = t.occurred_on.split('-').map(Number);
@@ -894,6 +906,7 @@ export class DashboardPage {
     const startY = today.getFullYear();
     const startM = today.getMonth() - (months - 1);
     for (const t of txs) {
+      if (t.source === 'transfer') continue;
       if (t.direction !== 'out') continue;
       if (t.category_id && catsMap.get(t.category_id) === 'savings') continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);

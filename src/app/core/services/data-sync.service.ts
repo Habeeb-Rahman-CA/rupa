@@ -5,6 +5,7 @@ import { PeopleService } from './people.service';
 import { TransactionsService } from './transactions.service';
 import { DebtsService } from './debts.service';
 import { MoneyHeldService } from './money-held.service';
+import { TransfersService } from './transfers.service';
 import { AppSettingsService } from './app-settings.service';
 
 import { BankAccountsService } from './bank-accounts.service';
@@ -18,6 +19,7 @@ export class DataSyncService {
   private readonly transactionsService = inject(TransactionsService);
   private readonly debtsService = inject(DebtsService);
   private readonly moneyHeldService = inject(MoneyHeldService);
+  private readonly transfersService = inject(TransfersService);
   // Instantiate settings during the authenticated shell bootstrap so legacy
   // localStorage settings are migrated even before bill scanning is opened.
   private readonly appSettingsService = inject(AppSettingsService);
@@ -56,6 +58,7 @@ export class DataSyncService {
           this.transactionsService.refresh(),
           this.debtsService.load(),
           this.moneyHeldService.load(),
+          this.transfersService.load(),
         ]);
       } catch (err) {
         console.error('Coordinated data sync failed', err);

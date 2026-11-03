@@ -46,6 +46,12 @@ describe('transaction filters', () => {
           direction: 'out',
           category_id: 'savings',
         }),
+        makeTransaction({
+          id: 'transfer-1',
+          amount: 500,
+          direction: 'out',
+          source: 'transfer',
+        }),
       ],
       new Set(['savings']),
     );

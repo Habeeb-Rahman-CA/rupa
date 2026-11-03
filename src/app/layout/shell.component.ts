@@ -85,14 +85,12 @@ export class ShellComponent implements AfterViewInit {
   readonly settingsNav: NavItem[] = [
     { path: '/categories', label: 'Categories', icon: 'tags' },
     { path: '/people',     label: 'People',     icon: 'users' },
-    { path: '/money-held', label: 'Money Held', icon: 'wallet' },
   ];
 
   readonly moreNav: NavItem[] = [
     { path: '/reports',    label: 'Reports',    icon: 'trending-up' },
     { path: '/categories', label: 'Categories', icon: 'tags' },
     { path: '/people',     label: 'People',     icon: 'users' },
-    { path: '/money-held', label: 'Money Held', icon: 'wallet' },
   ];
 
   readonly appVersion = APP_VERSION;

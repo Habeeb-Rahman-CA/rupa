@@ -21,6 +21,7 @@ import { AddDebtSheetComponent } from './add-debt-sheet.component';
 import { PayDebtDialogComponent } from './pay-debt-dialog.component';
 import { getAvatarColor, getInitial } from '../../shared/utils/avatar-utils';
 import { errText } from '../../shared/utils/error-utils';
+import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
 
 @Component({
   selector: 'app-debts-page',
@@ -33,9 +34,10 @@ import { errText } from '../../shared/utils/error-utils';
     EmptyStateComponent,
     LoadingStateComponent,
     SignedMoneyPipe,
+    OwedTabsComponent,
   ],
   template: `
-    <app-page-header title="Owed" subtitle="Loans and IOUs, in both directions">
+    <app-page-header title="People &amp; Balances" subtitle="Track Owed and money held on behalf of others">
       <button
         class="add-btn"
         type="button"
@@ -45,6 +47,8 @@ import { errText } from '../../shared/utils/error-utils';
         <lucide-icon name="plus" />
       </button>
     </app-page-header>
+
+    <app-owed-tabs />
 
     @if (isLoading() && debts().length === 0) {
       <app-loading-state label="Loading debts…" />

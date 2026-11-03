@@ -60,7 +60,7 @@ export class TransactionsService {
     let saved = 0;
 
     for (const t of txs) {
-      if (t.source === 'opening' || !t.occurred_on) continue;
+      if (t.source === 'opening' || t.source === 'transfer' || !t.occurred_on) continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);
       if (ty !== y || tm !== m) continue;
 
@@ -89,6 +89,7 @@ export class TransactionsService {
 
     let total = 0;
     for (const t of txs) {
+      if (t.source === 'transfer') continue;
       if (t.category_id && savingsCatIds.has(t.category_id)) {
         if (t.direction === 'out') total += Number(t.amount);
         else if (t.direction === 'in') total -= Number(t.amount);
@@ -286,6 +287,9 @@ export class TransactionsService {
   async delete(id: string): Promise<void> {
     const removed = this._transactions().find((t) => t.id === id);
     if (!removed) return;
+    if (removed.source === 'transfer') {
+      throw new Error('Transfer entries must be managed from the Transfers screen.');
+    }
 
     // 1. Optimistic removal from state for immediate UI feedback
     this._transactions.update((list) => list.filter((t) => t.id !== id));

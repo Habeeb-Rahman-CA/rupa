@@ -464,7 +464,10 @@ export class TransactionsPage {
     for (const t of list) {
       const cat = t.category_id ? catMap.get(t.category_id) : undefined;
       const isSavings = isSavingsCategory(cat);
-      const label = cat?.name ?? (t.direction === 'in' ? 'Income' : 'Expense');
+      const label =
+        t.source === 'transfer'
+          ? (t.direction === 'in' ? 'Transfer in' : 'Transfer out')
+          : (cat?.name ?? (t.direction === 'in' ? 'Income' : 'Expense'));
 
       let bankName = '';
       if (t.payment_mode === 'cash') bankName = 'Cash';
@@ -478,8 +481,8 @@ export class TransactionsPage {
       if (bankName) parts.push(bankName);
       const subText = parts.join(' • ');
 
-      const icon = isSavings ? 'piggy-bank' : getCategoryIcon(label);
-      const color = isSavings ? '#0ea5e9' : getCategoryColor(label);
+      const icon = t.source === 'transfer' ? 'arrow-left-right' : (isSavings ? 'piggy-bank' : getCategoryIcon(label));
+      const color = t.source === 'transfer' ? '#6366f1' : (isSavings ? '#0ea5e9' : getCategoryColor(label));
 
       const enriched: EnrichedTransaction = {
         ...t,
@@ -498,7 +501,9 @@ export class TransactionsPage {
       }
       group.items.push(enriched);
       const amt = Number(t.amount);
-      group.dayTotal += t.direction === 'in' ? amt : -amt;
+      if (t.source !== 'transfer') {
+        group.dayTotal += t.direction === 'in' ? amt : -amt;
+      }
     }
 
     return Array.from(groupMap.values());
@@ -515,6 +520,10 @@ export class TransactionsPage {
   }
 
   async confirmRemove(t: EnrichedTransaction): Promise<void> {
+    if (t.source === 'transfer') {
+      this.snack.open('Edit or delete transfers from the Transfers screen.', undefined, { duration: 3000 });
+      return;
+    }
     const ok = await openConfirm(this.dialog, {
       title: 'Delete transaction?',
       message: `Are you sure you want to delete ${t.label} entry of ₹${t.amount}?`,

@@ -158,4 +158,62 @@ describe('MoneyHeldService', () => {
     expect(mockSupabase.client.from).toHaveBeenCalledWith('money_held_transactions');
     expect(service.transactions()[0]).toEqual(created);
   });
+
+  it('allows deleting a receipt when the remaining receipts still cover returns', async () => {
+    (service as any)._heldPeople.set([
+      { id: 'held-1', owner_id: 'u1', person_id: 'person-1', created_at: '' },
+    ]);
+    const records: MoneyHeldTransaction[] = [
+      {
+        id: 'received-1',
+        owner_id: 'u1',
+        held_person_id: 'held-1',
+        direction: 'received',
+        amount: 100,
+        occurred_on: '2026-11-01',
+        payment_mode: 'cash',
+        bank_account_id: null,
+        notes: null,
+        created_at: '',
+      },
+      {
+        id: 'received-2',
+        owner_id: 'u1',
+        held_person_id: 'held-1',
+        direction: 'received',
+        amount: 50,
+        occurred_on: '2026-11-02',
+        payment_mode: 'cash',
+        bank_account_id: null,
+        notes: null,
+        created_at: '',
+      },
+      {
+        id: 'returned-1',
+        owner_id: 'u1',
+        held_person_id: 'held-1',
+        direction: 'returned',
+        amount: 100,
+        occurred_on: '2026-11-03',
+        payment_mode: 'cash',
+        bank_account_id: null,
+        notes: null,
+        created_at: '',
+      },
+    ];
+    (service as any)._transactions.set(records);
+
+    const query: any = {};
+    query.delete = jasmine.createSpy().and.returnValue(query);
+    query.eq = jasmine.createSpy().and.resolveTo({ data: null, error: null });
+    mockSupabase.client.from.and.returnValue(query);
+
+    await service.delete(records[1]);
+
+    expect(query.delete).toHaveBeenCalled();
+    expect(service.transactions().map((record) => record.id)).toEqual([
+      'received-1',
+      'returned-1',
+    ]);
+  });
 });

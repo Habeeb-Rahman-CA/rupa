@@ -15,6 +15,7 @@ import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
 import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { getAvatarColor, getInitial } from '../../shared/utils/avatar-utils';
 import { errText } from '../../shared/utils/error-utils';
+import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
 import { AddMoneyHeldPersonDialogComponent } from './add-money-held-person-dialog.component';
 import {
   RecordMoneyHeldSheetComponent,
@@ -32,14 +33,17 @@ import {
     EmptyStateComponent,
     LoadingStateComponent,
     SignedMoneyPipe,
+    OwedTabsComponent,
   ],
   template: `
-    <app-page-header title="Money Held" subtitle="Track money you keep for other people">
+    <app-page-header title="People &amp; Balances" subtitle="Track owed and money held on behalf of others">
       <button class="add-person-btn" type="button" (click)="openAddPerson()">
         <lucide-icon name="plus" />
         <span>Add person</span>
       </button>
     </app-page-header>
+
+    <app-owed-tabs />
 
     @if (!isAvailable()) {
       <app-empty-state
