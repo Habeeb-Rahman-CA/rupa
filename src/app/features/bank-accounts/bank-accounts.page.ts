@@ -14,6 +14,7 @@ import { BankAccount } from '../../core/models/domain.models';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { LoadingStateComponent } from '../../shared/components/loading-state.component';
+import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
 import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { BankAccountDialogComponent } from './bank-account-dialog.component';
 import { BankAccountDetailsDialogComponent } from './bank-account-details-dialog.component';
@@ -31,6 +32,7 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
     PageHeaderComponent,
     EmptyStateComponent,
     LoadingStateComponent,
+    SignedMoneyPipe,
     CardsTabsComponent,
   ],
   template: `
@@ -73,9 +75,18 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
         </button>
       </div>
     } @else {
+      <section class="overview app-card">
+        <div class="overview-icon"><lucide-icon name="credit-card" /></div>
+        <div>
+          <span class="micro-label">Cards balance</span>
+          <strong>{{ totalBalance() | signedMoney }}</strong>
+        </div>
+        <span class="overview-count">{{ cards().length }} card{{ cards().length === 1 ? '' : 's' }}</span>
+      </section>
+
       <div class="cards-grid">
         @for (card of cards(); track card.id) {
-          <div class="card-wrapper">
+          <section class="card-wrapper app-card">
             <!-- Physical Card Container -->
             <div
               class="bank-card"
@@ -189,7 +200,7 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
                 </button>
               </div>
             </div>
-          </div>
+          </section>
         }
       </div>
     }
@@ -229,23 +240,32 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
         gap: 6px;
       }
 
+      .overview { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding: 14px 16px; }
+      .overview-icon { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border-radius: 14px; background: var(--app-accent-soft); color: var(--app-accent); }
+      .overview-icon lucide-icon { width: 19px; height: 19px; }
+      .overview strong { display: block; margin-top: 2px; color: var(--app-ink); font-size: 20px; font-variant-numeric: tabular-nums; }
+      .overview-count { margin-left: auto; color: var(--app-ink-muted); font-size: 12px; }
+
       /* Cards Grid */
       .cards-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 24px;
+        gap: 14px;
         padding-bottom: 18px;
       }
       @media (max-width: 480px) {
         .cards-grid {
           grid-template-columns: 1fr;
-          gap: 16px;
+          gap: 14px;
         }
       }
       .card-wrapper {
         display: flex;
         flex-direction: column;
         gap: 8px;
+        min-width: 0;
+        padding: 12px;
+        overflow: hidden;
       }
 
       /* Individual Physical Bank Card */
@@ -463,7 +483,10 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 4px 8px;
+        gap: 8px;
+        margin-top: 2px;
+        padding: 8px 2px 0;
+        border-top: 1px solid var(--app-hairline);
       }
       .card-nickname {
         font-size: 13px;
@@ -472,7 +495,10 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
         display: flex;
         align-items: center;
         gap: 8px;
+        min-width: 0;
+        flex: 1 1 auto;
       }
+      .card-nickname > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .card-balance-tag {
         font-size: 12px;
         font-weight: 700;
@@ -484,6 +510,7 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
       .action-buttons {
         display: flex;
         gap: 4px;
+        flex: 0 0 auto;
       }
       .action-btn {
         color: var(--app-ink-muted);
@@ -506,6 +533,10 @@ export class BankAccountsPage {
 
   readonly cards = this.bankAccountsService.bankAccounts;
   readonly isLoading = this.bankAccountsService.isLoading;
+
+  totalBalance(): number {
+    return this.cards().reduce((sum, card) => sum + Number(card.balance ?? 0), 0);
+  }
 
   openAddDialog(): void {
     const isFirstCard = this.cards().length === 0;

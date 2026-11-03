@@ -2,7 +2,7 @@
  * Single source of truth for the app version shown in the UI.
  * Bump this together with `package.json` when releasing.
  */
-export const APP_VERSION = '1.0.3';
+export const APP_VERSION = '1.0.4';
 
 /**
  * A build tag included alongside the version in some diagnostic surfaces
