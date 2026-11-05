@@ -15,7 +15,7 @@ export interface CreateTransactionInput {
   notes?: string | null;
   payment_mode?: PaymentMode;
   bank_account_id?: string | null;
-  source?: 'manual' | 'debt' | 'event' | 'opening';
+  source?: 'manual' | 'debt' | 'event' | 'opening' | 'subscription';
   source_ref_id?: string | null;
 }
 

@@ -19,9 +19,8 @@ export interface WalletDialogData {
   template: `
     <div class="dialog-container">
       <header class="dialog-header">
-        <div class="header-icon"><lucide-icon name="wallet" /></div>
         <div>
-          <h2 mat-dialog-title>{{ isEdit ? 'Edit wallet' : 'Add wallet' }}</h2>
+          <h2 mat-dialog-title>{{ isEdit ? 'Edit Wallet' : 'Add Wallet' }}</h2>
           <p>{{ isEdit ? 'Update the wallet name or low-balance alert.' : 'Track a prepaid wallet or payment balance.' }}</p>
         </div>
       </header>

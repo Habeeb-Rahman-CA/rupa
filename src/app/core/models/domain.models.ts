@@ -6,7 +6,8 @@ export type TxSource =
   | 'event'
   | 'transfer'
   | 'wallet_recharge'
-  | 'wallet_spend';
+  | 'wallet_spend'
+  | 'subscription';
 export type CategoryKind = 'income' | 'expense' | 'savings';
 export type DebtDirection = 'i_owe' | 'they_owe';
 
@@ -215,5 +216,64 @@ export interface BankAccount {
   credit_limit?: number;
   theme: CardTheme;
   is_primary?: boolean;
+  created_at: string;
+}
+
+export type SubscriptionBillingCycle = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+export type SubscriptionStatus = 'active' | 'paused' | 'cancelled' | 'expired';
+
+export interface Subscription {
+  id: string;
+  owner_id: string;
+  name: string;
+  category: string;
+  amount: number;
+  billing_cycle: SubscriptionBillingCycle;
+  start_date: string;
+  next_renewal_date: string;
+  end_date: string | null;
+  payment_account_id: string | null;
+  auto_renewal: boolean;
+  status: SubscriptionStatus;
+  cancelled_on: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SubscriptionRenewalStatus = 'completed' | 'skipped';
+
+export interface SubscriptionRenewal {
+  id: string;
+  owner_id: string;
+  subscription_id: string;
+  due_on: string;
+  renewed_on: string;
+  amount: number;
+  status: SubscriptionRenewalStatus;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface SubscriptionPayment {
+  id: string;
+  owner_id: string;
+  subscription_id: string;
+  renewal_id: string;
+  amount: number;
+  paid_on: string;
+  transaction_id: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface SubscriptionPriceChange {
+  id: string;
+  owner_id: string;
+  subscription_id: string;
+  old_amount: number;
+  new_amount: number;
+  effective_on: string;
+  notes: string | null;
   created_at: string;
 }
