@@ -1,6 +1,9 @@
 import {
   daysBetween,
+  detectSubscriptionTheme,
+  isSubscriptionTheme,
   monthlyEquivalent,
+  resolveSubscriptionTheme,
   yearlyEquivalent,
 } from './subscriptions.service';
 
@@ -22,5 +25,29 @@ describe('subscription calculations', () => {
     expect(daysBetween('2026-11-04', '2026-11-05')).toBe(1);
     expect(daysBetween('2026-11-04', '2026-11-11')).toBe(7);
     expect(daysBetween('2026-11-11', '2026-11-04')).toBe(-7);
+  });
+
+  it('correctly detects brand themes based on subscription name and category', () => {
+    expect(detectSubscriptionTheme('Claude Pro')).toBe('amber');
+    expect(detectSubscriptionTheme('ChatGPT Plus')).toBe('mint');
+    expect(detectSubscriptionTheme('Spotify Premium')).toBe('neon');
+    expect(detectSubscriptionTheme('Apple Music Individual')).toBe('rose');
+    expect(detectSubscriptionTheme('Gold\'s Gym Membership')).toBe('amber');
+    expect(detectSubscriptionTheme('Netflix Standard')).toBe('scarlet');
+    expect(detectSubscriptionTheme('YouTube Premium')).toBe('scarlet');
+    expect(detectSubscriptionTheme('Random Gym Pass', 'Fitness')).toBe('amber');
+    expect(detectSubscriptionTheme('Custom Tool', 'Other')).toBe('slate');
+  });
+
+  it('resolves valid and fallback themes safely', () => {
+    expect(isSubscriptionTheme('copper')).toBeFalse();
+    expect(isSubscriptionTheme('mint')).toBeTrue();
+    expect(isSubscriptionTheme('unknown')).toBeFalse();
+
+    expect(resolveSubscriptionTheme('neon', 'My Service')).toBe('neon');
+    expect(resolveSubscriptionTheme('spotify', 'My Service')).toBe('neon'); // Legacy mapping
+    expect(resolveSubscriptionTheme('copper', 'My Service')).toBe('amber'); // Legacy copper fallback
+    expect(resolveSubscriptionTheme(null, 'Claude Pro')).toBe('amber');
+    expect(resolveSubscriptionTheme(undefined, 'Random Name')).toBe('slate');
   });
 });

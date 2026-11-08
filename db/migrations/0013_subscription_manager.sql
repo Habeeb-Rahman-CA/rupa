@@ -20,6 +20,10 @@ create table if not exists public.subscriptions (
   auto_renewal        boolean not null default true,
   status              text not null default 'active'
                       check (status in ('active', 'paused', 'cancelled', 'expired')),
+  theme               text not null default 'slate'
+                      check (theme in (
+                        'slate', 'mint', 'neon', 'rose', 'amber', 'scarlet', 'violet'
+                      )),
   cancelled_on        date,
   notes               text,
   created_at          timestamptz not null default now(),

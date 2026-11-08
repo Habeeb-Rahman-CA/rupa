@@ -6,6 +6,7 @@ import {
   SubscriptionPriceChange,
   SubscriptionRenewal,
   SubscriptionStatus,
+  SubscriptionTheme,
   Transaction,
 } from '../models/domain.models';
 import { AuthService } from './auth.service';
@@ -25,6 +26,7 @@ export interface CreateSubscriptionInput {
   payment_account_id?: string | null;
   auto_renewal?: boolean;
   status?: SubscriptionStatus;
+  theme?: SubscriptionTheme;
   cancelled_on?: string | null;
   notes?: string | null;
 }
@@ -40,15 +42,81 @@ export interface UpdateSubscriptionInput {
   payment_account_id?: string | null;
   auto_renewal?: boolean;
   status?: SubscriptionStatus;
+  theme?: SubscriptionTheme;
   cancelled_on?: string | null;
   notes?: string | null;
   price_change_effective_on?: string;
+}
+
+const VALID_SUBSCRIPTION_THEMES = new Set<SubscriptionTheme>([
+  'mint',
+  'neon',
+  'rose',
+  'amber',
+  'scarlet',
+  'slate',
+  'violet',
+]);
+
+const LEGACY_THEME_MAP: Record<string, SubscriptionTheme> = {
+  copper: 'amber',
+  claude: 'amber',
+  chatgpt: 'mint',
+  emerald: 'mint',
+  spotify: 'neon',
+  apple: 'rose',
+  gym: 'amber',
+  sunset: 'amber',
+  netflix: 'scarlet',
+  youtube: 'scarlet',
+  midnight: 'slate',
+  dark: 'slate',
+  indigo: 'violet',
+  lavender: 'violet',
+};
+
+export function isSubscriptionTheme(theme: unknown): theme is SubscriptionTheme {
+  return typeof theme === 'string' && VALID_SUBSCRIPTION_THEMES.has(theme as SubscriptionTheme);
+}
+
+export function detectSubscriptionTheme(name: string, category?: string): SubscriptionTheme {
+  const n = (name || '').toLowerCase().trim();
+  const c = (category || '').toLowerCase().trim();
+
+  if (n.includes('claude') || n.includes('anthropic')) return 'amber';
+  if (n.includes('chatgpt') || n.includes('openai') || n.includes('gpt-') || n.includes('chat gpt')) return 'mint';
+  if (n.includes('spotify')) return 'neon';
+  if (n.includes('apple') || n.includes('icloud') || n.includes('apple music') || n.includes('apple one')) return 'rose';
+  if (n.includes('gym') || n.includes('fitness') || n.includes('cult') || n.includes('workout') || n.includes('crossfit') || n.includes('gold\'s') || n.includes('anytime')) return 'amber';
+  if (n.includes('netflix') || n.includes('youtube') || n.includes('yt music') || n.includes('hotstar')) return 'scarlet';
+  if (n.includes('prime') || n.includes('amazon') || n.includes('aws') || n.includes('github') || n.includes('gitlab')) return 'violet';
+
+  if (c.includes('fitness') || c.includes('health') || c.includes('sport')) return 'amber';
+  if (c.includes('music') || c.includes('audio') || c.includes('podcast')) return 'neon';
+  if (c.includes('ai') || c.includes('software') || c.includes('developer') || c.includes('cloud')) return 'violet';
+  if (c.includes('video') || c.includes('streaming') || c.includes('movie')) return 'scarlet';
+
+  return 'slate';
+}
+
+export function resolveSubscriptionTheme(theme: unknown, name: string, category?: string): SubscriptionTheme {
+  if (typeof theme === 'string') {
+    if (VALID_SUBSCRIPTION_THEMES.has(theme as SubscriptionTheme)) {
+      return theme as SubscriptionTheme;
+    }
+    if (theme in LEGACY_THEME_MAP) {
+      return LEGACY_THEME_MAP[theme];
+    }
+  }
+  return detectSubscriptionTheme(name, category);
 }
 
 export interface RecordSubscriptionPaymentInput {
   subscription_id: string;
   amount: number;
   paid_on: string;
+  /** New expiry date after this renewal; drives both end_date and next_renewal_date. */
+  new_expiry_date?: string | null;
   transaction_id?: string | null;
   payment_mode?: 'cash' | 'bank';
   bank_account_id?: string | null;
@@ -78,50 +146,6 @@ export class SubscriptionsService {
   readonly renewals = this._renewals.asReadonly();
   readonly priceChanges = this._priceChanges.asReadonly();
   readonly isLoading = this._isLoading.asReadonly();
-
-  readonly activeSubscriptions = computed(() =>
-    this._subscriptions().filter((subscription) => this.statusFor(subscription) === 'active'),
-  );
-
-  readonly activeCount = computed(() => this.activeSubscriptions().length);
-
-  readonly monthlySpending = computed(() =>
-    this.activeSubscriptions().reduce(
-      (total, subscription) => total + monthlyEquivalent(subscription.amount, subscription.billing_cycle),
-      0,
-    ),
-  );
-
-  readonly yearlySpending = computed(() =>
-    this.activeSubscriptions().reduce(
-      (total, subscription) => total + yearlyEquivalent(subscription.amount, subscription.billing_cycle),
-      0,
-    ),
-  );
-
-  readonly totalRecurringCosts = this.monthlySpending;
-
-  readonly upcomingRenewals = computed(() =>
-    this._subscriptions()
-      .filter((subscription) => {
-        const status = this.statusFor(subscription);
-        const days = daysBetween(todayIso(), subscription.next_renewal_date);
-        return (status === 'active' || status === 'paused') && days >= 0 && days <= 30;
-      })
-      .sort((a, b) => a.next_renewal_date.localeCompare(b.next_renewal_date)),
-  );
-
-  readonly expiringSoon = computed(() =>
-    this._subscriptions()
-      .filter((subscription) => {
-        const status = this.statusFor(subscription);
-        if (status !== 'active' && status !== 'paused') return false;
-        if (!subscription.end_date) return false;
-        const days = daysBetween(todayIso(), subscription.end_date);
-        return days >= 0 && days <= 30;
-      })
-      .sort((a, b) => (a.end_date ?? '').localeCompare(b.end_date ?? '')),
-  );
 
   readonly renewalReminders = computed<SubscriptionReminder[]>(() =>
     this._subscriptions()
@@ -197,11 +221,15 @@ export class SubscriptionsService {
           }
         }
         this._subscriptions.set(
-          loadedSubscriptions.map((subscription) => ({
-            ...subscription,
-            amount: Number(subscription.amount),
-            status: this.statusFor(subscription),
-          })),
+          loadedSubscriptions.map((subscription) => {
+            const rawTheme = (subscription as unknown as { theme?: unknown }).theme;
+            return {
+              ...subscription,
+              theme: resolveSubscriptionTheme(rawTheme, subscription.name, subscription.category),
+              amount: Number(subscription.amount),
+              status: this.statusFor(subscription),
+            };
+          }),
         );
         this._payments.set(
           ((payments.data ?? []) as SubscriptionPayment[]).map((payment) => ({
@@ -236,7 +264,11 @@ export class SubscriptionsService {
   async create(input: CreateSubscriptionInput): Promise<Subscription> {
     const ownerId = this.requireUserId();
     this.validateInput(input);
-    const payload = {
+    const theme = input.theme && isSubscriptionTheme(input.theme)
+      ? input.theme
+      : detectSubscriptionTheme(input.name, input.category);
+
+    const payload: Record<string, unknown> = {
       owner_id: ownerId,
       name: input.name.trim(),
       category: input.category.trim() || 'Other',
@@ -248,18 +280,34 @@ export class SubscriptionsService {
       payment_account_id: input.payment_account_id || null,
       auto_renewal: input.auto_renewal ?? true,
       status: input.status ?? 'active',
+      theme,
       cancelled_on: input.status === 'cancelled' ? input.cancelled_on || todayIso() : null,
       notes: input.notes?.trim() || null,
     };
 
-    const { data, error } = await this.supabase.client
+    let result = await this.supabase.client
       .from('subscriptions')
       .insert(payload)
       .select()
       .single();
-    if (error) throw error;
 
-    const created = { ...(data as Subscription), amount: Number(data.amount) };
+    if (result.error && (result.error.message?.includes('theme') || result.error.code === 'PGRST204')) {
+      delete payload['theme'];
+      result = await this.supabase.client
+        .from('subscriptions')
+        .insert(payload)
+        .select()
+        .single();
+    }
+    if (result.error) throw result.error;
+
+    const data = result.data as Record<string, unknown>;
+    const created: Subscription = {
+      ...(data as unknown as Subscription),
+      theme,
+      amount: Number(data['amount']),
+      status: this.statusFor(data as unknown as Subscription),
+    };
     this._subscriptions.update((list) => [created, ...list]);
     return created;
   }
@@ -286,6 +334,10 @@ export class SubscriptionsService {
     }
 
     const nextStatus = changes.status ?? current.status;
+    const targetTheme: SubscriptionTheme = changes.theme !== undefined
+      ? (isSubscriptionTheme(changes.theme) ? changes.theme : current.theme)
+      : (changes.name ? resolveSubscriptionTheme(current.theme, changes.name, changes.category ?? current.category) : current.theme);
+
     const payload: Record<string, unknown> = {
       ...(changes.name === undefined ? {} : { name: changes.name.trim() }),
       ...(changes.category === undefined ? {} : { category: changes.category.trim() || 'Other' }),
@@ -299,6 +351,7 @@ export class SubscriptionsService {
         : { payment_account_id: changes.payment_account_id || null }),
       ...(changes.auto_renewal === undefined ? {} : { auto_renewal: changes.auto_renewal }),
       ...(changes.status === undefined ? {} : { status: changes.status }),
+      ...(changes.theme === undefined ? {} : { theme: targetTheme }),
       ...(changes.notes === undefined ? {} : { notes: changes.notes?.trim() || null }),
       cancelled_on:
         nextStatus === 'cancelled'
@@ -309,16 +362,33 @@ export class SubscriptionsService {
       updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await this.supabase.client
+    let updateRes = await this.supabase.client
       .from('subscriptions')
       .update(payload)
       .eq('id', id)
       .eq('owner_id', ownerId)
       .select()
       .single();
-    if (error) throw error;
 
-    const updated = { ...(data as Subscription), amount: Number(data.amount) };
+    if (updateRes.error && (updateRes.error.message?.includes('theme') || updateRes.error.code === 'PGRST204')) {
+      delete payload['theme'];
+      updateRes = await this.supabase.client
+        .from('subscriptions')
+        .update(payload)
+        .eq('id', id)
+        .eq('owner_id', ownerId)
+        .select()
+        .single();
+    }
+    if (updateRes.error) throw updateRes.error;
+
+    const data = updateRes.data as Record<string, unknown>;
+    const updated: Subscription = {
+      ...(data as unknown as Subscription),
+      theme: targetTheme,
+      amount: Number(data['amount']),
+      status: this.statusFor(data as unknown as Subscription),
+    };
     const amountChanged = changes.amount !== undefined && !isEqualCurrency(Number(current.amount), changes.amount);
 
     if (amountChanged) {
@@ -349,6 +419,10 @@ export class SubscriptionsService {
 
     this._subscriptions.update((list) => list.map((item) => (item.id === id ? updated : item)));
     return updated;
+  }
+
+  async updateTheme(id: string, theme: SubscriptionTheme): Promise<Subscription | null> {
+    return this.update(id, { theme });
   }
 
   async recordPayment(input: RecordSubscriptionPaymentInput): Promise<SubscriptionPayment> {
@@ -430,8 +504,17 @@ export class SubscriptionsService {
       if (paymentResult.error) throw paymentResult.error;
 
       const payment = { ...(paymentResult.data as SubscriptionPayment), amount: Number(paymentResult.data.amount) };
-      const nextRenewalDate = advanceDate(subscription.next_renewal_date, subscription.billing_cycle);
-      const updated = await this.update(subscription.id, { next_renewal_date: nextRenewalDate });
+      // Expiry and renewal are the same date in this app: the explicit new
+      // expiry date wins; otherwise fall back to advancing one billing cycle.
+      const nextRenewalDate =
+        input.new_expiry_date ?? advanceDate(subscription.next_renewal_date, subscription.billing_cycle);
+      const nextEndDate =
+        input.new_expiry_date ??
+        (subscription.end_date ? advanceDate(subscription.end_date, subscription.billing_cycle) : null);
+      const updated = await this.update(subscription.id, {
+        next_renewal_date: nextRenewalDate,
+        ...(nextEndDate ? { end_date: nextEndDate } : {}),
+      });
       if (updated) this._subscriptions.update((list) => list.map((item) => (item.id === updated.id ? updated : item)));
       this._renewals.update((list) => [renewal!, ...list]);
       this._payments.update((list) => [payment, ...list]);

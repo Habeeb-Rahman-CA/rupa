@@ -222,6 +222,33 @@ export interface BankAccount {
 export type SubscriptionBillingCycle = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 export type SubscriptionStatus = 'active' | 'paused' | 'cancelled' | 'expired';
 
+export type SubscriptionTheme =
+  | 'mint'
+  | 'neon'
+  | 'rose'
+  | 'amber'
+  | 'scarlet'
+  | 'slate'
+  | 'violet';
+
+export interface SubscriptionThemeOption {
+  id: SubscriptionTheme;
+  name: string;
+  subtitle: string;
+  accent: string;
+  icon: string;
+}
+
+export const SUBSCRIPTION_THEMES: readonly SubscriptionThemeOption[] = [
+  { id: 'mint', name: 'Mint', subtitle: 'Emerald mint', accent: '#10a37f', icon: 'bot' },
+  { id: 'neon', name: 'Neon', subtitle: 'Electric green', accent: '#1db954', icon: 'music' },
+  { id: 'rose', name: 'Rose', subtitle: 'Magenta rose', accent: '#fc3c44', icon: 'apple' },
+  { id: 'amber', name: 'Amber', subtitle: 'Blaze orange', accent: '#ff6b35', icon: 'dumbbell' },
+  { id: 'scarlet', name: 'Scarlet', subtitle: 'Crimson red', accent: '#e50914', icon: 'tv' },
+  { id: 'slate', name: 'Slate', subtitle: 'Carbon titanium', accent: '#94a3b8', icon: 'repeat' },
+  { id: 'violet', name: 'Violet', subtitle: 'Royal indigo', accent: '#6366f1', icon: 'zap' },
+];
+
 export interface Subscription {
   id: string;
   owner_id: string;
@@ -235,6 +262,7 @@ export interface Subscription {
   payment_account_id: string | null;
   auto_renewal: boolean;
   status: SubscriptionStatus;
+  theme: SubscriptionTheme;
   cancelled_on: string | null;
   notes: string | null;
   created_at: string;
