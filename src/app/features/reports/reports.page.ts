@@ -15,6 +15,9 @@ import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
 import { DebtsService } from '../../core/services/debts.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
+import { SubscriptionsService, monthlyEquivalent, yearlyEquivalent } from '../../core/services/subscriptions.service';
+import { WalletsService } from '../../core/services/wallets.service';
+import { MoneyHeldService } from '../../core/services/money-held.service';
 import { Category, Transaction, isSavingsCategory, BankAccount } from '../../core/models/domain.models';
 import { getCategoryColor, getCategoryIcon } from '../../shared/utils/category-utils';
 
@@ -178,7 +181,7 @@ interface BankReportRow extends BankAccount {
               <lucide-icon name="building-2" class="head-icon" />
               <span>Accounts Overview</span>
             </div>
-            <a routerLink="/cards" class="manage-link">
+            <a routerLink="/bank-accounts" class="manage-link">
               <span>Manage</span>
               <lucide-icon name="chevron-right" />
             </a>
@@ -226,7 +229,7 @@ interface BankReportRow extends BankAccount {
         <div class="app-card placeholder-bank">
           <lucide-icon name="credit-card" class="placeholder-icon" />
           <p>No bank accounts linked yet.</p>
-          <a routerLink="/cards" class="btn-primary-sm">
+          <a routerLink="/bank-accounts" class="btn-primary-sm">
             <lucide-icon name="plus" />
             <span>Add Bank Card</span>
           </a>
@@ -367,6 +370,86 @@ interface BankReportRow extends BankAccount {
         <div class="ob-hint">Money you need to pay back</div>
       </a>
     </section>
+
+    <!-- Subscriptions, wallets & money held -->
+    @if (hasHoldings()) {
+      <div class="section-head">
+        <h2>Recurring &amp; holdings</h2>
+        <span class="section-hint">Right now</span>
+      </div>
+      @if (hasGridCards()) {
+        <section class="outstanding-grid">
+          @if (activeSubscriptions().length > 0) {
+            <a class="ob-card" routerLink="/subscriptions">
+              <div class="micro-label">Monthly recurring</div>
+              <div class="ob-value">{{ subscriptionMonthly() | signedMoney }}</div>
+              <div class="ob-hint">
+                {{ activeSubscriptions().length }} active · {{ subscriptionYearly() | signedMoney }}/yr
+              </div>
+            </a>
+          }
+          @if (renewalsThisMonth().count > 0) {
+            <a class="ob-card" routerLink="/subscriptions">
+              <div class="micro-label">Renewed this month</div>
+              <div class="ob-value money-negative">
+                {{ renewalsThisMonth().amount | signedMoney: 'out' }}
+              </div>
+              <div class="ob-hint">
+                {{ renewalsThisMonth().count }} payment{{ renewalsThisMonth().count === 1 ? '' : 's' }}
+                · {{ monthDate() | date: 'MMM y' }}
+              </div>
+            </a>
+          }
+          @if (wallets().length > 0) {
+            <a class="ob-card" routerLink="/wallets">
+              <div class="micro-label">Wallet balance</div>
+              <div class="ob-value">{{ walletTotal() | signedMoney }}</div>
+              <div class="ob-hint">{{ walletHint() }}</div>
+            </a>
+          }
+        </section>
+      }
+
+      @if (moneyHeldPeople() > 0) {
+        <section class="held-card app-card">
+          <div class="held-card-head">
+            <div class="held-title-wrap">
+              <div class="held-badge"><lucide-icon name="wallet" /></div>
+              <div>
+                <div class="section-kicker">Money held</div>
+                <h2>For other people</h2>
+              </div>
+            </div>
+            <a routerLink="/money-held" class="btn-primary-sm">
+              <span>Manage</span>
+              <lucide-icon name="chevron-right" />
+            </a>
+          </div>
+
+          <div class="held-summary">
+            <div>
+              <div class="micro-label">Total held</div>
+              <div class="held-total">{{ moneyHeldTotal() | signedMoney }}</div>
+            </div>
+            <div class="held-people-count">
+              <strong>{{ moneyHeldPeople() }}</strong>
+              <span>{{ moneyHeldPeople() === 1 ? 'person' : 'people' }}</span>
+            </div>
+          </div>
+
+          <ul class="held-people-list">
+            @for (person of moneyHeldBalances(); track person.id) {
+              <li class="held-person-row">
+                <span class="held-person-name">{{ person.name }}</span>
+                <span class="held-person-balance" [class.settled]="person.outstanding <= 0">
+                  {{ person.outstanding | signedMoney }}
+                </span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    }
   `,
   styles: [
     `
@@ -857,6 +940,46 @@ interface BankReportRow extends BankAccount {
         color: var(--app-ink-muted);
       }
 
+      /* ---------- Money held ------------------------------------------- */
+      .held-card {
+        margin-bottom: 18px;
+        padding: 16px 20px;
+      }
+      .held-card-head, .held-title-wrap, .held-summary {
+        display: flex;
+        align-items: center;
+      }
+      .held-card-head, .held-summary { justify-content: space-between; gap: 12px; }
+      .held-title-wrap { gap: 10px; min-width: 0; }
+      .held-badge {
+        display: grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 11px;
+        background: var(--app-accent-soft);
+        color: var(--app-accent);
+      }
+      .held-badge lucide-icon { width: 19px; height: 19px; }
+      .section-kicker {
+        color: var(--app-ink-muted);
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+      }
+      .held-card h2 { margin: 1px 0 0; color: var(--app-ink); font-size: 15px; font-weight: 600; }
+      .held-summary { margin-top: 16px; padding: 12px 0; border-top: 1px solid var(--app-hairline); border-bottom: 1px solid var(--app-hairline); }
+      .held-total { margin-top: 2px; color: var(--app-ink); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .held-people-count { display: flex; flex-direction: column; align-items: flex-end; color: var(--app-ink-muted); font-size: 11px; }
+      .held-people-count strong { color: var(--app-ink); font-size: 18px; }
+      .held-people-list { list-style: none; margin: 0; padding: 0; }
+      .held-person-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--app-hairline); }
+      .held-person-row:last-child { border-bottom: 0; padding-bottom: 0; }
+      .held-person-name { min-width: 0; overflow: hidden; color: var(--app-ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+      .held-person-balance { color: var(--app-positive); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .held-person-balance.settled { color: var(--app-ink-muted); }
+
       .placeholder {
         color: var(--app-ink-muted);
         font-size: 14px;
@@ -870,6 +993,9 @@ export class ReportsPage {
   private readonly categoriesService = inject(CategoriesService);
   private readonly debtsService = inject(DebtsService);
   private readonly bankAccountsService = inject(BankAccountsService);
+  private readonly subscriptionsService = inject(SubscriptionsService);
+  private readonly walletsService = inject(WalletsService);
+  private readonly moneyHeldService = inject(MoneyHeldService);
 
   // Selected month state — Date pinned to day 1
   readonly monthDate = signal<Date>(startOfMonth(new Date()));
@@ -1119,6 +1245,67 @@ export class ReportsPage {
 
   readonly theyOweTotal = this.debtsService.theyOweYouTotal;
   readonly youOweTotal = this.debtsService.youOweTotal;
+
+  // Subscriptions, wallets & money held — "right now" figures
+  readonly wallets = this.walletsService.wallets;
+  readonly moneyHeldTotal = this.moneyHeldService.totalHeld;
+  readonly moneyHeldPeople = this.moneyHeldService.peopleCount;
+  readonly moneyHeldBalances = this.moneyHeldService.balances;
+
+  readonly activeSubscriptions = computed(() =>
+    this.subscriptionsService
+      .subscriptions()
+      .filter((subscription) => this.subscriptionsService.statusFor(subscription) === 'active'),
+  );
+
+  readonly subscriptionMonthly = computed(() =>
+    this.activeSubscriptions().reduce(
+      (total, subscription) => total + monthlyEquivalent(subscription.amount, subscription.billing_cycle),
+      0,
+    ),
+  );
+
+  readonly subscriptionYearly = computed(() =>
+    this.activeSubscriptions().reduce(
+      (total, subscription) => total + yearlyEquivalent(subscription.amount, subscription.billing_cycle),
+      0,
+    ),
+  );
+
+  readonly renewalsThisMonth = computed(() => {
+    const { y, m } = ym(this.monthDate());
+    let amount = 0;
+    let count = 0;
+    for (const payment of this.subscriptionsService.payments()) {
+      const [py, pm] = payment.paid_on.split('-').map(Number);
+      if (py !== y || pm !== m) continue;
+      amount += Number(payment.amount);
+      count++;
+    }
+    return { amount, count };
+  });
+
+  readonly walletTotal = computed(() =>
+    this.walletsService.wallets().reduce((total, wallet) => total + Number(wallet.balance), 0),
+  );
+
+  readonly walletHint = computed(() => {
+    const wallets = this.walletsService.wallets();
+    const low = wallets.filter((w) => w.minimum_balance > 0 && w.balance <= w.minimum_balance).length;
+    const base = `${wallets.length} wallet${wallets.length === 1 ? '' : 's'}`;
+    return low > 0 ? `${base} · ${low} low balance` : base;
+  });
+
+  readonly hasGridCards = computed(
+    () =>
+      this.activeSubscriptions().length > 0 ||
+      this.renewalsThisMonth().count > 0 ||
+      this.wallets().length > 0,
+  );
+
+  readonly hasHoldings = computed(
+    () => this.hasGridCards() || this.moneyHeldPeople() > 0,
+  );
 
   shiftMonth(delta: number): void {
     const cur = this.monthDate();
