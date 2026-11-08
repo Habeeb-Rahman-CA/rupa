@@ -1,5 +1,7 @@
 import { afterNextRender, Component, DestroyRef, inject, isDevMode } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { filter } from 'rxjs';
 
 @Component({
   selector: 'app-root',
@@ -10,8 +12,10 @@ import { RouterOutlet } from '@angular/router';
 })
 export class App {
   private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
   private timer1: number | null = null;
   private timer2: number | null = null;
+  private lastPath: string | null = null;
 
   constructor() {
     if (isDevMode()) {
@@ -22,6 +26,22 @@ export class App {
       if (this.timer1 !== null) window.clearTimeout(this.timer1);
       if (this.timer2 !== null) window.clearTimeout(this.timer2);
     });
+
+    // Pages share one scroll container across route changes (.mobile-main /
+    // .desktop-content), so without this a new page inherits the previous
+    // page's scroll offset instead of opening from the top. Only path changes
+    // reset it — same-path query tweaks keep the user's position.
+    this.router.events
+      .pipe(
+        filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((e) => {
+        const path = e.urlAfterRedirects.split('?')[0];
+        if (path === this.lastPath) return;
+        this.lastPath = path;
+        this.resetScroll();
+      });
 
     // Hide the boot splash once Angular has painted its first frame.
     afterNextRender(() => this.hideSplash());
@@ -52,6 +72,20 @@ export class App {
       }
     } catch {
       // Development cleanup is best-effort and should never block app startup.
+    }
+  }
+
+  private resetScroll(): void {
+    // The shell's own scrollers — both exist only under the active layout.
+    const container = document.querySelector('.mobile-main, .desktop-content');
+    if (container) {
+      // 'instant' overrides .mobile-main's CSS scroll-behavior: smooth,
+      // so the new page doesn't visibly glide from the old offset.
+      container.scrollTo({ top: 0, behavior: 'instant' });
+    }
+    // Login/terms scroll the document itself; harmless elsewhere (already 0).
+    if (window.scrollY !== 0) {
+      window.scrollTo({ top: 0, behavior: 'instant' });
     }
   }
 
