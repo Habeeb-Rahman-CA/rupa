@@ -45,7 +45,7 @@ export interface RecordSubscriptionPaymentDialogData {
         <div class="renewal-summary">
           <div>
             <span class="micro-label">Renewal due</span>
-            <strong>{{ data.subscription.next_renewal_date | date: 'MMM d, y' : 'UTC' }}</strong>
+            <strong>{{ data.subscription.next_renewal_date | date: 'MMM d, y' }}</strong>
           </div>
           <div>
             <span class="micro-label">Plan amount</span>

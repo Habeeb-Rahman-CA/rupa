@@ -79,7 +79,7 @@ import {
               <div class="reminder-row">
                 <div>
                   <strong>{{ reminder.subscription.name }}</strong>
-                  <span>{{ reminder.subscription.next_renewal_date | date: 'MMM d, y' : 'UTC' }}</span>
+                  <span>{{ reminder.subscription.next_renewal_date | date: 'MMM d, y' }}</span>
                 </div>
                 <span class="reminder-pill">{{ reminder.daysUntilRenewal }} day{{ reminder.daysUntilRenewal === 1 ? '' : 's' }}</span>
               </div>
@@ -125,7 +125,7 @@ import {
                   </div>
 
                   <div class="pass-renewal-chip" [class.urgent]="isDueSoon(subscription)">
-                    <span class="chip-date">{{ subscription.next_renewal_date | date: 'MMM d' : 'UTC' }}</span>
+                    <span class="chip-date">{{ subscription.next_renewal_date | date: 'MMM d' }}</span>
                     <span class="chip-sep">·</span>
                     <span class="chip-days">{{ daysLabel(subscription.next_renewal_date, 'Renewal') }}</span>
                   </div>
@@ -206,7 +206,7 @@ import {
               <div class="history-row">
                 <div class="history-copy">
                   <strong>{{ subscriptionName(payment.subscription_id) }}</strong>
-                  <span>Paid {{ payment.paid_on | date: 'MMM d, y' : 'UTC' }} · Renewal due {{ renewalDue(payment.renewal_id) | date: 'MMM d, y' : 'UTC' }}</span>
+                  <span>Paid {{ payment.paid_on | date: 'MMM d, y' }} · Renewal due {{ renewalDue(payment.renewal_id) | date: 'MMM d, y' }}</span>
                 </div>
                 <div class="history-amount"><strong>{{ payment.amount | signedMoney }}</strong><span>{{ payment.transaction_id ? 'Linked expense' : 'Unlinked' }}</span></div>
               </div>
@@ -224,7 +224,7 @@ import {
           <div class="history-list app-card">
             @for (change of priceChanges(); track change.id) {
               <div class="history-row">
-                <div class="history-copy"><strong>{{ subscriptionName(change.subscription_id) }}</strong><span>Effective {{ change.effective_on | date: 'MMM d, y' : 'UTC' }}</span></div>
+                <div class="history-copy"><strong>{{ subscriptionName(change.subscription_id) }}</strong><span>Effective {{ change.effective_on | date: 'MMM d, y' }}</span></div>
                 <div class="history-amount"><strong>{{ change.old_amount | signedMoney }} → {{ change.new_amount | signedMoney }}</strong><span>Price updated</span></div>
               </div>
             }

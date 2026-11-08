@@ -260,7 +260,7 @@ type Range = 'week' | 'month' | 'year';
             <div class="tx-mid">
               <div class="tx-title">{{ t.label }}</div>
               <div class="tx-sub">
-                {{ t.occurred_on | date: 'MMM d' : 'UTC' }}
+                {{ t.occurred_on | date: 'MMM d' }}
                 @if (t.notes) { · {{ t.notes }} }
               </div>
             </div>

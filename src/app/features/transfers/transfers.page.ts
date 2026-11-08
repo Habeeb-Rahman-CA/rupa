@@ -88,7 +88,7 @@ import { TransferSheetComponent, TransferSheetData } from './transfer-sheet.comp
             </div>
 
             <div class="transfer-meta">
-              <span><lucide-icon name="calendar" /> {{ transfer.occurred_on | date: 'MMM d, y' : 'UTC' }}</span>
+              <span><lucide-icon name="calendar" /> {{ transfer.occurred_on | date: 'MMM d, y' }}</span>
               @if (transfer.notes) {
                 <span class="note"><lucide-icon name="sticky-note" /> {{ transfer.notes }}</span>
               }

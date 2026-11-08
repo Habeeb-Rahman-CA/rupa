@@ -131,7 +131,7 @@ import {
                       {{ record.direction === 'received' ? 'Money received' : 'Money returned' }}
                     </div>
                     <div class="history-meta">
-                      {{ record.occurred_on | date: 'MMM d, y' : 'UTC' }} ·
+                      {{ record.occurred_on | date: 'MMM d, y' }} ·
                       {{ record.payment_mode === 'bank' ? 'Bank' : 'Cash' }}
                       @if (record.notes) { · {{ record.notes }} }
                     </div>

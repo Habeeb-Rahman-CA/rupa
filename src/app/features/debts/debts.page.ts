@@ -79,7 +79,7 @@ import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
                       <div class="title">{{ nameFor(d) }}</div>
                       <div class="sub">
                         @if (d.reason) { {{ d.reason }} · }
-                        Opened {{ d.opened_on | date: 'MMM d' : 'UTC' }}
+                        Opened {{ d.opened_on | date: 'MMM d' }}
                       </div>
                     </div>
                   </div>
@@ -128,7 +128,7 @@ import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
                       <div class="title">{{ nameFor(d) }}</div>
                       <div class="sub">
                         @if (d.reason) { {{ d.reason }} · }
-                        Opened {{ d.opened_on | date: 'MMM d' : 'UTC' }}
+                        Opened {{ d.opened_on | date: 'MMM d' }}
                       </div>
                     </div>
                   </div>
