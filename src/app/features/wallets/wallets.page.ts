@@ -35,7 +35,7 @@ import {
     CardsTabsComponent,
   ],
   template: `
-    <app-page-header title="Cards" subtitle="Manage your cards, accounts, and wallets">
+    <app-page-header title="Wallets" subtitle="Manage balances and transactions">
       <button class="add-wallet-btn" type="button" (click)="openAddWallet()">
         <lucide-icon name="plus" />
         <span>Add wallet</span>

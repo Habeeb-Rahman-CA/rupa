@@ -9,6 +9,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { CategoriesService } from '../../core/services/categories.service';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { LoadingStateComponent } from '../../shared/components/loading-state.component';
+import { ManageDataTabsComponent } from '../../shared/components/manage-data-tabs.component';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { SwipeableRowComponent } from '../../shared/components/swipeable-row.component';
@@ -26,6 +27,7 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
     MatButtonToggleModule,
     LucideAngularModule,
     PageHeaderComponent,
+    ManageDataTabsComponent,
     EmptyStateComponent,
     LoadingStateComponent,
     SwipeableRowComponent,
@@ -44,6 +46,8 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
         <lucide-icon name="plus" />
       </button>
     </app-page-header>
+
+    <app-manage-data-tabs />
 
     @if (isLoading() && categories().length === 0) {
       <app-loading-state label="Loading categories…" />

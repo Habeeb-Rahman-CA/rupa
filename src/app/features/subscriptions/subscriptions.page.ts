@@ -18,6 +18,7 @@ import {
 } from '../../core/services/subscriptions.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
+import { CardsTabsComponent } from '../../shared/components/cards-tabs.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { LoadingStateComponent } from '../../shared/components/loading-state.component';
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
@@ -37,6 +38,7 @@ import {
     MatTooltipModule,
     LucideAngularModule,
     PageHeaderComponent,
+    CardsTabsComponent,
     EmptyStateComponent,
     LoadingStateComponent,
     SignedMoneyPipe,
@@ -50,6 +52,8 @@ import {
         <lucide-icon name="plus" />
       </button>
     </app-page-header>
+
+    <app-cards-tabs />
 
     @if (isLoading() && subscriptions().length === 0) {
       <app-loading-state label="Loading subscriptions…" />

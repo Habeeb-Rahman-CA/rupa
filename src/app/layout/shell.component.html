@@ -38,12 +38,10 @@
       </div>
 
       <mat-menu #settingsMenu="matMenu">
-        @for (item of settingsNav; track item.path) {
-          <a mat-menu-item [routerLink]="item.path">
-            <lucide-icon [name]="item.icon" />
-            <span>{{ item.label }}</span>
-          </a>
-        }
+        <a mat-menu-item routerLink="/categories">
+          <lucide-icon name="database" />
+          <span>Manage Data</span>
+        </a>
         <button mat-menu-item (click)="checkPwaUpdate()">
           <lucide-icon [name]="pwaUpdateAvailable() ? 'download' : 'refresh-cw'" />
           <span>{{ pwaUpdateAvailable() ? 'Update & Reload App' : 'Check for updates' }}</span>

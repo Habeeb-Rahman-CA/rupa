@@ -35,13 +35,27 @@ import { LucideAngularModule } from 'lucide-angular';
           <span>Prepaid balances</span>
         </span>
       </a>
+
+      <a
+        class="cards-tab"
+        routerLink="/subscriptions"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        ariaCurrentWhenActive="page"
+      >
+        <span class="tab-icon"><lucide-icon name="repeat" /></span>
+        <span class="tab-copy">
+          <strong>Subs</strong>
+          <span>Recurring plans</span>
+        </span>
+      </a>
     </nav>
   `,
   styles: [
     `
       .cards-tabs {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 5px;
         margin: -4px 0 20px;
         padding: 5px;

@@ -82,12 +82,6 @@ export class ShellComponent implements AfterViewInit {
     { path: '/bank-accounts', label: 'Cards', icon: 'credit-card' },
   ];
 
-  readonly settingsNav: NavItem[] = [
-    { path: '/subscriptions', label: 'Subscriptions', icon: 'repeat' },
-    { path: '/categories', label: 'Categories', icon: 'tags' },
-    { path: '/people',     label: 'People',     icon: 'users' },
-  ];
-
   readonly moreNav: NavItem[] = [
     { path: '/reports',    label: 'Reports',    icon: 'trending-up' },
     { path: '/subscriptions', label: 'Subscriptions', icon: 'repeat' },

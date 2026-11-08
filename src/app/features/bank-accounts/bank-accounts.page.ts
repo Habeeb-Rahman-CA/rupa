@@ -39,7 +39,7 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
     <!-- Top Page Header matching system standards -->
     <app-page-header
       title="Cards"
-      subtitle="Manage your cards, accounts, and wallets"
+      subtitle="Manage your cards and accounts"
     >
       @if (cards().length > 1) {
         <a class="transfer-link" routerLink="/transfers">

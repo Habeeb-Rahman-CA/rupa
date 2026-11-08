@@ -6,6 +6,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
+import { ManageDataTabsComponent } from '../../shared/components/manage-data-tabs.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { LoadingStateComponent } from '../../shared/components/loading-state.component';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
@@ -24,6 +25,7 @@ import { errText } from '../../shared/utils/error-utils';
     MatButtonModule,
     LucideAngularModule,
     PageHeaderComponent,
+    ManageDataTabsComponent,
     EmptyStateComponent,
     LoadingStateComponent,
     TextFieldComponent,
@@ -43,6 +45,8 @@ import { errText } from '../../shared/utils/error-utils';
         <lucide-icon name="plus" />
       </button>
     </app-page-header>
+
+    <app-manage-data-tabs />
 
     @if (isLoading() && people().length === 0) {
       <app-loading-state label="Loading people…" />
