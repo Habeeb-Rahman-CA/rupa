@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { DatePipe, UpperCasePipe } from '@angular/common';
+import { DatePipe, UpperCasePipe, formatDate } from '@angular/common';
+import { MatDialog } from '@angular/material/dialog';
 
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -10,6 +11,11 @@ import {
   LineChartComponent,
   ChartPoint,
 } from '../../shared/components/line-chart.component';
+import {
+  ReportDetailDialogComponent,
+  ReportDetailData,
+  ReportDetailRow,
+} from './report-detail-dialog.component';
 
 import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
@@ -17,7 +23,8 @@ import { DebtsService } from '../../core/services/debts.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
 import { SubscriptionsService, monthlyEquivalent, yearlyEquivalent } from '../../core/services/subscriptions.service';
 import { WalletsService } from '../../core/services/wallets.service';
-import { MoneyHeldService } from '../../core/services/money-held.service';
+import { MoneyHeldService, MoneyHeldBalance } from '../../core/services/money-held.service';
+import { PeopleService } from '../../core/services/people.service';
 import { Category, Transaction, isSavingsCategory, BankAccount } from '../../core/models/domain.models';
 import { getCategoryColor, getCategoryIcon } from '../../shared/utils/category-utils';
 
@@ -82,34 +89,34 @@ interface BankReportRow extends BankAccount {
     <!-- Monthly summary hero -->
     <section class="hero app-card">
       <div class="stats">
-        <div class="stat-card">
-          <div class="micro-label">Spent</div>
-          <div class="stat-value money-negative">
+        <button type="button" class="stat-card" (click)="openHeroDetail('spent')">
+          <span class="micro-label">Spent</span>
+          <span class="stat-value money-negative">
             {{ monthly().spent | signedMoney: 'out' }}
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="micro-label">Received</div>
-          <div class="stat-value money-positive">
+          </span>
+        </button>
+        <button type="button" class="stat-card" (click)="openHeroDetail('received')">
+          <span class="micro-label">Received</span>
+          <span class="stat-value money-positive">
             {{ monthly().received | signedMoney: 'in' }}
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="micro-label">Saved</div>
-          <div class="stat-value money-savings">
+          </span>
+        </button>
+        <button type="button" class="stat-card" (click)="openHeroDetail('saved')">
+          <span class="micro-label">Saved</span>
+          <span class="stat-value money-savings">
             {{ monthly().saved | signedMoney }}
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="micro-label">Net Cash</div>
-          <div
+          </span>
+        </button>
+        <button type="button" class="stat-card" (click)="openHeroDetail('net')">
+          <span class="micro-label">Net Cash</span>
+          <span
             class="stat-value"
             [class.money-positive]="monthly().net >= 0"
             [class.money-negative]="monthly().net < 0"
           >
             {{ monthly().net | signedMoney }}
-          </div>
-        </div>
+          </span>
+        </button>
       </div>
 
       @if (savingsRate() !== null) {
@@ -149,26 +156,36 @@ interface BankReportRow extends BankAccount {
               class="split-bar-segment bank-seg"
               [style.width.%]="bankVsCashMonthly().bankPct"
               [title]="'Bank: ' + bankVsCashMonthly().bankPct + '%'"
+              (click)="openPaymentModeDetail('bank')"
             ></div>
             <div
               class="split-bar-segment cash-seg"
               [style.width.%]="bankVsCashMonthly().cashPct"
               [title]="'Cash: ' + bankVsCashMonthly().cashPct + '%'"
+              (click)="openPaymentModeDetail('cash')"
             ></div>
           </div>
           <div class="split-legend">
-            <div class="legend-item">
+            <button
+              type="button"
+              class="legend-item"
+              (click)="openPaymentModeDetail('bank')"
+            >
               <span class="dot bank-dot"></span>
               <span class="legend-label">Bank Accounts</span>
               <span class="legend-val">{{ bankVsCashMonthly().bankSpent | signedMoney: 'out' }}</span>
               <span class="legend-pct">({{ bankVsCashMonthly().bankPct }}%)</span>
-            </div>
-            <div class="legend-item">
+            </button>
+            <button
+              type="button"
+              class="legend-item"
+              (click)="openPaymentModeDetail('cash')"
+            >
               <span class="dot cash-dot"></span>
               <span class="legend-label">Cash</span>
               <span class="legend-val">{{ bankVsCashMonthly().cashSpent | signedMoney: 'out' }}</span>
               <span class="legend-pct">({{ bankVsCashMonthly().cashPct }}%)</span>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -189,7 +206,11 @@ interface BankReportRow extends BankAccount {
 
           <ul class="bank-accounts-list">
             @for (acc of bankAccountRows(); track acc.id; let last = $last) {
-              <li class="bank-acc-row" [class.last]="last">
+              <li
+                class="bank-acc-row"
+                [class.last]="last"
+                (click)="openBankAccountDetail(acc)"
+              >
                 <div class="bank-acc-info">
                   <div class="bank-icon-badge" [attr.data-theme]="acc.theme">
                     <lucide-icon name="credit-card" />
@@ -249,6 +270,7 @@ interface BankReportRow extends BankAccount {
           [highlight]="trendHighlight()"
           color="var(--app-ink-dark)"
           [formatter]="chartFormatter"
+          (pointClick)="openTrendDetail($event)"
         />
       } @else {
         <div class="empty">Add expenses over a few months to see the trend.</div>
@@ -264,7 +286,7 @@ interface BankReportRow extends BankAccount {
       <section class="cat-card app-card-tight">
         <ul class="cat-list">
           @for (c of savingsCategoryRows(); track c.id; let last = $last) {
-            <li class="cat-row" [class.last]="last">
+            <li class="cat-row" [class.last]="last" (click)="openSavingsCategoryDetail(c)">
               <div class="cat-icon" [style.background]="c.color">
                 <lucide-icon [name]="c.icon" />
               </div>
@@ -299,7 +321,7 @@ interface BankReportRow extends BankAccount {
       <section class="cat-card app-card-tight">
         <ul class="cat-list">
           @for (c of categoryRows(); track c.id; let last = $last) {
-            <li class="cat-row" [class.last]="last">
+            <li class="cat-row" [class.last]="last" (click)="openCategoryDetail(c)">
               <div class="cat-icon" [style.background]="c.color">
                 <lucide-icon [name]="c.icon" />
               </div>
@@ -338,7 +360,7 @@ interface BankReportRow extends BankAccount {
       <section class="app-card-tight">
         <ul class="day-list">
           @for (d of topDays(); track d.date; let last = $last) {
-            <li class="day-row" [class.last]="last">
+            <li class="day-row" [class.last]="last" (click)="openDayDetail(d)">
               <div class="day-label">{{ d.date | date: 'EEE, MMM d' }}</div>
               <div class="day-amount money-negative">
                 {{ d.amount | signedMoney: 'out' }}
@@ -355,20 +377,20 @@ interface BankReportRow extends BankAccount {
       <span class="section-hint">Right now</span>
     </div>
     <section class="outstanding-grid">
-      <a class="ob-card" routerLink="/debts">
-        <div class="micro-label">They owe you</div>
-        <div class="ob-value money-positive">
+      <button type="button" class="ob-card" (click)="openDebtDetail('they_owe')">
+        <span class="micro-label">They owe you</span>
+        <span class="ob-value money-positive">
           {{ theyOweTotal() | signedMoney: 'in' }}
-        </div>
-        <div class="ob-hint">Money you're waiting on</div>
-      </a>
-      <a class="ob-card" routerLink="/debts">
-        <div class="micro-label">You owe</div>
-        <div class="ob-value money-negative">
+        </span>
+        <span class="ob-hint">Money you're waiting on</span>
+      </button>
+      <button type="button" class="ob-card" (click)="openDebtDetail('i_owe')">
+        <span class="micro-label">You owe</span>
+        <span class="ob-value money-negative">
           {{ youOweTotal() | signedMoney: 'out' }}
-        </div>
-        <div class="ob-hint">Money you need to pay back</div>
-      </a>
+        </span>
+        <span class="ob-hint">Money you need to pay back</span>
+      </button>
     </section>
 
     <!-- Subscriptions, wallets & money held -->
@@ -380,32 +402,32 @@ interface BankReportRow extends BankAccount {
       @if (hasGridCards()) {
         <section class="outstanding-grid">
           @if (activeSubscriptions().length > 0) {
-            <a class="ob-card" routerLink="/subscriptions">
-              <div class="micro-label">Monthly recurring</div>
-              <div class="ob-value">{{ subscriptionMonthly() | signedMoney }}</div>
-              <div class="ob-hint">
+            <button type="button" class="ob-card" (click)="openSubscriptionsDetail()">
+              <span class="micro-label">Monthly recurring</span>
+              <span class="ob-value">{{ subscriptionMonthly() | signedMoney }}</span>
+              <span class="ob-hint">
                 {{ activeSubscriptions().length }} active · {{ subscriptionYearly() | signedMoney }}/yr
-              </div>
-            </a>
+              </span>
+            </button>
           }
           @if (renewalsThisMonth().count > 0) {
-            <a class="ob-card" routerLink="/subscriptions">
-              <div class="micro-label">Renewed this month</div>
-              <div class="ob-value money-negative">
+            <button type="button" class="ob-card" (click)="openRenewalsDetail()">
+              <span class="micro-label">Renewed this month</span>
+              <span class="ob-value money-negative">
                 {{ renewalsThisMonth().amount | signedMoney: 'out' }}
-              </div>
-              <div class="ob-hint">
+              </span>
+              <span class="ob-hint">
                 {{ renewalsThisMonth().count }} payment{{ renewalsThisMonth().count === 1 ? '' : 's' }}
                 · {{ monthDate() | date: 'MMM y' }}
-              </div>
-            </a>
+              </span>
+            </button>
           }
           @if (wallets().length > 0) {
-            <a class="ob-card" routerLink="/wallets">
-              <div class="micro-label">Wallet balance</div>
-              <div class="ob-value">{{ walletTotal() | signedMoney }}</div>
-              <div class="ob-hint">{{ walletHint() }}</div>
-            </a>
+            <button type="button" class="ob-card" (click)="openWalletsDetail()">
+              <span class="micro-label">Wallet balance</span>
+              <span class="ob-value">{{ walletTotal() | signedMoney }}</span>
+              <span class="ob-hint">{{ walletHint() }}</span>
+            </button>
           }
         </section>
       }
@@ -426,7 +448,7 @@ interface BankReportRow extends BankAccount {
             </a>
           </div>
 
-          <div class="held-summary">
+          <div class="held-summary" (click)="openMoneyHeldDetail()">
             <div>
               <div class="micro-label">Total held</div>
               <div class="held-total">{{ moneyHeldTotal() | signedMoney }}</div>
@@ -439,7 +461,7 @@ interface BankReportRow extends BankAccount {
 
           <ul class="held-people-list">
             @for (person of moneyHeldBalances(); track person.id) {
-              <li class="held-person-row">
+              <li class="held-person-row" (click)="openHeldPersonDetail(person)">
                 <span class="held-person-name">{{ person.name }}</span>
                 <span class="held-person-balance" [class.settled]="person.outstanding <= 0">
                   {{ person.outstanding | signedMoney }}
@@ -502,12 +524,21 @@ interface BankReportRow extends BankAccount {
       }
       .stat-card {
         background: var(--app-canvas);
+        border: 0;
+        font: inherit;
+        color: inherit;
+        text-align: left;
+        cursor: pointer;
         border-radius: var(--app-radius-md);
         padding: 12px 14px;
         display: flex;
         flex-direction: column;
         justify-content: center;
         min-width: 0;
+        transition: background .15s ease, transform .1s ease;
+
+        &:hover { background: var(--app-hairline); }
+        &:active { transform: scale(0.98); }
       }
       .stat-value {
         margin-top: 6px;
@@ -603,6 +634,7 @@ interface BankReportRow extends BankAccount {
       .split-bar-segment {
         height: 100%;
         transition: width .3s ease;
+        cursor: pointer;
       }
       .bank-seg {
         background: var(--app-ink-dark, #0f172a);
@@ -621,6 +653,17 @@ interface BankReportRow extends BankAccount {
         align-items: center;
         gap: 6px;
         font-size: 13px;
+        font-family: inherit;
+        color: inherit;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        padding: 4px;
+        margin: -4px;
+        border-radius: 8px;
+        transition: background .15s ease;
+
+        &:hover { background: var(--app-canvas); }
       }
       .dot {
         width: 8px;
@@ -647,6 +690,10 @@ interface BankReportRow extends BankAccount {
         gap: 10px;
         padding: 12px 16px;
         border-bottom: 1px solid var(--app-hairline);
+        cursor: pointer;
+        transition: background .15s ease;
+
+        &:hover { background: var(--app-canvas); }
 
         @media (min-width: 480px) {
           flex-direction: row;
@@ -831,6 +878,10 @@ interface BankReportRow extends BankAccount {
         align-items: center;
         padding: 14px 16px;
         border-bottom: 1px solid var(--app-hairline);
+        cursor: pointer;
+        transition: background .15s ease;
+
+        &:hover { background: var(--app-canvas); }
       }
       .cat-row.last { border-bottom: 0; }
       .cat-icon {
@@ -894,6 +945,10 @@ interface BankReportRow extends BankAccount {
         align-items: center;
         padding: 12px 16px;
         border-bottom: 1px solid var(--app-hairline);
+        cursor: pointer;
+        transition: background .15s ease;
+
+        &:hover { background: var(--app-canvas); }
       }
       .day-row.last { border-bottom: 0; }
       .day-label {
@@ -915,16 +970,22 @@ interface BankReportRow extends BankAccount {
       }
       .ob-card {
         background: var(--app-surface);
+        border: 0;
+        font: inherit;
+        color: inherit;
+        text-align: left;
+        width: 100%;
+        cursor: pointer;
         border-radius: var(--app-radius-lg);
         box-shadow: var(--app-shadow-md);
         padding: 14px 16px;
         text-decoration: none;
-        color: inherit;
         min-width: 0;
         transition: transform .1s ease;
 
         &:active { transform: scale(0.98); }
       }
+      .ob-card > span { display: block; }
       .ob-value {
         margin-top: 6px;
         font-size: clamp(16px, 4.5vw, 20px);
@@ -969,16 +1030,21 @@ interface BankReportRow extends BankAccount {
         text-transform: uppercase;
       }
       .held-card h2 { margin: 1px 0 0; color: var(--app-ink); font-size: 15px; font-weight: 600; }
-      .held-summary { margin-top: 16px; padding: 12px 0; border-top: 1px solid var(--app-hairline); border-bottom: 1px solid var(--app-hairline); }
+      .held-summary { margin-top: 16px; padding: 12px 0; border-top: 1px solid var(--app-hairline); border-bottom: 1px solid var(--app-hairline); cursor: pointer; transition: opacity .15s ease; }
+      .held-summary:hover { opacity: .75; }
       .held-total { margin-top: 2px; color: var(--app-ink); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
       .held-people-count { display: flex; flex-direction: column; align-items: flex-end; color: var(--app-ink-muted); font-size: 11px; }
       .held-people-count strong { color: var(--app-ink); font-size: 18px; }
       .held-people-list { list-style: none; margin: 0; padding: 0; }
-      .held-person-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--app-hairline); }
+      .held-person-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--app-hairline); cursor: pointer; transition: opacity .15s ease; }
+      .held-person-row:hover { opacity: .75; }
       .held-person-row:last-child { border-bottom: 0; padding-bottom: 0; }
       .held-person-name { min-width: 0; overflow: hidden; color: var(--app-ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
       .held-person-balance { color: var(--app-positive); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
       .held-person-balance.settled { color: var(--app-ink-muted); }
+
+      /* Clip row hover backgrounds to the card's rounded corners */
+      .app-card-tight { overflow: hidden; }
 
       .placeholder {
         color: var(--app-ink-muted);
@@ -996,6 +1062,8 @@ export class ReportsPage {
   private readonly subscriptionsService = inject(SubscriptionsService);
   private readonly walletsService = inject(WalletsService);
   private readonly moneyHeldService = inject(MoneyHeldService);
+  private readonly peopleService = inject(PeopleService);
+  private readonly dialog = inject(MatDialog);
 
   // Selected month state — Date pinned to day 1
   readonly monthDate = signal<Date>(startOfMonth(new Date()));
@@ -1314,6 +1382,385 @@ export class ReportsPage {
     if (next > now) return;
     this.monthDate.set(next);
   }
+
+  // -------- drill-down details ----------------------------------------------
+  // Every report item opens ReportDetailDialogComponent with the records
+  // behind its number. Filters below mirror the matching computed exactly so
+  // the dialog total always equals the figure that was tapped.
+
+  private readonly inr = new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  });
+
+  openHeroDetail(kind: 'spent' | 'received' | 'saved' | 'net'): void {
+    const catMap = this.categoryMap();
+    const rows: ReportDetailRow[] = [];
+    for (const t of this.monthTx()) {
+      const isSavings = isSavingsCategory(t.category_id ? catMap.get(t.category_id) : undefined);
+      if (kind === 'spent' && (isSavings || t.direction !== 'out')) continue;
+      if (kind === 'received' && (isSavings || t.direction !== 'in')) continue;
+      if (kind === 'saved' && !isSavings) continue;
+      rows.push(this.txRow(t, catMap));
+    }
+
+    const totals = this.monthly();
+    const conf = {
+      spent: { title: 'Spent', total: totals.spent, totalTone: 'out' as const, totalLabel: 'Total spent' },
+      received: { title: 'Received', total: totals.received, totalTone: 'in' as const, totalLabel: 'Total received' },
+      saved: { title: 'Saved', total: totals.saved, totalTone: null, totalLabel: 'Net saved' },
+      net: { title: 'Net Cash', total: totals.net, totalTone: null, totalLabel: 'Net this month' },
+    }[kind];
+
+    this.openDetail({
+      icon: 'receipt',
+      title: conf.title,
+      subtitle: this.monthLabel(),
+      total: conf.total,
+      totalTone: conf.totalTone,
+      totalLabel: conf.totalLabel,
+      rows,
+      emptyText: 'No transactions this month.',
+    });
+  }
+
+  openPaymentModeDetail(mode: 'bank' | 'cash'): void {
+    const catMap = this.categoryMap();
+    const rows: ReportDetailRow[] = [];
+    for (const t of this.monthTx()) {
+      if (t.direction !== 'out') continue;
+      if ((t.payment_mode === 'bank' ? 'bank' : 'cash') !== mode) continue;
+      rows.push(this.txRow(t, catMap));
+    }
+
+    const v = this.bankVsCashMonthly();
+    this.openDetail({
+      icon: 'wallet',
+      title: mode === 'bank' ? 'Bank spend' : 'Cash spend',
+      subtitle: this.monthLabel(),
+      total: mode === 'bank' ? v.bankSpent : v.cashSpent,
+      totalTone: 'out',
+      totalLabel: 'Total spent',
+      rows,
+      emptyText: mode === 'bank' ? 'No bank expenses this month.' : 'No cash expenses this month.',
+    });
+  }
+
+  openBankAccountDetail(acc: BankReportRow): void {
+    const catMap = this.categoryMap();
+    const rows: ReportDetailRow[] = [];
+    for (const t of this.monthTx()) {
+      if (t.direction !== 'out' || t.payment_mode !== 'bank') continue;
+      if (t.bank_account_id !== acc.id) continue;
+      rows.push(this.txRow(t, catMap));
+    }
+
+    this.openDetail({
+      icon: 'credit-card',
+      title: acc.account_name || acc.bank_name,
+      subtitle: `${acc.bank_name} · ${this.monthLabel()}`,
+      total: acc.monthlySpend,
+      totalTone: 'out',
+      totalLabel: 'Monthly spend',
+      rows,
+      emptyText: 'No expenses on this card this month.',
+    });
+  }
+
+  openCategoryDetail(row: CategoryRow): void {
+    const catMap = this.categoryMap();
+    const rows = this.monthExpenseTx()
+      .filter((t) => this.categoryKey(t) === row.id)
+      .map((t) => this.txRow(t, catMap));
+
+    this.openDetail({
+      icon: row.icon,
+      iconColor: row.color,
+      title: row.name,
+      subtitle: `${this.monthLabel()} · expenses`,
+      total: row.amount,
+      totalTone: 'out',
+      totalLabel: 'Total spent',
+      rows,
+      emptyText: 'No expenses in this category.',
+    });
+  }
+
+  openSavingsCategoryDetail(row: CategoryRow): void {
+    const catMap = this.categoryMap();
+    const rows = this.monthTx()
+      .filter((t) => isSavingsCategory(t.category_id ? catMap.get(t.category_id) : undefined))
+      .filter((t) => (t.category_id ?? '__savings__') === row.id)
+      .map((t) => this.txRow(t, catMap));
+
+    this.openDetail({
+      icon: row.icon,
+      iconColor: row.color,
+      title: row.name,
+      subtitle: `${this.monthLabel()} · savings`,
+      total: row.amount,
+      totalTone: null,
+      totalLabel: 'Total saved',
+      rows,
+      emptyText: 'No savings in this category.',
+    });
+  }
+
+  openDayDetail(day: DayRow): void {
+    const catMap = this.categoryMap();
+    const rows = this.monthExpenseTx()
+      .filter((t) => t.occurred_on === day.date)
+      .map((t) => this.txRow(t, catMap));
+
+    this.openDetail({
+      icon: 'calendar',
+      title: formatDate(day.date, 'EEE, MMM d', 'en-US'),
+      subtitle: `${this.monthLabel()} · biggest spending days`,
+      total: day.amount,
+      totalTone: 'out',
+      totalLabel: 'Total spent',
+      rows,
+      emptyText: 'No expenses on this day.',
+    });
+  }
+
+  openDebtDetail(direction: 'they_owe' | 'i_owe'): void {
+    const people = this.peopleService.people();
+    const theyOwe = direction === 'they_owe';
+    const rows: ReportDetailRow[] = this.debtsService
+      .openDebts()
+      .filter((d) => d.direction === direction)
+      .map((d) => ({
+        id: d.id,
+        title: people.find((p) => p.id === d.person_id)?.name ?? 'Unknown person',
+        date: d.opened_on,
+        meta: d.reason ?? undefined,
+        amount: Number(d.outstanding),
+        tone: theyOwe ? 'in' : 'out',
+      }));
+
+    this.openDetail({
+      icon: 'handshake',
+      title: theyOwe ? 'They owe you' : 'You owe',
+      subtitle: 'Outstanding balances',
+      total: theyOwe ? this.theyOweTotal() : this.youOweTotal(),
+      totalTone: theyOwe ? 'in' : 'out',
+      totalLabel: 'Outstanding',
+      rows,
+      emptyText: 'No outstanding balances.',
+    });
+  }
+
+  openSubscriptionsDetail(): void {
+    const rows: ReportDetailRow[] = this.activeSubscriptions()
+      .map((s) => ({
+        id: s.id,
+        title: s.name,
+        meta:
+          `${capitalize(s.billing_cycle)}` +
+          (s.next_renewal_date
+            ? ` · renews ${formatDate(s.next_renewal_date, 'MMM d, y', 'en-US')}`
+            : ''),
+        amount: monthlyEquivalent(s.amount, s.billing_cycle),
+        tone: null,
+      }))
+      .sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0));
+
+    this.openDetail({
+      icon: 'repeat',
+      title: 'Monthly recurring',
+      subtitle: 'Active subscriptions',
+      total: this.subscriptionMonthly(),
+      totalTone: null,
+      totalLabel: 'Per month',
+      rows,
+      emptyText: 'No active subscriptions.',
+    });
+  }
+
+  openRenewalsDetail(): void {
+    const prefix = this.monthPrefix();
+    const subs = this.subscriptionsService.subscriptions();
+    const rows: ReportDetailRow[] = [];
+    for (const p of this.subscriptionsService.payments()) {
+      if (!p.paid_on.startsWith(prefix)) continue;
+      const sub = subs.find((s) => s.id === p.subscription_id);
+      rows.push({
+        id: p.id,
+        title: sub?.name ?? 'Renewal',
+        date: p.paid_on,
+        meta: p.notes ?? undefined,
+        amount: Number(p.amount),
+        tone: 'out',
+      });
+    }
+
+    this.openDetail({
+      icon: 'refresh-cw',
+      title: 'Renewed this month',
+      subtitle: this.monthLabel(),
+      total: this.renewalsThisMonth().amount,
+      totalTone: 'out',
+      totalLabel: 'Total paid',
+      rows,
+      emptyText: 'No renewals this month.',
+    });
+  }
+
+  openWalletsDetail(): void {
+    const rows: ReportDetailRow[] = this.wallets().map((w) => ({
+      id: w.id,
+      title: w.name,
+      meta:
+        w.minimum_balance > 0 && Number(w.balance) <= w.minimum_balance
+          ? 'Low balance'
+          : undefined,
+      amount: Number(w.balance),
+      tone: null,
+    }));
+
+    this.openDetail({
+      icon: 'wallet',
+      title: 'Wallet balance',
+      subtitle: this.walletHint(),
+      total: this.walletTotal(),
+      totalTone: null,
+      totalLabel: 'Total balance',
+      rows,
+      emptyText: 'No wallets yet.',
+    });
+  }
+
+  openMoneyHeldDetail(): void {
+    const rows: ReportDetailRow[] = this.moneyHeldBalances().map((p) => ({
+      id: p.id,
+      title: p.name,
+      meta: `Received ${this.inr.format(p.received)} · Returned ${this.inr.format(p.returned)}`,
+      amount: p.outstanding,
+      tone: p.outstanding > 0 ? 'in' : null,
+    }));
+
+    this.openDetail({
+      icon: 'wallet',
+      title: 'Money held',
+      subtitle: 'For other people',
+      total: this.moneyHeldTotal(),
+      totalTone: null,
+      totalLabel: 'Total held',
+      rows,
+      emptyText: 'No money held for anyone.',
+    });
+  }
+
+  openHeldPersonDetail(person: MoneyHeldBalance): void {
+    const rows: ReportDetailRow[] = person.records.map((r) => ({
+      id: r.id,
+      title: r.direction === 'received' ? 'Received' : 'Returned',
+      date: r.occurred_on,
+      meta: r.notes ?? undefined,
+      amount: Number(r.amount),
+      tone: r.direction === 'received' ? 'in' : 'out',
+    }));
+
+    this.openDetail({
+      icon: 'wallet',
+      title: person.name,
+      subtitle: 'Money held',
+      total: person.outstanding,
+      totalTone: person.outstanding > 0 ? 'in' : null,
+      totalLabel: 'Outstanding',
+      rows,
+      emptyText: 'No records yet.',
+    });
+  }
+
+  openTrendDetail(index: number): void {
+    const point = this.trend()[index];
+    if (!point) return;
+
+    const anchor = this.monthDate();
+    const month = new Date(anchor.getFullYear(), anchor.getMonth() - (11 - index), 1);
+    const prefix = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`;
+    const catMap = this.categoryMap();
+    const rows: ReportDetailRow[] = [];
+    for (const t of this.txService.transactions()) {
+      if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
+      if (t.direction !== 'out') continue;
+      if (t.category_id && catMap.get(t.category_id)?.kind === 'savings') continue;
+      if (!t.occurred_on.startsWith(prefix)) continue;
+      rows.push(this.txRow(t, catMap));
+    }
+
+    this.openDetail({
+      icon: 'trending-up',
+      title: `Expenses · ${formatDate(month, 'MMM y', 'en-US')}`,
+      subtitle: '12-month trend',
+      total: point.value,
+      totalTone: 'out',
+      totalLabel: 'Total spent',
+      rows,
+      emptyText: 'No expenses this month.',
+    });
+  }
+
+  // -------- helpers ----------------------------------------------------------
+
+  private monthPrefix(): string {
+    const { y, m } = ym(this.monthDate());
+    return `${y}-${String(m).padStart(2, '0')}`;
+  }
+
+  private monthLabel(): string {
+    return formatDate(this.monthDate(), 'MMMM y', 'en-US');
+  }
+
+  /** All non-transfer transactions of the selected month (mirrors monthly()). */
+  private monthTx(): Transaction[] {
+    const prefix = this.monthPrefix();
+    return this.txService.transactions().filter(
+      (t) =>
+        t.source !== 'transfer' &&
+        t.source !== 'wallet_recharge' &&
+        t.occurred_on.startsWith(prefix),
+    );
+  }
+
+  /** Outgoing, non-savings month expenses (mirrors categoryRows/topDays). */
+  private monthExpenseTx(): Transaction[] {
+    const catMap = this.categoryMap();
+    return this.monthTx().filter(
+      (t) =>
+        t.direction === 'out' &&
+        !isSavingsCategory(t.category_id ? catMap.get(t.category_id) : undefined),
+    );
+  }
+
+  /** Grouping key used by categoryRows(). */
+  private categoryKey(t: Transaction): string {
+    return t.source === 'wallet_spend' ? '__wallet_spending__' : t.category_id ?? '__uncategorized__';
+  }
+
+  private txRow(t: Transaction, catMap: Map<string, Category>): ReportDetailRow {
+    const cat = t.category_id ? catMap.get(t.category_id) : undefined;
+    const fallback =
+      t.source === 'wallet_spend' ? 'Wallet spending' : cat?.name ?? 'Uncategorized';
+    return {
+      id: t.id,
+      title: t.notes?.trim() || fallback,
+      date: t.occurred_on,
+      meta: t.payment_mode === 'bank' ? 'Bank' : 'Cash',
+      amount: Number(t.amount),
+      tone: t.direction === 'in' ? 'in' : 'out',
+    };
+  }
+
+  private openDetail(data: ReportDetailData): void {
+    this.dialog.open(ReportDetailDialogComponent, {
+      data,
+      width: 'min(520px, calc(100vw - 24px))',
+    });
+  }
 }
 
 // -------- helpers -----------------------------------------------------------
@@ -1324,4 +1771,8 @@ function startOfMonth(d: Date): Date {
 
 function ym(d: Date): { y: number; m: number } {
   return { y: d.getFullYear(), m: d.getMonth() + 1 };
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }

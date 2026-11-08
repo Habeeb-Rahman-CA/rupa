@@ -1,4 +1,4 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 
 export interface ChartPoint {
   label: string;
@@ -12,7 +12,8 @@ export interface ChartPoint {
  * - Bottom axis labels only
  * - Optional highlighted point with tooltip
  *
- * Purely presentational; no clicks / no external deps.
+ * Presentational; no external deps. Point taps are optional and reported
+ * through the pointClick output (emits the point index).
  */
 @Component({
   selector: 'app-line-chart',
@@ -69,6 +70,18 @@ export interface ChartPoint {
               stroke-width="2.5"
             />
           }
+
+          <!-- Invisible per-point hit columns so taps can drill down -->
+          @for (p of points(); track $index) {
+            <rect
+              class="hit"
+              [attr.x]="hitRect($index).x"
+              y="0"
+              [attr.width]="hitRect($index).w"
+              [attr.height]="h - padBottom"
+              (click)="pointClick.emit($index)"
+            />
+          }
         </svg>
 
         <!-- x-axis labels via HTML for crisper text -->
@@ -103,6 +116,10 @@ export interface ChartPoint {
         display: block;
         width: 100%;
         height: 120px;
+      }
+      .hit {
+        fill: transparent;
+        cursor: pointer;
       }
       .xaxis {
         display: flex;
@@ -145,6 +162,8 @@ export class LineChartComponent {
   readonly highlight = input<number | null>(null);
   readonly color = input<string>('var(--app-ink-dark)');
   readonly formatter = input<(v: number) => string>((v) => String(Math.round(v)));
+  /** Emits the tapped point's index; unused consumers can simply not bind it. */
+  readonly pointClick = output<number>();
 
   // Fixed viewBox — the SVG stretches responsively
   protected readonly w = 320;
@@ -173,6 +192,13 @@ export class LineChartComponent {
     const n = this.points().length;
     if (n <= 1) return this.padX;
     return this.padX + (i / (n - 1)) * this.innerW();
+  }
+
+  hitRect(i: number): { x: number; w: number } {
+    const n = this.points().length;
+    if (n <= 0) return { x: 0, w: 0 };
+    const w = this.w / n;
+    return { x: i * w, w };
   }
 
   yFor(v: number): number {
