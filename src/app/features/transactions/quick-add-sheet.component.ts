@@ -23,6 +23,7 @@ import { TransactionsService } from '../../core/services/transactions.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
 import { BillScannerService } from '../../core/services/bill-scanner.service';
 import { Category, CategoryKind, PaymentMode, TxDirection, isSavingsCategory } from '../../core/models/domain.models';
+import { isWalletSpendingCategory } from '../../shared/utils/category-utils';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
 import { SetOpeningBalanceSheetComponent } from '../dashboard/set-opening-balance-sheet.component';
@@ -414,6 +415,9 @@ export class QuickAddSheetComponent {
   readonly relevantCategories = computed<Category[]>(() => {
     const kind = this.txKind();
     return this.categoriesService.categories().filter((c) => {
+      // Wallet spending is recorded through the wallet flow only — its system
+      // category must not be offered for manual expenses.
+      if (isWalletSpendingCategory(c)) return false;
       if (kind === 'savings') return isSavingsCategory(c);
       if (kind === 'expense') return c.kind === 'expense' && !isSavingsCategory(c);
       if (kind === 'income') return c.kind === 'income' && !isSavingsCategory(c);

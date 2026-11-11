@@ -39,3 +39,19 @@ export function getCategoryColor(name: string): string {
 export const iconFor = getCategoryIcon;
 export const colorFor = getCategoryColor;
 export const tileColor = getCategoryColor;
+
+/**
+ * Name of the system category that wallet spending is recorded under.
+ * The wallet spend sheet shows it as pre-selected, so the service resolves
+ * (and creates on first use) its real id before saving.
+ */
+export const WALLET_SPENDING_CATEGORY_NAME = 'Wallet spending';
+
+export function isWalletSpendingCategory(
+  category: { name: string } | null | undefined,
+): boolean {
+  return (
+    (category?.name ?? '').trim().toLowerCase() ===
+    WALLET_SPENDING_CATEGORY_NAME.toLowerCase()
+  );
+}

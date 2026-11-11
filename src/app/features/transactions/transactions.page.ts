@@ -18,7 +18,7 @@ import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
 import { BankAccount, Category, Transaction, isSavingsCategory } from '../../core/models/domain.models';
-import { getCategoryColor, getCategoryIcon } from '../../shared/utils/category-utils';
+import { getCategoryColor, getCategoryIcon, isWalletSpendingCategory } from '../../shared/utils/category-utils';
 import { errText } from '../../shared/utils/error-utils';
 import {
   filterTransactions,
@@ -418,8 +418,11 @@ export class TransactionsPage {
   readonly categoryOptions = computed<SelectOption<string>[]>(() => [
     { value: '', label: 'All categories', icon: 'layers-3' },
     { value: WALLET_CATEGORY_ID, label: 'Wallet spending', icon: 'wallet' },
+    // The system "Wallet spending" category is already listed above as the
+    // built-in wallet entry — skip it so the option never appears twice.
     ...this.categoriesService.categories()
       .slice()
+      .filter((category) => !isWalletSpendingCategory(category))
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((category) => ({
         value: category.id,

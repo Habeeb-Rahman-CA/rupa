@@ -2,10 +2,15 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 
 import { BankAccountsService } from './bank-accounts.service';
 import { AuthService } from './auth.service';
+import { CategoriesService } from './categories.service';
 import { SupabaseService } from './supabase.service';
 import { TransactionsService } from './transactions.service';
 import { CardTheme, PaymentMode, Wallet, WalletTransaction, WalletTransactionKind } from '../models/domain.models';
 import { roundCurrency } from '../../shared/utils/currency-utils';
+import {
+  WALLET_SPENDING_CATEGORY_NAME,
+  isWalletSpendingCategory,
+} from '../../shared/utils/category-utils';
 
 export interface CreateWalletInput {
   name: string;
@@ -37,6 +42,7 @@ export class WalletsService {
   private readonly auth = inject(AuthService);
   private readonly bankAccountsService = inject(BankAccountsService);
   private readonly transactionsService = inject(TransactionsService);
+  private readonly categoriesService = inject(CategoriesService);
 
   private readonly _wallets = signal<Wallet[]>([]);
   private readonly _transactions = signal<WalletTransaction[]>([]);
@@ -188,7 +194,7 @@ export class WalletsService {
       p_kind: input.kind,
       p_amount: roundCurrency(input.amount),
       p_occurred_on: input.occurred_on ?? todayIso(),
-      p_category_id: null,
+      p_category_id: input.kind === 'spend' ? await this.walletSpendingCategoryId() : null,
       p_funding_mode: input.kind === 'recharge' ? input.funding_mode ?? null : null,
       p_bank_account_id:
         input.kind === 'recharge' && input.funding_mode === 'bank'
@@ -216,7 +222,7 @@ export class WalletsService {
       p_kind: input.kind,
       p_amount: roundCurrency(input.amount),
       p_occurred_on: input.occurred_on ?? todayIso(),
-      p_category_id: null,
+      p_category_id: input.kind === 'spend' ? await this.walletSpendingCategoryId() : null,
       p_funding_mode: input.kind === 'recharge' ? input.funding_mode ?? null : null,
       p_bank_account_id:
         input.kind === 'recharge' && input.funding_mode === 'bank'
@@ -246,6 +252,35 @@ export class WalletsService {
 
   transactionsFor(walletId: string): WalletTransaction[] {
     return this._transactions().filter((transaction) => transaction.wallet_id === walletId);
+  }
+
+  /**
+   * Wallet spending is grouped under the system category "Wallet spending"
+   * (the sheet shows it pre-selected), so resolve its real id — creating it
+   * on first use — instead of saving an uncategorized spend. Recharges never
+   * carry a category (the database forbids it).
+   */
+  private async walletSpendingCategoryId(): Promise<string | null> {
+    const findId = (): string | null =>
+      this.categoriesService.categories().find((c) => isWalletSpendingCategory(c))?.id ?? null;
+
+    await this.categoriesService.load().catch(() => undefined);
+    const existing = findId();
+    if (existing) return existing;
+
+    try {
+      const created = await this.categoriesService.create(
+        WALLET_SPENDING_CATEGORY_NAME,
+        'expense',
+      );
+      return created?.id ?? findId();
+    } catch (err) {
+      console.error('Could not ensure the Wallet spending category', err);
+      // The category may already exist (e.g. created from another tab) —
+      // re-read the list and use it before giving up.
+      await this.categoriesService.load().catch(() => undefined);
+      return findId();
+    }
   }
 
   private validateInput(input: WalletTransactionInput, current?: WalletTransaction): void {
