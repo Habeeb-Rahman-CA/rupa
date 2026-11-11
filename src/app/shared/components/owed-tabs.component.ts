@@ -35,13 +35,27 @@ import { LucideAngularModule } from 'lucide-angular';
           <span>For other people</span>
         </span>
       </a>
+
+      <a
+        class="owed-tab"
+        routerLink="/interest"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        ariaCurrentWhenActive="page"
+      >
+        <span class="tab-icon"><lucide-icon name="percent" /></span>
+        <span class="tab-copy">
+          <strong>Interest</strong>
+          <span>Riba tracker</span>
+        </span>
+      </a>
     </nav>
   `,
   styles: [
     `
       .owed-tabs {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 5px;
         margin: -4px 0 20px;
         padding: 5px;
