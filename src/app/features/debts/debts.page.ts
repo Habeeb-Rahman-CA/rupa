@@ -37,7 +37,7 @@ import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
     OwedTabsComponent,
   ],
   template: `
-    <app-page-header title="People &amp; Balances" subtitle="Track Owed and money held on behalf of others">
+    <app-page-header title="Owed" subtitle="Loans and IOUs — what people owe you and what you owe them">
       <button
         class="add-btn"
         type="button"

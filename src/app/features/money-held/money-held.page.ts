@@ -36,7 +36,7 @@ import {
     OwedTabsComponent,
   ],
   template: `
-    <app-page-header title="People &amp; Balances" subtitle="Track owed and money held on behalf of others">
+    <app-page-header title="Money Held" subtitle="Money kept on behalf of other people">
       <button class="add-person-btn" type="button" (click)="openAddPerson()">
         <lucide-icon name="plus" />
         <span>Add person</span>
