@@ -11,6 +11,7 @@ import { AppSettingsService } from './app-settings.service';
 
 import { BankAccountsService } from './bank-accounts.service';
 import { SubscriptionsService } from './subscriptions.service';
+import { InterestService } from './interest.service';
 
 @Injectable({ providedIn: 'root' })
 export class DataSyncService {
@@ -27,6 +28,7 @@ export class DataSyncService {
   // localStorage settings are migrated even before bill scanning is opened.
   private readonly appSettingsService = inject(AppSettingsService);
   private readonly subscriptionsService = inject(SubscriptionsService);
+  private readonly interestService = inject(InterestService);
 
   private syncPromise: Promise<void> | null = null;
 
@@ -65,6 +67,7 @@ export class DataSyncService {
           this.transfersService.load(),
           this.walletsService.load(),
           this.subscriptionsService.load(),
+          this.interestService.load(),
         ]);
       } catch (err) {
         console.error('Coordinated data sync failed', err);

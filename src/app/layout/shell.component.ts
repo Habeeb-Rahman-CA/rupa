@@ -85,6 +85,7 @@ export class ShellComponent implements AfterViewInit {
   readonly moreNav: NavItem[] = [
     { path: '/reports',    label: 'Reports',    icon: 'trending-up' },
     { path: '/subscriptions', label: 'Subscriptions', icon: 'repeat' },
+    { path: '/interest',   label: 'Interest (Riba)', icon: 'percent' },
     { path: '/categories', label: 'Categories', icon: 'tags' },
     { path: '/people',     label: 'People',     icon: 'users' },
   ];

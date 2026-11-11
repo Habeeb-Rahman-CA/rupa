@@ -60,6 +60,11 @@ export const routes: Routes = [
           import('./features/subscriptions/subscriptions.page').then((m) => m.SubscriptionsPage),
       },
       {
+        path: 'interest',
+        loadComponent: () =>
+          import('./features/interest/interest.page').then((m) => m.InterestPage),
+      },
+      {
         path: 'categories',
         loadComponent: () =>
           import('./features/categories/categories.page').then((m) => m.CategoriesPage),

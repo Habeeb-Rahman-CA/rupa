@@ -109,6 +109,35 @@ export interface MoneyHeldTransaction {
   created_at: string;
 }
 
+/** Interest (Riba) tracker — kept fully separate from personal finance. */
+export type InterestStage = 'received' | 'separated' | 'disposed';
+
+export interface InterestEntry {
+  id: string;
+  owner_id: string;
+  bank_account_id: string;
+  occurred_on: string;
+  amount: number;
+  stage: InterestStage;
+  separated_on: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InterestDisposal {
+  id: string;
+  owner_id: string;
+  entry_id: string;
+  occurred_on: string;
+  amount: number;
+  recipient: string;
+  purpose: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Transaction {
   id: string;
   owner_id: string;
