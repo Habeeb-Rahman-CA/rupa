@@ -171,7 +171,7 @@ export interface QuickAddSheetData {
             <mat-chip-option [value]="c.id">{{ c.name }}</mat-chip-option>
           }
           <mat-chip-option [value]="NEW_CATEGORY">
-            Other
+            + New category
           </mat-chip-option>
         </mat-chip-listbox>
       </div>
