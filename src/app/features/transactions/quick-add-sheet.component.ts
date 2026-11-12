@@ -26,6 +26,7 @@ import { Category, CategoryKind, PaymentMode, TxDirection, isSavingsCategory } f
 import { isWalletSpendingCategory } from '../../shared/utils/category-utils';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
+import { SheetDragCloseDirective } from '../../shared/directives/sheet-drag-close.directive';
 import { SetOpeningBalanceSheetComponent } from '../dashboard/set-opening-balance-sheet.component';
 import { errorText } from '../../shared/utils/error-utils';
 
@@ -39,6 +40,7 @@ export interface QuickAddSheetData {
   selector: 'app-quick-add-sheet',
   standalone: true,
   imports: [
+    SheetDragCloseDirective,
     FormsModule,
     MatButtonModule,
     MatButtonToggleModule,
@@ -49,6 +51,7 @@ export interface QuickAddSheetData {
   ],
   template: `
     <div class="sheet">
+      <div appSheetDragClose></div>
       <header class="sheet-header">
         <h2>
           @switch (txKind()) {

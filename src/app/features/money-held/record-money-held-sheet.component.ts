@@ -15,6 +15,7 @@ import { MoneyHeldService } from '../../core/services/money-held.service';
 import { DateFieldComponent } from '../../shared/components/date-field.component';
 import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
+import { SheetDragCloseDirective } from '../../shared/directives/sheet-drag-close.directive';
 import { errorText } from '../../shared/utils/error-utils';
 import { isLessOrEqualCurrency } from '../../shared/utils/currency-utils';
 
@@ -28,6 +29,7 @@ export interface RecordMoneyHeldSheetData {
   selector: 'app-record-money-held-sheet',
   standalone: true,
   imports: [
+    SheetDragCloseDirective,
     MatButtonModule,
     MatButtonToggleModule,
     LucideAngularModule,
@@ -37,6 +39,7 @@ export interface RecordMoneyHeldSheetData {
   ],
   template: `
     <div class="sheet">
+      <div appSheetDragClose></div>
       <header class="sheet-header">
         <div>
           <h2>Money held</h2>

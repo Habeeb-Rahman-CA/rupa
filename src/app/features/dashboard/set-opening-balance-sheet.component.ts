@@ -7,12 +7,14 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { TransactionsService } from '../../core/services/transactions.service';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
+import { SheetDragCloseDirective } from '../../shared/directives/sheet-drag-close.directive';
 import { errorText } from '../../shared/utils/error-utils';
 
 @Component({
   selector: 'app-set-opening-balance-sheet',
   standalone: true,
   imports: [
+    SheetDragCloseDirective,
     MatButtonModule,
     MatButtonToggleModule,
     LucideAngularModule,
@@ -20,6 +22,7 @@ import { errorText } from '../../shared/utils/error-utils';
   ],
   template: `
     <div class="sheet">
+      <div appSheetDragClose></div>
       <header class="sheet-header">
         <div>
           <h2>Set starting balance</h2>

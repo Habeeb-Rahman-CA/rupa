@@ -336,8 +336,10 @@ lucide-angular {
   padding-top: 12px !important;
   padding-bottom: env(safe-area-inset-bottom) !important;
 
-  // Small drag handle at the top
-  &::before {
+  // Small drag handle at the top.
+  // Decorative only — sheets rendering a real, draggable `.sheet-handle`
+  // element (see SheetDragCloseDirective) suppress this pseudo-element.
+  &:not(:has(.sheet-handle))::before {
     content: '';
     display: block;
     width: 40px;
@@ -345,6 +347,33 @@ lucide-angular {
     border-radius: 999px;
     background: var(--app-hairline);
     margin: 0 auto 8px;
+  }
+}
+
+// Real drag handle: overlays the container's top padding (same bar position
+// as the old ::before) without affecting layout. Drag down to close the sheet.
+.sheet-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 26px;
+  z-index: 2;
+  touch-action: none;
+  cursor: grab;
+  &::after {
+    content: '';
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--app-hairline);
+  }
+  &:active {
+    cursor: grabbing;
   }
 }
 

@@ -9,6 +9,7 @@ import { AccountTransferInput, TransfersService } from '../../core/services/tran
 import { DateFieldComponent } from '../../shared/components/date-field.component';
 import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
+import { SheetDragCloseDirective } from '../../shared/directives/sheet-drag-close.directive';
 import { errText } from '../../shared/utils/error-utils';
 
 export interface TransferSheetData {
@@ -19,6 +20,7 @@ export interface TransferSheetData {
   selector: 'app-transfer-sheet',
   standalone: true,
   imports: [
+    SheetDragCloseDirective,
     MatButtonModule,
     LucideAngularModule,
     DateFieldComponent,
@@ -27,6 +29,7 @@ export interface TransferSheetData {
   ],
   template: `
     <div class="sheet">
+      <div appSheetDragClose></div>
       <header class="sheet-header">
         <div class="header-icon"><lucide-icon name="arrow-left-right" /></div>
         <div>

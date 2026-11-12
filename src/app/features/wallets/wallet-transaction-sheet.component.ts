@@ -19,6 +19,7 @@ import {
 import { DateFieldComponent } from '../../shared/components/date-field.component';
 import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
+import { SheetDragCloseDirective } from '../../shared/directives/sheet-drag-close.directive';
 import { errText } from '../../shared/utils/error-utils';
 
 export interface WalletTransactionSheetData {
@@ -31,6 +32,7 @@ export interface WalletTransactionSheetData {
   selector: 'app-wallet-transaction-sheet',
   standalone: true,
   imports: [
+    SheetDragCloseDirective,
     MatButtonModule,
     MatButtonToggleModule,
     LucideAngularModule,
@@ -41,6 +43,7 @@ export interface WalletTransactionSheetData {
   ],
   template: `
     <div class="sheet">
+      <div appSheetDragClose></div>
       <header class="sheet-header">
         <div class="header-icon"><lucide-icon name="wallet" /></div>
         <div>

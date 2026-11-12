@@ -25,6 +25,7 @@ import {
   SelectFieldComponent,
   SelectOption,
 } from '../../shared/components/select-field.component';
+import { SheetDragCloseDirective } from '../../shared/directives/sheet-drag-close.directive';
 import { errorText } from '../../shared/utils/error-utils';
 
 const NEW_PERSON = '__new__';
@@ -33,6 +34,7 @@ const NEW_PERSON = '__new__';
   selector: 'app-add-debt-sheet',
   standalone: true,
   imports: [
+    SheetDragCloseDirective,
     MatButtonModule,
     MatButtonToggleModule,
     LucideAngularModule,
@@ -41,6 +43,7 @@ const NEW_PERSON = '__new__';
   ],
   template: `
     <div class="sheet">
+      <div appSheetDragClose></div>
       <header class="sheet-header">
         <h2>Record a debt</h2>
         <mat-button-toggle-group
