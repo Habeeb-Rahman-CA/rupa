@@ -41,8 +41,8 @@ const STAGE_META: Record<InterestEntry['stage'], { label: string; icon: string }
   ],
   template: `
     <app-page-header
-      title="Interest (Riba)"
-      subtitle="Bank interest kept separate from income — received, separated, disposed"
+      title="Interest"
+      subtitle="Bank interest kept separate from income"
     >
       <button class="add-btn" type="button" (click)="openAdd()" aria-label="Add interest">
         <lucide-icon name="plus" />

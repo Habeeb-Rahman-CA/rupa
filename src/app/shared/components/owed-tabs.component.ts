@@ -31,7 +31,7 @@ import { LucideAngularModule } from 'lucide-angular';
       >
         <span class="tab-icon"><lucide-icon name="wallet" /></span>
         <span class="tab-copy">
-          <strong>Money Held</strong>
+          <strong>Held</strong>
           <span>For other people</span>
         </span>
       </a>
