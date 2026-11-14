@@ -188,12 +188,7 @@ const STAGE_META: Record<InterestEntry['stage'], { label: string; icon: string }
           </div>
         </article>
       }
-
-      <p class="privacy-note">
-        <lucide-icon name="shield-check" />
-        Interest is tracked outside your personal ledger — it never counts as income,
-        expense, or savings, and never affects budgets or reports.
-      </p>
+      
     }
   `,
   styles: [
