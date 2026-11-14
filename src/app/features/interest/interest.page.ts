@@ -6,7 +6,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LucideAngularModule } from 'lucide-angular';
 
-import { InterestDisposal, InterestEntry } from '../../core/models/domain.models';
+import { InterestEntry } from '../../core/models/domain.models';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
 import { InterestPeriodSummary, InterestService } from '../../core/services/interest.service';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
@@ -72,30 +72,6 @@ const STAGE_META: Record<InterestEntry['stage'], { label: string; icon: string }
         </button>
       </div>
     } @else {
-      <!-- AT A GLANCE -->
-      <section class="stat-grid" aria-label="Interest summary">
-        <div class="stat-tile app-card">
-          <div class="stat-icon received"><lucide-icon name="landmark" /></div>
-          <span class="micro-label">Received</span>
-          <strong>{{ totalReceived() | signedMoney }}</strong>
-        </div>
-        <div class="stat-tile app-card">
-          <div class="stat-icon separated"><lucide-icon name="clock" /></div>
-          <span class="micro-label">Separated</span>
-          <strong>{{ totalSeparated() | signedMoney }}</strong>
-        </div>
-        <div class="stat-tile app-card">
-          <div class="stat-icon disposed"><lucide-icon name="gift" /></div>
-          <span class="micro-label">Disposed</span>
-          <strong>{{ totalDisposed() | signedMoney }}</strong>
-        </div>
-        <div class="stat-tile app-card">
-          <div class="stat-icon pending"><lucide-icon name="percent" /></div>
-          <span class="micro-label">Pending</span>
-          <strong [class.money-positive]="pendingBalance() > 0">{{ pendingBalance() | signedMoney }}</strong>
-        </div>
-      </section>
-
       <!-- MONTHLY / YEARLY SUMMARIES -->
       <section class="summary-card app-card" aria-label="Interest summaries">
         <div class="section-heading">
@@ -134,7 +110,7 @@ const STAGE_META: Record<InterestEntry['stage'], { label: string; icon: string }
         </ul>
       </section>
 
-      <!-- INTEREST ENTRIES -->
+      <!-- INTEREST ENTRIES — each card is its own history (stage + progress) -->
       <section class="list-head" aria-label="Interest received">
         <h2>Interest received</h2>
         <span class="count">{{ entries().length }} entr{{ entries().length === 1 ? 'y' : 'ies' }}</span>
@@ -201,14 +177,6 @@ const STAGE_META: Record<InterestEntry['stage'], { label: string; icon: string }
               </button>
             }
             <button
-              mat-stroked-button
-              type="button"
-              class="entry-btn edit-btn"
-              (click)="openEdit(entry)"
-            >
-              <lucide-icon name="pencil" /> Edit
-            </button>
-            <button
               mat-icon-button
               type="button"
               class="delete-btn"
@@ -220,64 +188,6 @@ const STAGE_META: Record<InterestEntry['stage'], { label: string; icon: string }
           </div>
         </article>
       }
-
-      <!-- DISPOSAL HISTORY -->
-      <section class="disposal-card app-card" aria-label="Disposal history">
-        <div class="disposal-head">
-          <div>
-            <span class="micro-label">History</span>
-            <h2>Disposals</h2>
-          </div>
-          <button
-            mat-stroked-button
-            type="button"
-            class="record-disposal-btn"
-            [disabled]="pendingBalance() <= 0"
-            (click)="openDispose()"
-          >
-            <lucide-icon name="plus" /> Record disposal
-          </button>
-        </div>
-
-        @if (disposals().length > 0) {
-          <ul class="history-list">
-            @for (disposal of disposals(); track disposal.id) {
-              <li class="history-row">
-                <div class="history-icon"><lucide-icon name="gift" /></div>
-                <div class="history-main">
-                  <div class="history-title">{{ disposal.recipient }}</div>
-                  <div class="history-meta">
-                    {{ disposal.occurred_on | date: 'MMM d, y' }} · {{ disposal.purpose }}
-                    @if (disposal.notes) { · {{ disposal.notes }} }
-                    @if (entryFor(disposal); as linked) {
-                      · from {{ bankLabel(linked.bank_account_id) }}
-                    }
-                  </div>
-                </div>
-                <div class="history-amount">{{ disposal.amount | signedMoney }}</div>
-                <button
-                  mat-icon-button
-                  type="button"
-                  aria-label="Edit disposal record"
-                  (click)="openEditDisposal(disposal)"
-                >
-                  <lucide-icon name="pencil" />
-                </button>
-                <button
-                  mat-icon-button
-                  type="button"
-                  aria-label="Delete disposal record"
-                  (click)="confirmDeleteDisposal(disposal)"
-                >
-                  <lucide-icon name="trash-2" />
-                </button>
-              </li>
-            }
-          </ul>
-        } @else {
-          <div class="history-empty">No disposals recorded yet.</div>
-        }
-      </section>
 
       <p class="privacy-note">
         <lucide-icon name="shield-check" />
@@ -308,48 +218,16 @@ const STAGE_META: Record<InterestEntry['stage'], { label: string; icon: string }
       .empty-actions button { border-radius: 999px; }
       .empty-actions lucide-icon { width: 17px; height: 17px; margin-right: 5px; }
 
-      /* Stat tiles */
-      .stat-grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 10px;
-        margin-bottom: 14px;
-      }
-      .stat-tile { display: flex; flex-direction: column; gap: 3px; padding: 14px; min-width: 0; }
-      .stat-icon {
-        display: grid;
-        place-items: center;
-        width: 34px;
-        height: 34px;
-        margin-bottom: 6px;
-        border-radius: 11px;
-        background: var(--app-accent-soft);
-        color: var(--app-accent);
-      }
-      .stat-icon.separated { background: var(--app-input-bg); color: var(--app-ink-muted); }
-      .stat-icon.disposed { background: var(--app-positive-soft, rgba(16, 163, 127, .12)); color: var(--app-positive); }
-      .stat-icon.pending { background: rgba(255, 107, 53, .12); color: #b43403; }
-      .stat-icon lucide-icon { width: 17px; height: 17px; }
-      .stat-tile .micro-label { color: var(--app-ink-muted); font-size: 11px; }
-      .stat-tile strong {
-        overflow: hidden;
-        color: var(--app-ink);
-        font-size: 17px;
-        font-weight: 700;
-        font-variant-numeric: tabular-nums;
-        text-overflow: ellipsis;
-      }
-
       /* Summaries */
       .summary-card { margin-bottom: 18px; padding: 16px; }
-      .section-heading, .disposal-head {
+      .section-heading {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
         gap: 12px;
         margin-bottom: 12px;
       }
-      .section-heading h2, .disposal-head h2, .list-head h2 {
+      .section-heading h2, .list-head h2 {
         margin: 2px 0 0;
         color: var(--app-ink);
         font-size: 15px;
@@ -429,14 +307,19 @@ const STAGE_META: Record<InterestEntry['stage'], { label: string; icon: string }
       .progress-fill { height: 100%; border-radius: 999px; background: var(--app-accent); transition: width .25s ease; }
       .progress-fill.fully-disposed { background: var(--app-positive); }
       .progress-copy { margin-top: 6px; color: var(--app-ink-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
-      .entry-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+      /* Compact single-row actions: Separate · Dispose · Delete */
+      .entry-actions { display: flex; flex-wrap: nowrap; gap: 6px; margin-top: 12px; }
       .entry-actions .entry-btn {
-        min-height: 36px;
+        min-height: 32px;
+        min-width: 0;
+        padding: 0 11px;
         border-radius: 999px !important;
-        font-size: 12px;
+        font-size: 11.5px;
         font-weight: 700;
+        line-height: 1;
       }
-      .entry-actions lucide-icon { width: 15px; height: 15px; margin-right: 4px; }
+      .entry-actions lucide-icon { width: 14px; height: 14px; margin-right: 4px; }
       .separate-btn {
         border-color: var(--app-accent) !important;
         color: var(--app-accent) !important;
@@ -445,44 +328,14 @@ const STAGE_META: Record<InterestEntry['stage'], { label: string; icon: string }
         border-color: var(--app-positive) !important;
         color: var(--app-positive) !important;
       }
-      .entry-actions .delete-btn { margin-left: auto; width: 36px; height: 36px; color: var(--app-ink-muted); }
+      .entry-actions .delete-btn {
+        margin-left: auto;
+        width: 32px;
+        height: 32px;
+        flex: 0 0 auto;
+        color: var(--app-ink-muted);
+      }
       .entry-actions .delete-btn lucide-icon { width: 16px; height: 16px; margin: 0; }
-
-      /* Disposal history */
-      .disposal-card { margin-bottom: 16px; padding: 16px; }
-      .record-disposal-btn {
-        border-radius: 999px !important;
-        font-size: 12px;
-        font-weight: 700;
-      }
-      .record-disposal-btn lucide-icon { width: 15px; height: 15px; margin-right: 4px; }
-      .history-list { list-style: none; margin: 0; padding: 0; }
-      .history-row {
-        display: grid;
-        grid-template-columns: 30px minmax(0, 1fr) auto auto auto;
-        gap: 9px;
-        align-items: center;
-        padding: 10px 0;
-        border-bottom: 1px solid var(--app-hairline);
-      }
-      .history-row:last-child { border-bottom: 0; }
-      .history-icon {
-        display: grid;
-        place-items: center;
-        width: 28px;
-        height: 28px;
-        border-radius: 9px;
-        background: var(--app-positive-soft, rgba(16, 163, 127, .12));
-        color: var(--app-positive);
-      }
-      .history-icon lucide-icon { width: 15px; height: 15px; }
-      .history-main { min-width: 0; }
-      .history-title { color: var(--app-ink); font-size: 13px; font-weight: 600; }
-      .history-meta { margin-top: 2px; overflow: hidden; color: var(--app-ink-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-      .history-amount { color: var(--app-ink); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-      .history-row button { width: 32px; height: 32px; color: var(--app-ink-muted); }
-      .history-row button lucide-icon { width: 16px; height: 16px; }
-      .history-empty { padding: 14px 0 2px; color: var(--app-ink-muted); font-size: 13px; text-align: center; }
 
       .privacy-note {
         display: flex;
@@ -495,18 +348,17 @@ const STAGE_META: Record<InterestEntry['stage'], { label: string; icon: string }
       .privacy-note lucide-icon { width: 15px; height: 15px; flex: 0 0 auto; }
 
       @media (max-width: 640px) {
-        .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .add-btn span { display: none; }
         .add-btn { width: 40px; justify-content: center; padding: 0; }
       }
       @media (max-width: 480px) {
         .entry-head { align-items: flex-start; }
-        .history-row { grid-template-columns: 30px minmax(0, 1fr) auto; }
-        .history-row button[aria-label='Edit disposal record'] { grid-column: 3; grid-row: 1; }
-        .history-amount { grid-column: 2; grid-row: 2; justify-self: start; }
-        .history-row button[aria-label='Delete disposal record'] { grid-column: 3; grid-row: 2; }
-        .period-head { display: none; }
-        .period-row { grid-template-columns: minmax(0, 1fr) repeat(3, auto); font-size: 12px; }
+        /* Keep the column header visible on phones — just tighter. */
+        .period-head { font-size: 9px; letter-spacing: .03em; }
+        .period-row { font-size: 11px; }
+        .period-label { font-size: 12px; }
+        .period-value { font-size: 11px; }
+        .entry-actions .entry-btn { padding: 0 9px; font-size: 11px; }
       }
     `,
   ],
@@ -518,13 +370,8 @@ export class InterestPage {
   private readonly snack = inject(MatSnackBar);
 
   readonly entries = this.interestService.entries;
-  readonly disposals = this.interestService.disposals;
   readonly isLoading = this.interestService.isLoading;
   readonly isAvailable = this.interestService.isAvailable;
-  readonly totalReceived = this.interestService.totalReceived;
-  readonly totalSeparated = this.interestService.totalSeparated;
-  readonly totalDisposed = this.interestService.totalDisposed;
-  readonly pendingBalance = this.interestService.pendingBalance;
   readonly monthlySummaries = this.interestService.monthlySummaries;
   readonly yearlySummaries = this.interestService.yearlySummaries;
 
@@ -559,34 +406,16 @@ export class InterestPage {
     return Math.min(100, (this.disposedFor(entry) / amount) * 100);
   }
 
-  entryFor(disposal: InterestDisposal): InterestEntry | undefined {
-    return this.entries().find((entry) => entry.id === disposal.entry_id);
-  }
-
   openAdd(): void {
     this.dialog.open(InterestDialogComponent, {
       width: 'min(520px, calc(100vw - 24px))',
     });
   }
 
-  openEdit(entry: InterestEntry): void {
-    this.dialog.open(InterestDialogComponent, {
+  openDispose(entry: InterestEntry): void {
+    this.dialog.open(RecordDisposalDialogComponent, {
       width: 'min(520px, calc(100vw - 24px))',
       data: { entry },
-    });
-  }
-
-  openDispose(entry?: InterestEntry): void {
-    this.dialog.open(RecordDisposalDialogComponent, {
-      width: 'min(520px, calc(100vw - 24px))',
-      data: entry ? { entry } : {},
-    });
-  }
-
-  openEditDisposal(disposal: InterestDisposal): void {
-    this.dialog.open(RecordDisposalDialogComponent, {
-      width: 'min(520px, calc(100vw - 24px))',
-      data: { disposal },
     });
   }
 
@@ -605,7 +434,7 @@ export class InterestPage {
     const ok = await openConfirm(this.dialog, {
       title: 'Delete this interest entry?',
       message:
-        'Only this tracker record is removed — no personal transactions or balances are affected. Entries with disposal records must have those disposals deleted first.',
+        'Only this tracker record is removed — no personal transactions or balances are affected. Its disposal records are deleted with it.',
       confirmLabel: 'Delete',
       destructive: true,
       icon: 'trash-2',
@@ -616,25 +445,6 @@ export class InterestPage {
       this.snack.open('Interest entry deleted.', undefined, { duration: 2000 });
     } catch (error: unknown) {
       this.snack.open(errorText(error, 'Couldn’t delete the entry.'), 'Dismiss', {
-        duration: 4000,
-      });
-    }
-  }
-
-  async confirmDeleteDisposal(disposal: InterestDisposal): Promise<void> {
-    const ok = await openConfirm(this.dialog, {
-      title: 'Delete this disposal record?',
-      message: 'The amount will return to the pending balance awaiting disposal.',
-      confirmLabel: 'Delete',
-      destructive: true,
-      icon: 'trash-2',
-    });
-    if (!ok) return;
-    try {
-      await this.interestService.deleteDisposal(disposal.id);
-      this.snack.open('Disposal record deleted.', undefined, { duration: 2000 });
-    } catch (error: unknown) {
-      this.snack.open(errorText(error, 'Couldn’t delete the record.'), 'Dismiss', {
         duration: 4000,
       });
     }

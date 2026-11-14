@@ -131,8 +131,9 @@ export interface InterestDisposal {
   entry_id: string;
   occurred_on: string;
   amount: number;
-  recipient: string;
-  purpose: string;
+  /** Legacy fields — the app now records a free-text note only. */
+  recipient: string | null;
+  purpose: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

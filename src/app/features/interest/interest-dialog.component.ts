@@ -1,26 +1,17 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
-import { InterestEntry } from '../../core/models/domain.models';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
-import {
-  CreateInterestEntryInput,
-  InterestService,
-  UpdateInterestEntryInput,
-} from '../../core/services/interest.service';
+import { CreateInterestEntryInput, InterestService } from '../../core/services/interest.service';
 import { DateFieldComponent } from '../../shared/components/date-field.component';
 import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { errorText } from '../../shared/utils/error-utils';
 import { isEqualCurrency, roundCurrency } from '../../shared/utils/currency-utils';
-
-export interface InterestDialogData {
-  entry?: InterestEntry;
-}
 
 @Component({
   selector: 'app-interest-dialog',
@@ -37,7 +28,7 @@ export interface InterestDialogData {
     <div class="dialog-container">
       <header class="dialog-header">
         <div>
-          <h2 mat-dialog-title>{{ isEdit ? 'Edit Interest Entry' : 'Add Interest' }}</h2>
+          <h2 mat-dialog-title>Add Interest</h2>
           <p class="dialog-subtitle">Record interest actually credited to a bank account.</p>
         </div>
       </header>
@@ -124,7 +115,7 @@ export interface InterestDialogData {
           (click)="save()"
           [disabled]="!canSave() || submitting()"
         >
-          {{ submitting() ? 'Saving…' : (isEdit ? 'Save changes' : 'Add Interest') }}
+          {{ submitting() ? 'Saving…' : 'Add Interest' }}
         </button>
       </mat-dialog-actions>
     </div>
@@ -182,21 +173,17 @@ export interface InterestDialogData {
 })
 export class InterestDialogComponent {
   private readonly ref = inject(MatDialogRef<InterestDialogComponent>);
-  private readonly data = inject<InterestDialogData>(MAT_DIALOG_DATA, { optional: true }) ?? {};
   private readonly interestService = inject(InterestService);
   private readonly bankAccountsService = inject(BankAccountsService);
   private readonly snack = inject(MatSnackBar);
   private readonly router = inject(Router);
 
-  readonly isEdit = !!this.data.entry;
   readonly submitting = signal(false);
   readonly touched = signal(false);
-  readonly amount = signal<number | null>(this.data.entry?.amount ?? null);
-  readonly occurredOn = signal<Date | null>(
-    this.data.entry ? parseIsoDate(this.data.entry.occurred_on) : new Date(),
-  );
-  readonly bankAccountId = signal<string | null>(this.data.entry?.bank_account_id ?? null);
-  readonly notes = signal(this.data.entry?.notes ?? '');
+  readonly amount = signal<number | null>(null);
+  readonly occurredOn = signal<Date | null>(new Date());
+  readonly bankAccountId = signal<string | null>(null);
+  readonly notes = signal('');
 
   readonly accountOptions = () =>
     this.bankAccountsService.bankAccounts().map<SelectOption<string>>((account) => ({
@@ -215,7 +202,6 @@ export class InterestDialogComponent {
     if (!amount || !on || !bankId) return false;
     return this.interestService.entries().some(
       (entry) =>
-        entry.id !== this.data.entry?.id &&
         entry.occurred_on === on &&
         entry.bank_account_id === bankId &&
         isEqualCurrency(Number(entry.amount), roundCurrency(amount)),
@@ -258,13 +244,8 @@ export class InterestDialogComponent {
     };
 
     try {
-      if (this.isEdit && this.data.entry) {
-        await this.interestService.updateEntry(this.data.entry.id, base satisfies UpdateInterestEntryInput);
-        this.snack.open('Interest entry updated.', undefined, { duration: 2000 });
-      } else {
-        await this.interestService.createEntry(base satisfies CreateInterestEntryInput);
-        this.snack.open('Interest recorded.', undefined, { duration: 2000 });
-      }
+      await this.interestService.createEntry(base satisfies CreateInterestEntryInput);
+      this.snack.open('Interest recorded.', undefined, { duration: 2000 });
       this.ref.close({ saved: true });
     } catch (error: unknown) {
       this.snack.open(errorText(error, 'Couldn’t save the interest entry.'), 'Dismiss', {
@@ -277,12 +258,6 @@ export class InterestDialogComponent {
   close(): void {
     this.ref.close();
   }
-}
-
-function parseIsoDate(value: string | null | undefined): Date | null {
-  if (!value) return null;
-  const [year, month, day] = value.split('-').map(Number);
-  return new Date(year, month - 1, day);
 }
 
 function toIsoDate(value: Date | null): string | null {

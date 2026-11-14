@@ -128,8 +128,6 @@ describe('InterestService', () => {
       service.recordDisposal({
         entry_id: 'entry-1',
         amount: 40,
-        recipient: 'Charity',
-        purpose: 'Donation',
       }),
     ).toBeRejectedWithError(
       'Disposal cannot exceed the remaining interest of ₹30.00 for this entry.',
@@ -155,8 +153,7 @@ describe('InterestService', () => {
       entry_id: 'entry-1',
       amount: 40,
       occurred_on: '2026-11-10',
-      recipient: 'Orphanage',
-      purpose: 'Education',
+      notes: 'Orphanage education fund',
     });
 
     expect(service.entries()[0].stage).toBe('disposed');
@@ -165,30 +162,19 @@ describe('InterestService', () => {
     expect(service.pendingBalance()).toBe(0);
   });
 
-  it('returns an entry to separated when its disposal is deleted', async () => {
-    seed(
-      [entry({ stage: 'disposed', separated_on: '2026-11-05' })],
-      [disposal({ amount: 100 })],
-    );
+  it('deletes an entry together with its disposal records (cascade)', async () => {
+    seed([entry()], [disposal()]);
+
     const query: any = {};
     query.delete = jasmine.createSpy('delete').and.returnValue(query);
     query.eq = jasmine.createSpy('eq').and.returnValue(query);
-    query.update = jasmine.createSpy('update').and.returnValue(query);
     mockSupabase.client.from.and.returnValue(query);
 
-    await service.deleteDisposal('disp-1');
+    await service.deleteEntry('entry-1');
 
-    expect(service.entries()[0].stage).toBe('separated');
-    expect(service.pendingBalance()).toBe(100);
-  });
-
-  it('refuses to delete an interest entry that has disposal records', async () => {
-    seed([entry()], [disposal()]);
-
-    await expectAsync(service.deleteEntry('entry-1')).toBeRejectedWithError(
-      'Delete this entry’s disposal records first.',
-    );
-    expect(mockSupabase.client.from).not.toHaveBeenCalled();
+    expect(mockSupabase.client.from).toHaveBeenCalledWith('interest_entries');
+    expect(service.entries().length).toBe(0);
+    expect(service.disposals().length).toBe(0);
   });
 
   it('builds monthly summaries keyed by year-month', () => {

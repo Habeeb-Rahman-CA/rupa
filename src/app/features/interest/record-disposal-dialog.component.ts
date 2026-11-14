@@ -4,13 +4,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LucideAngularModule } from 'lucide-angular';
 
-import { InterestDisposal, InterestEntry } from '../../core/models/domain.models';
+import { InterestEntry } from '../../core/models/domain.models';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
-import {
-  InterestService,
-  RecordInterestDisposalInput,
-  UpdateInterestDisposalInput,
-} from '../../core/services/interest.service';
+import { InterestService, RecordInterestDisposalInput } from '../../core/services/interest.service';
 import { DateFieldComponent } from '../../shared/components/date-field.component';
 import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
@@ -20,8 +16,6 @@ import { isGreaterCurrency, roundCurrency } from '../../shared/utils/currency-ut
 export interface RecordDisposalDialogData {
   /** Pre-select the entry this disposal covers (when opened from an entry card). */
   entry?: InterestEntry;
-  /** Edit an existing disposal record instead of creating one. */
-  disposal?: InterestDisposal;
 }
 
 @Component({
@@ -39,7 +33,7 @@ export interface RecordDisposalDialogData {
     <div class="dialog-container">
       <header class="dialog-header">
         <div>
-          <h2 mat-dialog-title>{{ isEdit ? 'Edit Disposal' : 'Record Disposal' }}</h2>
+          <h2 mat-dialog-title>Record Disposal</h2>
           <p class="dialog-subtitle">
             Interest given away — recorded separately from personal expenses.
           </p>
@@ -48,12 +42,7 @@ export interface RecordDisposalDialogData {
 
       <mat-dialog-content class="dialog-content">
         <div class="form-grid">
-          @if (isEdit) {
-            <div class="full entry-chip">
-              <lucide-icon name="percent" />
-              <span>{{ entryLabel(entryId()) }}</span>
-            </div>
-          } @else if (entryOptions().length > 1) {
+          @if (entryOptions().length > 1) {
             <div class="full">
               <app-select-field
                 label="Interest entry"
@@ -97,28 +86,9 @@ export interface RecordDisposalDialogData {
 
           <app-text-field
             class="full"
-            label="Recipient"
-            placeholder="e.g. Masjid committee, relative, charity org"
-            leadIcon="users"
-            [value]="recipient()"
-            [invalid]="touched() && !recipient().trim()"
-            (valueChange)="recipient.set($any($event) ?? '')"
-          />
-
-          <app-text-field
-            class="full"
-            label="Purpose"
-            placeholder="e.g. Building fund, medical aid, sadaqah"
+            label="Note (optional)"
+            placeholder="e.g. who it was given for, what it was used for"
             leadIcon="sticky-note"
-            [value]="purpose()"
-            [invalid]="touched() && !purpose().trim()"
-            (valueChange)="purpose.set($any($event) ?? '')"
-          />
-
-          <app-text-field
-            class="full"
-            label="Notes (optional)"
-            placeholder="Anything else worth remembering"
             [maxlength]="120"
             [value]="notes()"
             (valueChange)="notes.set($any($event) ?? '')"
@@ -150,7 +120,7 @@ export interface RecordDisposalDialogData {
           (click)="save()"
           [disabled]="!canSave() || submitting()"
         >
-          {{ submitting() ? 'Saving…' : (isEdit ? 'Save changes' : 'Record Disposal') }}
+          {{ submitting() ? 'Saving…' : 'Record Disposal' }}
         </button>
       </mat-dialog-actions>
     </div>
@@ -204,28 +174,20 @@ export class RecordDisposalDialogComponent {
   private readonly bankAccountsService = inject(BankAccountsService);
   private readonly snack = inject(MatSnackBar);
 
-  readonly isEdit = !!this.data.disposal;
   readonly submitting = signal(false);
   readonly touched = signal(false);
   readonly entryId = signal<string | null>(this.initialEntryId());
   readonly amount = signal<number | null>(
-    this.data.disposal?.amount ?? this.remainingFor(this.entryId()),
+    this.remainingFor(this.entryId()),
   );
-  readonly occurredOn = signal<Date | null>(
-    parseIsoDate(this.data.disposal?.occurred_on) ?? new Date(),
-  );
-  readonly recipient = signal(this.data.disposal?.recipient ?? '');
-  readonly purpose = signal(this.data.disposal?.purpose ?? '');
-  readonly notes = signal(this.data.disposal?.notes ?? '');
+  readonly occurredOn = signal<Date | null>(new Date());
+  readonly notes = signal('');
 
-  /** Entries that still have interest left to dispose (plus the edited one). */
+  /** Entries that still have interest left to dispose. */
   readonly entryOptions = computed<SelectOption<string>[]>(() =>
     this.interestService
       .entries()
-      .filter(
-        (entry) =>
-          entry.id === this.entryId() || this.interestService.remainingForEntry(entry) > 0,
-      )
+      .filter((entry) => this.interestService.remainingForEntry(entry) > 0)
       .map((entry) => ({
         value: entry.id,
         label: this.entryLabel(entry.id),
@@ -236,7 +198,7 @@ export class RecordDisposalDialogComponent {
   readonly remaining = computed(() => {
     const entry = this.entry();
     if (!entry) return 0;
-    return roundCurrency(this.interestService.remainingForEntry(entry) + this.reservedAmount());
+    return roundCurrency(this.interestService.remainingForEntry(entry));
   });
 
   readonly overRemaining = computed(() => {
@@ -257,13 +219,7 @@ export class RecordDisposalDialogComponent {
   }
 
   canSave(): boolean {
-    return (
-      !!this.entryId() &&
-      this.amountValid() &&
-      !!this.occurredOn() &&
-      !!this.recipient().trim() &&
-      !!this.purpose().trim()
-    );
+    return !!this.entryId() && this.amountValid() && !!this.occurredOn();
   }
 
   toNumber(value: string | number | null): number | null {
@@ -290,28 +246,14 @@ export class RecordDisposalDialogComponent {
     this.submitting.set(true);
 
     try {
-      if (this.isEdit && this.data.disposal) {
-        const changes: UpdateInterestDisposalInput = {
-          amount: Number(this.amount()),
-          occurred_on: toIsoDate(this.occurredOn()!)!,
-          recipient: this.recipient().trim(),
-          purpose: this.purpose().trim(),
-          notes: this.notes().trim() || null,
-        };
-        await this.interestService.updateDisposal(this.data.disposal.id, changes);
-        this.snack.open('Disposal updated.', undefined, { duration: 2000 });
-      } else {
-        const input: RecordInterestDisposalInput = {
-          entry_id: this.entryId()!,
-          amount: Number(this.amount()),
-          occurred_on: toIsoDate(this.occurredOn()!)!,
-          recipient: this.recipient().trim(),
-          purpose: this.purpose().trim(),
-          notes: this.notes().trim() || null,
-        };
-        await this.interestService.recordDisposal(input);
-        this.snack.open('Disposal recorded.', undefined, { duration: 2000 });
-      }
+      const input: RecordInterestDisposalInput = {
+        entry_id: this.entryId()!,
+        amount: Number(this.amount()),
+        occurred_on: toIsoDate(this.occurredOn()!)!,
+        notes: this.notes().trim() || null,
+      };
+      await this.interestService.recordDisposal(input);
+      this.snack.open('Disposal recorded.', undefined, { duration: 2000 });
       this.ref.close({ saved: true });
     } catch (error: unknown) {
       this.snack.open(errorText(error, 'Couldn’t save the disposal record.'), 'Dismiss', {
@@ -332,9 +274,8 @@ export class RecordDisposalDialogComponent {
   }
 
   private initialEntryId(): string | null {
-    if (this.data.disposal) return this.data.disposal.entry_id;
     if (this.data.entry) return this.data.entry.id;
-    // Opened from the history list: pre-select when exactly one entry is pending.
+    // Opened without a pre-selected entry: pick it when exactly one is pending.
     const open = this.interestService
       .entries()
       .filter((entry) => this.interestService.remainingForEntry(entry) > 0);
@@ -345,17 +286,6 @@ export class RecordDisposalDialogComponent {
     const entry = this.interestService.entries().find((item) => item.id === entryId);
     return entry ? roundCurrency(this.interestService.remainingForEntry(entry)) : null;
   }
-
-  /** The edited disposal's own amount still counts toward its entry. */
-  private reservedAmount(): number {
-    return this.data.disposal ? Number(this.data.disposal.amount) : 0;
-  }
-}
-
-function parseIsoDate(value: string | null | undefined): Date | null {
-  if (!value) return null;
-  const [year, month, day] = value.split('-').map(Number);
-  return new Date(year, month - 1, day);
 }
 
 function toIsoDate(value: Date | null): string | null {

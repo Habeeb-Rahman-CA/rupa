@@ -16,27 +16,10 @@ export interface CreateInterestEntryInput {
   notes?: string | null;
 }
 
-export interface UpdateInterestEntryInput {
-  bank_account_id?: string;
-  amount?: number;
-  occurred_on?: string;
-  notes?: string | null;
-}
-
 export interface RecordInterestDisposalInput {
   entry_id: string;
   amount: number;
   occurred_on?: string;
-  recipient: string;
-  purpose: string;
-  notes?: string | null;
-}
-
-export interface UpdateInterestDisposalInput {
-  amount?: number;
-  occurred_on?: string;
-  recipient?: string;
-  purpose?: string;
   notes?: string | null;
 }
 
@@ -214,64 +197,17 @@ export class InterestService {
     return created;
   }
 
-  async updateEntry(id: string, changes: UpdateInterestEntryInput): Promise<InterestEntry> {
-    this.ensureAvailable();
-    const current = this._entries().find((entry) => entry.id === id);
-    if (!current) throw new Error('Interest entry not found.');
-
-    const amount = changes.amount != null ? roundCurrency(changes.amount) : Number(current.amount);
-    if (!(amount > 0)) throw new Error('Amount must be greater than zero.');
-    const bankAccountId = (changes.bank_account_id ?? current.bank_account_id)?.trim();
-    if (!bankAccountId) throw new Error('Bank account is required.');
-
-    const disposed = this.disposedForEntry(id);
-    if (isGreaterCurrency(disposed, amount)) {
-      throw new Error('Amount cannot be lower than the disposals already recorded against it.');
-    }
-
-    const occurredOn = changes.occurred_on ?? current.occurred_on;
-    this.assertNoDuplicate(bankAccountId, occurredOn, amount, id);
-
-    const payload = {
-      bank_account_id: bankAccountId,
-      occurred_on: occurredOn,
-      amount,
-      notes: changes.notes != null ? changes.notes.trim() || null : current.notes,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { data, error } = await this.supabase.client
-      .from('interest_entries')
-      .update(payload)
-      .eq('id', id)
-      .eq('owner_id', this.requireUserId())
-      .select()
-      .single();
-    if (error) {
-      if (isDuplicateViolation(error)) {
-        throw new Error(
-          'A matching interest entry already exists for this date, account, and amount.',
-        );
-      }
-      console.error('Failed to update interest entry', error);
-      throw error;
-    }
-
-    const updated = data as InterestEntry;
-    this._entries.update((list) => list.map((item) => (item.id === id ? updated : item)));
-    return updated;
-  }
-
   async deleteEntry(id: string): Promise<void> {
     this.ensureAvailable();
     const current = this._entries().find((entry) => entry.id === id);
     if (!current) return;
 
-    if (this.disposalsForEntry(id).length > 0) {
-      throw new Error('Delete this entry’s disposal records first.');
-    }
-
+    const linked = this.disposalsForEntry(id);
     this._entries.update((list) => list.filter((item) => item.id !== id));
+    this._disposals.update((list) => list.filter((item) => item.entry_id !== id));
+
+    // interest_disposals.entry_id is ON DELETE CASCADE (migration 0016), so the
+    // linked disposal rows go with the entry in a single atomic delete.
     const { error } = await this.supabase.client
       .from('interest_entries')
       .delete()
@@ -279,6 +215,9 @@ export class InterestService {
       .eq('owner_id', this.requireUserId());
     if (error) {
       this._entries.update((list) => [current, ...list]);
+      if (linked.length > 0) {
+        this._disposals.update((list) => [...linked, ...list]);
+      }
       console.error('Failed to delete interest entry', error);
       throw error;
     }
@@ -321,11 +260,7 @@ export class InterestService {
     if (!entry) throw new Error('Interest entry not found.');
 
     const amount = roundCurrency(input.amount ?? 0);
-    const recipient = input.recipient?.trim();
-    const purpose = input.purpose?.trim();
     if (!(amount > 0)) throw new Error('Amount must be greater than zero.');
-    if (!recipient) throw new Error('Recipient is required.');
-    if (!purpose) throw new Error('Purpose is required.');
     this.assertWithinRemaining(entry.id, amount);
 
     const ownerId = this.requireUserId();
@@ -336,8 +271,6 @@ export class InterestService {
         entry_id: entry.id,
         occurred_on: input.occurred_on ?? todayIso(),
         amount,
-        recipient,
-        purpose,
         notes: input.notes?.trim() || null,
       })
       .select()
@@ -351,71 +284,6 @@ export class InterestService {
     this._disposals.update((list) => [created, ...list]);
     await this.syncEntryStage(entry.id, created.occurred_on);
     return created;
-  }
-
-  async updateDisposal(id: string, changes: UpdateInterestDisposalInput): Promise<InterestDisposal> {
-    this.ensureAvailable();
-    const current = this._disposals().find((item) => item.id === id);
-    if (!current) throw new Error('Disposal record not found.');
-
-    const amount = changes.amount != null ? roundCurrency(changes.amount) : Number(current.amount);
-    const recipient = (changes.recipient ?? current.recipient).trim();
-    const purpose = (changes.purpose ?? current.purpose).trim();
-    if (!(amount > 0)) throw new Error('Amount must be greater than zero.');
-    if (!recipient) throw new Error('Recipient is required.');
-    if (!purpose) throw new Error('Purpose is required.');
-
-    // The previous amount stays reserved while checking the new one.
-    this.assertWithinRemaining(
-      current.entry_id,
-      amount,
-      Number(current.amount),
-    );
-
-    const payload = {
-      amount,
-      occurred_on: changes.occurred_on ?? current.occurred_on,
-      recipient,
-      purpose,
-      notes: changes.notes != null ? changes.notes.trim() || null : current.notes,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { data, error } = await this.supabase.client
-      .from('interest_disposals')
-      .update(payload)
-      .eq('id', id)
-      .eq('owner_id', this.requireUserId())
-      .select()
-      .single();
-    if (error) {
-      console.error('Failed to update interest disposal', error);
-      throw error;
-    }
-
-    const updated = data as InterestDisposal;
-    this._disposals.update((list) => list.map((item) => (item.id === id ? updated : item)));
-    await this.syncEntryStage(current.entry_id, payload.occurred_on);
-    return updated;
-  }
-
-  async deleteDisposal(id: string): Promise<void> {
-    this.ensureAvailable();
-    const current = this._disposals().find((item) => item.id === id);
-    if (!current) return;
-
-    this._disposals.update((list) => list.filter((item) => item.id !== id));
-    const { error } = await this.supabase.client
-      .from('interest_disposals')
-      .delete()
-      .eq('id', id)
-      .eq('owner_id', this.requireUserId());
-    if (error) {
-      this._disposals.update((list) => [current, ...list]);
-      console.error('Failed to delete interest disposal', error);
-      throw error;
-    }
-    await this.syncEntryStage(current.entry_id);
   }
 
   // ----------------------------------------------------------------- helpers
@@ -435,11 +303,11 @@ export class InterestService {
     return roundCurrency(Math.max(0, Number(entry.amount) - this.disposedForEntry(entry.id)));
   }
 
-  private assertWithinRemaining(entryId: string, amount: number, reserved = 0): void {
+  private assertWithinRemaining(entryId: string, amount: number): void {
     const entry = this._entries().find((item) => item.id === entryId);
     if (!entry) throw new Error('Interest entry not found.');
     const remaining = roundCurrency(
-      Number(entry.amount) - (this.disposedForEntry(entryId) - reserved),
+      Number(entry.amount) - this.disposedForEntry(entryId),
     );
     if (isGreaterCurrency(amount, remaining)) {
       throw new Error(
@@ -452,11 +320,9 @@ export class InterestService {
     bankAccountId: string,
     occurredOn: string,
     amount: number,
-    excludeEntryId?: string,
   ): void {
     const duplicate = this._entries().some(
       (entry) =>
-        entry.id !== excludeEntryId &&
         entry.occurred_on === occurredOn &&
         entry.bank_account_id === bankAccountId &&
         isEqualCurrency(Number(entry.amount), amount),
