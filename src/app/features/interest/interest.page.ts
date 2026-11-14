@@ -18,6 +18,7 @@ import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { errorText } from '../../shared/utils/error-utils';
 import { InterestDialogComponent } from './interest-dialog.component';
 import { RecordDisposalDialogComponent } from './record-disposal-dialog.component';
+import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
 
 const STAGE_META: Record<InterestEntry['stage'], { label: string; icon: string }> = {
   received: { label: 'Received', icon: 'landmark' },
@@ -44,6 +45,15 @@ const STAGE_META: Record<InterestEntry['stage'], { label: string; icon: string }
       title="Interest"
       subtitle="Bank interest kept separate from income"
     >
+      <button
+        class="guide-btn"
+        type="button"
+        (click)="openGuide()"
+        aria-label="Open Riba guide"
+        title="Riba guide"
+      >
+        <lucide-icon name="book-open" />
+      </button>
       <button class="add-btn" type="button" (click)="openAdd()" aria-label="Add interest">
         <lucide-icon name="plus" />
         <span>Add interest</span>
@@ -209,6 +219,20 @@ const STAGE_META: Record<InterestEntry['stage'], { label: string; icon: string }
         font-weight: 600;
       }
       .add-btn lucide-icon { width: 17px; height: 17px; }
+      .guide-btn {
+        display: inline-grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        border: 1px solid var(--app-hairline);
+        border-radius: 999px;
+        background: var(--app-surface);
+        color: var(--app-ink-muted);
+        cursor: pointer;
+      }
+      .guide-btn:hover { color: var(--app-accent); border-color: var(--app-accent); }
+      .guide-btn lucide-icon { width: 17px; height: 17px; }
       .empty-actions { display: flex; justify-content: center; margin-top: 16px; }
       .empty-actions button { border-radius: 999px; }
       .empty-actions lucide-icon { width: 17px; height: 17px; margin-right: 5px; }
@@ -404,6 +428,12 @@ export class InterestPage {
   openAdd(): void {
     this.dialog.open(InterestDialogComponent, {
       width: 'min(520px, calc(100vw - 24px))',
+    });
+  }
+
+  openGuide(): void {
+    this.dialog.open(RibaGuideDialogComponent, {
+      width: 'min(560px, calc(100vw - 24px))',
     });
   }
 
