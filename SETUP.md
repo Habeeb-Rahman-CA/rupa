@@ -75,3 +75,49 @@ See `src/app/features/` — one folder per feature. We'll build in this order:
 6. Debts
 7. Events (trips/functions)
 8. Reports (monthly spending)
+
+## 8. Web Push notifications (one-time backend setup)
+
+Push sending runs entirely on Supabase: an Edge Function holds the VAPID
+private key and pg_cron triggers the scheduled checks. The Angular app only
+registers devices — it never sends anything and never sees the private key.
+
+1. **Apply migration `0017_push_notifications.sql`** (SQL Editor, like the
+   others). It creates the subscription/preference/log tables and schedules a
+   job called `rupa-push-notifications` every 15 minutes.
+   - The schedule needs the **`pg_cron` and `pg_net`** extensions. The
+     migration tries to create them; if they are missing it still succeeds and
+     prints a notice. Enable both under *Database → Extensions*, then re-run
+     **section 4** (the `do $$ …` block at the bottom) of the migration.
+2. **Deploy the function** (JWT verification must be OFF — the function does
+   its own auth, because pg_cron cannot present a JWT):
+   ```sh
+   supabase functions deploy push-notifications --no-verify-jwt
+   ```
+   (CLI config is in `supabase/config.toml`; if you deploy from the
+   dashboard, turn the **Verify JWT** toggle *off* for this function.)
+3. **Set the VAPID secrets** — both keys are in the gitignored `.env` file at
+   the repo root:
+   ```sh
+   supabase secrets set \
+     VAPID_PUBLIC_KEY=...from-.env... \
+     VAPID_PRIVATE_KEY=...from-.env...
+   ```
+   Never put the private key in `src/`, a migration, or git.
+4. **Check the schedule** — the cron secret the scheduler authenticates with
+   lives only in the database:
+   ```sql
+   select value from public.push_config where name = 'cron_secret';
+   select jobid, schedule from cron.job where jobname = 'rupa-push-notifications';
+   ```
+5. **Use it in the app** — sign in, open **Settings → Push notifications**,
+   press *Turn on notifications*, then *Send test*.
+
+Notes:
+- Categories: **Renewals** (active subscriptions within 3 days) and
+  **Low balance** (wallet balance at/below its alert level), plus a manual
+  **test**. Each event fires at most once per renewal date / per wallet per day.
+- Android Chrome works in the browser or installed PWA. iOS 16.4+ only allows
+  web push for sites **added to the Home Screen** (Share → Add to Home Screen).
+- Denied permission cannot be re-prompted — it must be re-enabled in the
+  browser's site settings; the Settings page says so when detected.

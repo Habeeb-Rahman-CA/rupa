@@ -88,6 +88,7 @@ export class ShellComponent implements AfterViewInit {
     { path: '/interest',   label: 'Interest (Riba)', icon: 'percent' },
     { path: '/categories', label: 'Categories', icon: 'tags' },
     { path: '/people',     label: 'People',     icon: 'users' },
+    { path: '/settings',   label: 'Settings',   icon: 'settings' },
   ];
 
   readonly appVersion = APP_VERSION;

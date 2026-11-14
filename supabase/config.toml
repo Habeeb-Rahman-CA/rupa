@@ -1,0 +1,9 @@
+# Supabase CLI project config.
+#
+# push-notifications verifies auth itself (cron secret / user JWT) because
+# pg_cron cannot present a JWT — so JWT verification must stay OFF for it.
+
+project_id = "rupa"
+
+[functions.push-notifications]
+verify_jwt = false

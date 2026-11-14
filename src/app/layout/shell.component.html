@@ -38,6 +38,10 @@
       </div>
 
       <mat-menu #settingsMenu="matMenu">
+        <a mat-menu-item routerLink="/settings">
+          <lucide-icon name="bell" />
+          <span>Notifications</span>
+        </a>
         <a mat-menu-item routerLink="/categories">
           <lucide-icon name="database" />
           <span>Manage Data</span>
@@ -155,6 +159,10 @@
           <span class="user-email">{{ userEmail() }}</span>
         </button>
         <mat-menu #userMenu="matMenu">
+          <a mat-menu-item routerLink="/settings">
+            <lucide-icon name="settings" />
+            <span>Settings</span>
+          </a>
           <button mat-menu-item (click)="checkPwaUpdate()">
             <lucide-icon [name]="pwaUpdateAvailable() ? 'download' : 'refresh-cw'" />
             <span>{{ pwaUpdateAvailable() ? 'Update & Reload App' : 'Check for updates' }}</span>
