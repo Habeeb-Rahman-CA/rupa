@@ -14,9 +14,8 @@ import { LucideAngularModule } from 'lucide-angular';
   template: `
     <div class="dialog-container">
       <header class="dialog-header">
-        <div class="header-icon"><lucide-icon name="book-open" /></div>
         <div>
-          <h2 mat-dialog-title>Islamic Interest (Riba) – Quick Reference</h2>
+          <h2 mat-dialog-title>Riba: Quick Reference</h2>
           <p class="dialog-subtitle">Guidance for handling interest received</p>
         </div>
       </header>
@@ -51,10 +50,6 @@ import { LucideAngularModule } from 'lucide-angular';
             <li>Do not expect Sadaqah rewards for this disposal.</li>
             <li>Keep a record of the amount received and disposed.</li>
           </ol>
-          <p class="note">
-            <lucide-icon name="info" />
-            <span>This is the general Hanafi scholarly guidance for disposing of bank interest.</span>
-          </p>
         </section>
 
         <section class="guide-section">
