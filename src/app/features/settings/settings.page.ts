@@ -10,15 +10,15 @@ import { PushCategory, PushService, PushStatus } from '../../core/services/push.
 const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
   unsupported: {
     label: 'Not supported',
-    hint: 'This browser does not support web push notifications. Try Chrome, Edge, or the installed (Home Screen) app on iOS.',
+    hint: 'This browser can’t show push notifications. Try Chrome or Edge, or open rūpa from your iPhone’s Home Screen.',
   },
   dev: {
-    label: 'Dev only',
-    hint: 'Push notifications run in the production build — the service worker is disabled while developing, so they cannot be enabled here.',
+    label: 'Not available',
+    hint: 'Notifications only work in the published app, not while previewing it locally.',
   },
   denied: {
     label: 'Blocked',
-    hint: 'Notifications are blocked for this site. Re-enable them in your browser’s site settings (the padlock / address bar), then come back and turn them on.',
+    hint: 'Notifications are blocked for this site. Allow them in your browser settings, then try again.',
   },
   off: {
     label: 'Off',
@@ -134,15 +134,11 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
       <ul class="notes">
         <li>
           <lucide-icon name="smartphone" />
-          <span>Each device subscribes separately — turn notifications on on your phone and laptop independently.</span>
+          <span>Turn notifications on separately on each device — your phone and laptop each subscribe on their own.</span>
         </li>
         <li>
           <lucide-icon name="apple" />
           <span>On iPhone/iPad, add rūpa to your Home Screen first (Share → Add to Home Screen), then enable notifications.</span>
-        </li>
-        <li>
-          <lucide-icon name="shield-check" />
-          <span>Notification content is generated on the server; your VAPID private key and data never leave the backend.</span>
         </li>
       </ul>
     </section>

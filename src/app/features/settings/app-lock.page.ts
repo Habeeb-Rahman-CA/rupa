@@ -39,8 +39,7 @@ import { MpinDialogComponent, MpinDialogMode } from './mpin-dialog.component';
 
       @if (mpin.isConfigured()) {
         <p class="status-hint">
-          Locked on launch and after {{ autoLockLabel() }} in the background. The keypad layout
-          is randomized every time it appears.
+          Locked on launch and after {{ autoLockLabel() }} in the background.
         </p>
 
         <div class="auto-lock">
@@ -71,9 +70,7 @@ import { MpinDialogComponent, MpinDialogMode } from './mpin-dialog.component';
         </div>
       } @else {
         <p class="status-hint">
-          Off by default. When enabled, your MPIN is stored only as a salted
-          PBKDF2 hash (Web Crypto) — never in plain text — and routes stay
-          locked until it is entered.
+          Off by default. Set it up to require a PIN every time the app opens.
         </p>
 
         <div class="primary-actions">
@@ -92,11 +89,7 @@ import { MpinDialogComponent, MpinDialogMode } from './mpin-dialog.component';
       <ul class="notes">
         <li>
           <lucide-icon name="shield" />
-          <span>Forgotten PIN: reset it from the lock screen — you'll be asked to confirm while signed in.</span>
-        </li>
-        <li>
-          <lucide-icon name="smartphone" />
-          <span>The MPIN is stored on this device only; clearing browser data removes it.</span>
+          <span>Forgot your PIN? Reset it from the lock screen while you're signed in.</span>
         </li>
       </ul>
     </section>
