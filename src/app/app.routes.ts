@@ -90,6 +90,11 @@ export const routes: Routes = [
           import('./features/settings/settings.page').then((m) => m.SettingsPage),
       },
       {
+        path: 'settings/app-lock',
+        loadComponent: () =>
+          import('./features/settings/app-lock.page').then((m) => m.AppLockPage),
+      },
+      {
         path: 'reports',
         loadComponent: () =>
           import('./features/reports/reports.page').then((m) => m.ReportsPage),

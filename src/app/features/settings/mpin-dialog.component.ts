@@ -46,123 +46,171 @@ type Stage = 'length' | 'verify' | 'enter' | 'confirm';
     MpinKeypadComponent,
   ],
   template: `
-    <div class="wrap">
-      <div class="icon" [class.destructive]="data.mode === 'disable'">
-        <lucide-icon [name]="icon()" />
-      </div>
-
-      <h2 mat-dialog-title>{{ title() }}</h2>
-      @if (subtitle(); as subtitle) {
-        <p class="subtitle">{{ subtitle }}</p>
-      }
-
-      @if (error(); as error) {
-        <p class="error" role="alert">{{ error }}</p>
-      }
-
-      @if (stage() === 'length') {
-        <div class="length-picker">
-          <mat-button-toggle-group
-            [value]="pinLength()"
-            (change)="pinLength.set($event.value)"
-            aria-label="MPIN length"
-          >
-            <mat-button-toggle [value]="4">4 digits</mat-button-toggle>
-            <mat-button-toggle [value]="6">6 digits</mat-button-toggle>
-          </mat-button-toggle-group>
-          <p class="hint">
-            You'll be asked to enter it twice to confirm. It locks the app on
-            launch and when you return after the auto-lock timeout.
-          </p>
-          <div class="actions">
-            <button mat-button type="button" (click)="ref.close(false)">
-              Cancel
-            </button>
-            <button mat-flat-button color="primary" type="button" (click)="startEntry()">
-              Continue
-            </button>
-          </div>
+    <div class="dialog-container">
+      <header class="dialog-header">
+        <div class="header-icon" [class.destructive]="data.mode === 'disable'">
+          <lucide-icon [name]="icon()" />
         </div>
-      } @else {
-        <!-- One view per tick: re-created (new shuffle) whenever the stage
-             or a failed attempt bumps the counter. -->
-        @for (tick of [keypadTick()]; track tick) {
-          <app-mpin-keypad
-            [length]="entryLength()"
-            [disabled]="busy()"
-            (completed)="onCompleted($event)"
-          />
+        <div class="header-text">
+          <h2 mat-dialog-title>{{ title() }}</h2>
+          @if (subtitle(); as subtitle) {
+            <p class="dialog-subtitle">{{ subtitle }}</p>
+          }
+        </div>
+      </header>
+
+      <mat-dialog-content class="dialog-content">
+        @if (error(); as error) {
+          <div class="error-notice" role="alert">
+            <lucide-icon name="alert-circle" />
+            <span>{{ error }}</span>
+          </div>
         }
 
-        <div class="actions">
-          <button mat-button type="button" [disabled]="busy()" (click)="ref.close(false)">
-            Cancel
+        @if (stage() === 'length') {
+          <div class="field-group">
+            <label class="ft-label">MPIN length</label>
+            <mat-button-toggle-group
+              [value]="pinLength()"
+              (change)="pinLength.set($event.value)"
+              aria-label="MPIN length"
+              class="length-toggle"
+            >
+              <mat-button-toggle [value]="4">4 digits</mat-button-toggle>
+              <mat-button-toggle [value]="6">6 digits</mat-button-toggle>
+            </mat-button-toggle-group>
+            <p class="hint">
+              You'll be asked to enter it twice to confirm. It locks the app on
+              launch and when you return after the auto-lock timeout.
+            </p>
+          </div>
+        } @else {
+          <!-- One view per tick: re-created (new shuffle) whenever the stage
+               or a failed attempt bumps the counter. -->
+          @for (tick of [keypadTick()]; track tick) {
+            <app-mpin-keypad
+              [length]="entryLength()"
+              [disabled]="busy()"
+              (completed)="onCompleted($event)"
+            />
+          }
+        }
+      </mat-dialog-content>
+
+      <mat-dialog-actions align="end" class="dialog-actions">
+        <button mat-button type="button" [disabled]="busy()" (click)="ref.close(false)" class="cancel-btn">
+          Cancel
+        </button>
+        @if (stage() === 'length') {
+          <button mat-flat-button color="primary" type="button" (click)="startEntry()">
+            Continue
           </button>
-        </div>
-      }
+        }
+      </mat-dialog-actions>
     </div>
   `,
   styles: [
     `
-      .wrap {
+      .dialog-container {
+        padding: 4px;
         min-width: 300px;
-        max-width: 340px;
-        padding: 20px 16px 12px;
-        text-align: center;
+        max-width: 380px;
+        background: var(--app-surface);
+        color: var(--app-ink);
+        font-family: inherit;
       }
-      .icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 999px;
+
+      /* Header — same structure as the other app dialogs */
+      .dialog-header {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 4px 16px 14px;
+        border-bottom: 1px solid var(--app-hairline);
+      }
+      .header-icon {
         display: grid;
         place-items: center;
+        width: 38px;
+        height: 38px;
+        flex: 0 0 auto;
+        border-radius: 12px;
         background: var(--app-accent-soft);
         color: var(--app-accent);
-        margin: 0 auto;
       }
-      .icon.destructive {
+      .header-icon.destructive {
         background: var(--app-negative-soft);
         color: var(--app-negative);
       }
-      .icon lucide-icon {
-        width: 22px;
-        height: 22px;
-      }
+      .header-icon lucide-icon { width: 19px; height: 19px; }
+      .header-text { min-width: 0; }
       h2 {
-        text-align: center;
-        margin: 12px 0 0 !important;
-        font-size: 17px !important;
-        padding: 0;
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        line-height: 1.2 !important;
+        color: var(--app-ink) !important;
       }
-      .subtitle {
-        margin: 6px 0 14px;
+      .dialog-subtitle {
+        margin: 4px 0 0;
         color: var(--app-ink-muted);
-        font-size: 13px;
-        line-height: 1.45;
+        font-size: 12px;
+        line-height: 1.35;
       }
-      .error {
-        margin: 0 0 10px;
-        color: var(--app-negative, #dc2626);
-        font-size: 13px;
+
+      .dialog-content {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-width: 300px;
+        padding: 16px !important;
+      }
+      .error-notice {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: var(--app-negative-soft);
+        color: var(--app-negative);
+        font-size: 12px;
         font-weight: 600;
+        line-height: 1.35;
       }
+      .error-notice lucide-icon { width: 16px; height: 16px; flex: 0 0 auto; }
+
+      .field-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .ft-label {
+        display: block;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--app-ink);
+      }
+      .length-toggle {
+        width: 100%;
+        display: flex;
+      }
+      .length-toggle mat-button-toggle { flex: 1; }
       .hint {
-        margin: 12px 0 0;
+        margin: 8px 0 0;
         color: var(--app-ink-muted);
         font-size: 12px;
         line-height: 1.45;
       }
-      .length-picker {
-        margin-top: 8px;
+
+      .dialog-actions {
+        padding: 0 16px 12px;
       }
-      .length-picker .hint {
-        margin-top: 14px;
+      .dialog-actions button {
+        border-radius: 999px;
       }
-      .actions {
-        display: flex;
-        justify-content: center;
-        gap: 8px;
-        margin-top: 14px;
+      .dialog-actions .cancel-btn {
+        color: var(--app-ink-muted) !important;
       }
     `,
   ],

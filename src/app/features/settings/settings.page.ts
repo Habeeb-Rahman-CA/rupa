@@ -1,15 +1,11 @@
 import { Component, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatDialog } from '@angular/material/dialog';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { PushCategory, PushService, PushStatus } from '../../core/services/push.service';
-import { MpinService } from '../../core/services/mpin.service';
-import { MpinDialogComponent, MpinDialogMode } from './mpin-dialog.component';
 
 const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
   unsupported: {
@@ -40,7 +36,6 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
   imports: [
     MatButtonModule,
     MatSlideToggleModule,
-    MatButtonToggleModule,
     MatProgressSpinnerModule,
     LucideAngularModule,
     PageHeaderComponent,
@@ -151,93 +146,10 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
         </li>
       </ul>
     </section>
-
-    <!-- -------------------------------- App lock (MPIN) --------------------- -->
-    <section class="app-card settings-card lock-card" aria-label="App lock">
-      <div class="section-heading">
-        <div class="heading-icon"><lucide-icon name="lock" /></div>
-        <div class="heading-text">
-          <h2>App lock (MPIN)</h2>
-          <p>Require a 4 or 6-digit PIN when the app launches or returns from the background.</p>
-        </div>
-        <span class="status-chip" [attr.data-status]="mpin.isConfigured() ? 'active' : 'off'">
-          {{ mpin.isConfigured() ? 'On' : 'Off' }}
-        </span>
-      </div>
-
-      @if (mpin.isConfigured()) {
-        <p class="status-hint">
-          Locked on launch and after {{ autoLockLabel() }} in the background. The keypad layout
-          is randomized every time it appears.
-        </p>
-
-        <div class="auto-lock">
-          <span class="auto-lock-label">Auto-lock after</span>
-          <mat-button-toggle-group
-            [value]="mpin.autoLockSeconds()"
-            (change)="setAutoLock($event.value)"
-            aria-label="Auto-lock timeout"
-          >
-            <mat-button-toggle [value]="0">Immediately</mat-button-toggle>
-            <mat-button-toggle [value]="60">1 minute</mat-button-toggle>
-            <mat-button-toggle [value]="300">5 minutes</mat-button-toggle>
-          </mat-button-toggle-group>
-        </div>
-
-        <div class="primary-actions">
-          <button mat-stroked-button type="button" class="pill-btn" (click)="openMpin('change')">
-            <lucide-icon name="key-round" /> Change MPIN
-          </button>
-          <button
-            mat-stroked-button
-            type="button"
-            class="pill-btn danger-btn"
-            (click)="openMpin('disable')"
-          >
-            <lucide-icon name="lock-open" /> Turn off
-          </button>
-        </div>
-      } @else {
-        <p class="status-hint">
-          Off by default. When enabled, your MPIN is stored only as a salted
-          PBKDF2 hash (Web Crypto) — never in plain text — and routes stay
-          locked until it is entered.
-        </p>
-
-        <div class="primary-actions">
-          <button
-            mat-flat-button
-            color="primary"
-            type="button"
-            class="pill-btn"
-            (click)="openMpin('setup')"
-          >
-            <lucide-icon name="lock" /> Set up App Lock
-          </button>
-        </div>
-      }
-
-      <ul class="notes">
-        <li>
-          <lucide-icon name="shield" />
-          <span>Forgotten PIN: reset it from the lock screen — you'll be asked to confirm while signed in.</span>
-        </li>
-        <li>
-          <lucide-icon name="smartphone" />
-          <span>The MPIN is stored on this device only; clearing browser data removes it.</span>
-        </li>
-      </ul>
-    </section>
   `,
   styles: [
     `
       .settings-card { padding: 16px; }
-      /* Distinct, clearly separated section cards */
-      .settings-card + .settings-card { margin-top: 16px; }
-      .lock-card .heading-icon {
-        background: rgba(99, 102, 241, .12);
-        color: #3f4bb8;
-      }
 
       .section-heading {
         display: flex;
@@ -346,34 +258,11 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
         line-height: 1.45;
       }
       .notes lucide-icon { width: 15px; height: 15px; flex: 0 0 auto; margin-top: 1px; }
-
-      .auto-lock {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        margin-top: 14px;
-      }
-      .auto-lock-label {
-        color: var(--app-ink);
-        font-size: 13px;
-        font-weight: 600;
-      }
-      .auto-lock mat-button-toggle-group {
-        align-self: flex-start;
-      }
-      .danger-btn { color: var(--app-negative, #dc2626) !important; }
-      .status-chip[data-status='off'] {
-        background: var(--app-input-bg);
-        color: var(--app-ink-muted);
-      }
     `,
   ],
 })
 export class SettingsPage {
   readonly push = inject(PushService);
-  readonly mpin = inject(MpinService);
-
-  private readonly dialog = inject(MatDialog);
 
   statusMeta() {
     return STATUS_META[this.push.status()];
@@ -381,32 +270,5 @@ export class SettingsPage {
 
   setCategory(category: PushCategory, enabled: boolean): void {
     void this.push.setCategory(category, enabled);
-  }
-
-  // ---------------------------------------------------------- app lock
-
-  openMpin(mode: MpinDialogMode): void {
-    const ref = this.dialog.open(MpinDialogComponent, {
-      data: { mode },
-      disableClose: true,
-    });
-    ref.afterClosed().subscribe(() => {
-      // Signals in MpinService already reflect the outcome — nothing to do.
-    });
-  }
-
-  setAutoLock(seconds: number): void {
-    this.mpin.setAutoLock(seconds);
-  }
-
-  autoLockLabel(): string {
-    switch (this.mpin.autoLockSeconds()) {
-      case 0:
-        return 'immediately';
-      case 300:
-        return '5 minutes';
-      default:
-        return '1 minute';
-    }
   }
 }
