@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
+import { mpinGuard } from './core/guards/mpin.guard';
 
 export const routes: Routes = [
   {
@@ -12,11 +13,20 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/legal/terms.page').then((m) => m.TermsPage),
   },
+  // MPIN lock screen — top-level (outside the shell) so no feature service
+  // or data load while the app is locked. Still requires a valid login: the
+  // forgot-MPIN reset is authorized by the existing session.
+  {
+    path: 'lock',
+    loadComponent: () =>
+      import('./features/lock/lock.page').then((m) => m.LockPage),
+    canActivate: [authGuard],
+  },
   {
     path: '',
     loadComponent: () =>
       import('./layout/shell.component').then((m) => m.ShellComponent),
-    canActivate: [authGuard],
+    canActivate: [authGuard, mpinGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {
