@@ -49,7 +49,7 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
     <app-page-header title="Settings" subtitle="App preferences and notifications" />
 
     <!-- ------------------------------ Push notifications ------------------- -->
-    <section class="app-card notify-card" aria-label="Push notifications">
+    <section class="app-card settings-card" aria-label="Push notifications">
       <div class="section-heading">
         <div class="heading-icon"><lucide-icon name="bell" /></div>
         <div class="heading-text">
@@ -153,7 +153,7 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
     </section>
 
     <!-- -------------------------------- App lock (MPIN) --------------------- -->
-    <section class="app-card notify-card" aria-label="App lock">
+    <section class="app-card settings-card lock-card" aria-label="App lock">
       <div class="section-heading">
         <div class="heading-icon"><lucide-icon name="lock" /></div>
         <div class="heading-text">
@@ -231,7 +231,13 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
   `,
   styles: [
     `
-      .notify-card { padding: 16px; }
+      .settings-card { padding: 16px; }
+      /* Distinct, clearly separated section cards */
+      .settings-card + .settings-card { margin-top: 16px; }
+      .lock-card .heading-icon {
+        background: rgba(99, 102, 241, .12);
+        color: #3f4bb8;
+      }
 
       .section-heading {
         display: flex;
