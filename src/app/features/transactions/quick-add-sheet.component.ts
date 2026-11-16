@@ -1,10 +1,4 @@
-import {
-  Component,
-  computed,
-  effect,
-  inject,
-  signal,
-} from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   MAT_BOTTOM_SHEET_DATA,
@@ -22,7 +16,13 @@ import { CategoriesService } from '../../core/services/categories.service';
 import { TransactionsService } from '../../core/services/transactions.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
 import { BillScannerService } from '../../core/services/bill-scanner.service';
-import { Category, CategoryKind, PaymentMode, TxDirection, isSavingsCategory } from '../../core/models/domain.models';
+import {
+  Category,
+  CategoryKind,
+  PaymentMode,
+  TxDirection,
+  isSavingsCategory,
+} from '../../core/models/domain.models';
 import { isWalletSpendingCategory } from '../../shared/utils/category-utils';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
@@ -55,9 +55,15 @@ export interface QuickAddSheetData {
       <header class="sheet-header">
         <h2>
           @switch (txKind()) {
-            @case ('expense') { Expense }
-            @case ('income') { Income }
-            @case ('savings') { Savings }
+            @case ('expense') {
+              Expense
+            }
+            @case ('income') {
+              Income
+            }
+            @case ('savings') {
+              Savings
+            }
           }
         </h2>
         <mat-button-toggle-group
@@ -90,8 +96,13 @@ export interface QuickAddSheetData {
 
       <div class="scan-bar" [class.is-offline]="isOffline()">
         <span class="scan-tag">
-          <lucide-icon [name]="isOffline() ? 'wifi' : (scanningBill() ? 'sparkles' : 'receipt')" class="scan-tag-icon" />
-          <span>{{ isOffline() ? 'Offline (AI Disabled)' : (scanningBill() ? 'Scanning…' : 'Scan Bill') }}</span>
+          <lucide-icon
+            [name]="isOffline() ? 'wifi' : scanningBill() ? 'sparkles' : 'receipt'"
+            class="scan-tag-icon"
+          />
+          <span>{{
+            isOffline() ? 'Offline (AI Disabled)' : scanningBill() ? 'Scanning…' : 'Scan Bill'
+          }}</span>
         </span>
         <div class="scan-actions">
           <button
@@ -99,7 +110,11 @@ export interface QuickAddSheetData {
             class="scan-btn"
             (click)="cameraInput.click()"
             [disabled]="scanningBill() || isOffline()"
-            [title]="isOffline() ? 'AI scanning requires an active internet connection' : 'Take Photo with Camera'"
+            [title]="
+              isOffline()
+                ? 'AI scanning requires an active internet connection'
+                : 'Take Photo with Camera'
+            "
           >
             <lucide-icon name="camera" class="scan-btn-icon" />
             <span>Camera</span>
@@ -109,7 +124,11 @@ export interface QuickAddSheetData {
             class="scan-btn"
             (click)="galleryInput.click()"
             [disabled]="scanningBill() || isOffline()"
-            [title]="isOffline() ? 'AI scanning requires an active internet connection' : 'Upload Image File'"
+            [title]="
+              isOffline()
+                ? 'AI scanning requires an active internet connection'
+                : 'Upload Image File'
+            "
           >
             <lucide-icon name="upload" class="scan-btn-icon" />
             <span>Upload</span>
@@ -173,9 +192,7 @@ export interface QuickAddSheetData {
           @for (c of relevantCategories(); track c.id) {
             <mat-chip-option [value]="c.id">{{ c.name }}</mat-chip-option>
           }
-          <mat-chip-option [value]="NEW_CATEGORY">
-            + New category
-          </mat-chip-option>
+          <mat-chip-option [value]="NEW_CATEGORY"> + New category </mat-chip-option>
         </mat-chip-listbox>
       </div>
 
@@ -193,7 +210,11 @@ export interface QuickAddSheetData {
 
       <app-text-field
         label="Note (optional)"
-        [placeholder]="txKind() === 'savings' ? 'e.g. Set aside from monthly salary' : 'A quick reminder for later'"
+        [placeholder]="
+          txKind() === 'savings'
+            ? 'e.g. Set aside from monthly salary'
+            : 'A quick reminder for later'
+        "
         [maxlength]="120"
         [value]="notes()"
         (valueChange)="notes.set($event ? String($event) : '')"
@@ -207,7 +228,7 @@ export interface QuickAddSheetData {
           (click)="save()"
           [disabled]="!canSave() || submitting()"
         >
-          {{ submitting() ? 'Saving…' : (txKind() === 'savings' ? 'Move to Savings' : 'Save') }}
+          {{ submitting() ? 'Saving…' : txKind() === 'savings' ? 'Move to Savings' : 'Save' }}
         </button>
       </div>
     </div>
@@ -265,7 +286,9 @@ export interface QuickAddSheetData {
         color: var(--app-ink-subtle);
         flex: 0 0 auto;
       }
-      .cat-label { margin-bottom: 8px; }
+      .cat-label {
+        margin-bottom: 8px;
+      }
       .starting-balance-link {
         font-size: 12px;
         color: var(--app-ink-muted);
@@ -280,7 +303,9 @@ export interface QuickAddSheetData {
         font-weight: 600;
         cursor: pointer;
       }
-      .link-btn:hover { text-decoration: underline; }
+      .link-btn:hover {
+        text-decoration: underline;
+      }
       .actions {
         display: flex;
         justify-content: flex-end;
@@ -353,7 +378,9 @@ export class QuickAddSheetComponent {
 
   private readonly ref = inject(MatBottomSheetRef<QuickAddSheetComponent>);
   private readonly bottomSheet = inject(MatBottomSheet);
-  private readonly sheetData = inject<QuickAddSheetData | null>(MAT_BOTTOM_SHEET_DATA, { optional: true });
+  private readonly sheetData = inject<QuickAddSheetData | null>(MAT_BOTTOM_SHEET_DATA, {
+    optional: true,
+  });
   private readonly categoriesService = inject(CategoriesService);
   private readonly transactionsService = inject(TransactionsService);
   private readonly bankAccountsService = inject(BankAccountsService);
@@ -376,7 +403,9 @@ export class QuickAddSheetComponent {
   readonly bankAccountOptions = computed<SelectOption[]>(() => {
     return this.bankAccountsService.bankAccounts().map((acc) => ({
       value: acc.id,
-      label: acc.is_primary ? `${acc.bank_name} (${acc.account_name}) ★` : `${acc.bank_name} (${acc.account_name})`,
+      label: acc.is_primary
+        ? `${acc.bank_name} (${acc.account_name}) ★`
+        : `${acc.bank_name} (${acc.account_name})`,
       icon: 'landmark',
     }));
   });
@@ -389,23 +418,15 @@ export class QuickAddSheetComponent {
 
     effect(() => {
       const primary = this.bankAccountsService.primaryAccount();
-      const accounts = this.bankAccountsService.bankAccounts();
+      // Default to the primary bank account only when none has been selected yet.
+      // Never override the user's explicit payment-mode choice.
       if (primary && !this.selectedBankAccountId()) {
         this.selectedBankAccountId.set(primary.id);
-      }
-      if (accounts.length > 0 && this.paymentMode() === 'cash' && !this.userExplicitlySetCash) {
-        this.paymentMode.set('bank');
-        if (primary) {
-          this.selectedBankAccountId.set(primary.id);
-        }
       }
     });
   }
 
-  private userExplicitlySetCash = false;
-
   setPaymentMode(mode: PaymentMode): void {
-    this.userExplicitlySetCash = mode === 'cash';
     this.paymentMode.set(mode);
     if (mode === 'bank' && !this.selectedBankAccountId()) {
       const primary = this.bankAccountsService.primaryAccount();
@@ -434,7 +455,11 @@ export class QuickAddSheetComponent {
     if (this.selectedCategoryId() === NEW_CATEGORY && !this.newCategoryName().trim()) {
       return false;
     }
-    if (this.paymentMode() === 'bank' && this.bankAccountOptions().length > 0 && !this.selectedBankAccountId()) {
+    if (
+      this.paymentMode() === 'bank' &&
+      this.bankAccountOptions().length > 0 &&
+      !this.selectedBankAccountId()
+    ) {
       return false;
     }
     return true;
@@ -457,10 +482,7 @@ export class QuickAddSheetComponent {
     try {
       let categoryId: string | null = null;
       if (this.selectedCategoryId() === NEW_CATEGORY) {
-        const created = await this.categoriesService.create(
-          this.newCategoryName(),
-          this.txKind(),
-        );
+        const created = await this.categoriesService.create(this.newCategoryName(), this.txKind());
         categoryId = created?.id ?? null;
       } else {
         categoryId = this.selectedCategoryId();
@@ -483,8 +505,8 @@ export class QuickAddSheetComponent {
         this.txKind() === 'savings'
           ? 'Moved to savings.'
           : this.txKind() === 'income'
-          ? 'Income recorded.'
-          : 'Expense recorded.';
+            ? 'Income recorded.'
+            : 'Expense recorded.';
 
       this.snack.open(message, undefined, { duration: 2000 });
       this.ref.dismiss({ saved: true });
@@ -528,9 +550,10 @@ export class QuickAddSheetComponent {
         this.notes.set(result.title);
       }
 
-      const statusMsg = result.total_amount || result.title
-        ? `Bill scanned: ${result.title ?? ''} ${result.total_amount ? '₹' + result.total_amount : ''}`.trim()
-        : 'Bill scanned, but details could not be parsed automatically.';
+      const statusMsg =
+        result.total_amount || result.title
+          ? `Bill scanned: ${result.title ?? ''} ${result.total_amount ? '₹' + result.total_amount : ''}`.trim()
+          : 'Bill scanned, but details could not be parsed automatically.';
 
       this.snack.open(statusMsg, 'OK', { duration: 3500 });
     } catch (err: unknown) {
@@ -547,4 +570,3 @@ export class QuickAddSheetComponent {
     this.ref.dismiss();
   }
 }
-
