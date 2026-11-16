@@ -39,11 +39,14 @@ export class TransactionsService {
   private readonly _balance = signal<number>(0);
   private readonly _openingBalance = signal<number | null>(null);
   private readonly _isLoading = signal(false);
+  private readonly _hasMore = signal(false);
+  private readonly _lastCursor = signal<string | null>(null);
 
   readonly transactions = this._transactions.asReadonly();
   readonly balance = this._balance.asReadonly();
   readonly openingBalance = this._openingBalance.asReadonly();
   readonly isLoading = this._isLoading.asReadonly();
+  readonly hasMore = this._hasMore.asReadonly();
 
   readonly monthly = computed<MonthlyStats>(() => {
     const txs = this._transactions();
@@ -208,6 +211,9 @@ export class TransactionsService {
     this._isLoading.set(true);
     this.refreshPromise = (async () => {
       try {
+        // Reset pagination state on full refresh
+        this._hasMore.set(false);
+        this._lastCursor.set(null);
         await Promise.all([this.loadTransactions(), this.loadBalance(), this.loadOpeningBalance()]);
         try {
           const bankAccountsService = this.injector.get(BankAccountsService);
@@ -225,18 +231,51 @@ export class TransactionsService {
     return this.refreshPromise;
   }
 
-  async loadTransactions(limit = 200): Promise<void> {
-    const { data, error } = await this.supabase.client
+  async loadTransactions(limit = 50, cursor?: string): Promise<void> {
+    const ownerId = this.auth.user()?.id;
+    if (!ownerId) return;
+
+    let query = this.supabase.client
       .from('transactions')
-      .select('*')
+      .select('*', { count: 'exact' })
+      .eq('owner_id', ownerId)
       .order('occurred_on', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(limit);
+      .limit(limit + 1);
+
+    if (cursor) {
+      query = query.lte('occurred_on', cursor);
+    }
+
+    const { data, error, count } = await query;
     if (error) {
       console.error('Failed to load transactions', error);
       return;
     }
-    this._transactions.set((data ?? []) as Transaction[]);
+
+    const rows = (data ?? []) as Transaction[];
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+
+    // Filter out duplicates at the cursor boundary (same occurred_on as cursor)
+    const loadedIds = new Set(this._transactions().map((t) => t.id));
+    const newPage = cursor ? page.filter((t) => !loadedIds.has(t.id)) : page;
+
+    if (cursor) {
+      this._transactions.update((list) => [...list, ...newPage]);
+    } else {
+      this._transactions.set(newPage);
+    }
+
+    this._hasMore.set(hasMore);
+    const last = newPage[newPage.length - 1];
+    this._lastCursor.set(last ? last.occurred_on : null);
+  }
+
+  async loadMoreTransactions(): Promise<void> {
+    const cursor = this._lastCursor();
+    if (!cursor || !this._hasMore()) return;
+    await this.loadTransactions(50, cursor);
   }
 
   async loadBalance(): Promise<void> {

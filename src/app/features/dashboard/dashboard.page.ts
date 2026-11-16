@@ -9,15 +9,17 @@ import { MatBottomSheet, MatBottomSheetModule } from '@angular/material/bottom-s
 import { LucideAngularModule } from 'lucide-angular';
 
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
-import {
-  LineChartComponent,
-  ChartPoint,
-} from '../../shared/components/line-chart.component';
+import { LineChartComponent, ChartPoint } from '../../shared/components/line-chart.component';
 import { AuthService } from '../../core/services/auth.service';
 import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
 import { DebtsService } from '../../core/services/debts.service';
-import { Category, CategoryKind, Transaction, isSavingsCategory } from '../../core/models/domain.models';
+import {
+  Category,
+  CategoryKind,
+  Transaction,
+  isSavingsCategory,
+} from '../../core/models/domain.models';
 import { SetOpeningBalanceSheetComponent } from './set-opening-balance-sheet.component';
 import { getCategoryColor, getCategoryIcon } from '../../shared/utils/category-utils';
 import { QuickAddSheetComponent } from '../transactions/quick-add-sheet.component';
@@ -54,17 +56,14 @@ type Range = 'week' | 'month' | 'year';
           <div class="banner-info">
             <h3>Set your starting balance</h3>
             <p>
-              Add your current cash or bank balance so your monthly income and expense metrics remain 100% accurate.
+              Add your current cash or bank balance so your monthly income and expense metrics
+              remain 100% accurate.
             </p>
           </div>
         </div>
         <div class="banner-actions">
-          <button mat-flat-button color="primary" (click)="openSetBalance()">
-            Set Balance
-          </button>
-          <button mat-button (click)="dismissBalanceBanner()">
-            Maybe later
-          </button>
+          <button mat-flat-button color="primary" (click)="openSetBalance()">Set Balance</button>
+          <button mat-button (click)="dismissBalanceBanner()">Maybe later</button>
         </div>
       </section>
     }
@@ -99,6 +98,9 @@ type Range = 'week' | 'month' | 'year';
           <mat-button-toggle value="month">Month</mat-button-toggle>
           <mat-button-toggle value="year">Year</mat-button-toggle>
         </mat-button-toggle-group>
+        @if (periodStats().rangeUsed === 'last30') {
+          <p class="range-fallback">Showing last 30 days (no transactions this month)</p>
+        }
       </div>
 
       @if (chart().length >= 2) {
@@ -111,9 +113,7 @@ type Range = 'week' | 'month' | 'year';
           />
         </div>
       } @else {
-        <div class="chart-empty">
-          Add a few expenses to see your trend.
-        </div>
+        <div class="chart-empty">Add a few expenses to see your trend.</div>
       }
 
       <div class="chip-row">
@@ -155,7 +155,8 @@ type Range = 'week' | 'month' | 'year';
           </div>
           <div class="savings-sub font-medium">
             @if (periodStats().saved > 0) {
-              <span class="money-savings">+{{ periodStats().saved | signedMoney }}</span> saved this period
+              <span class="money-savings">+{{ periodStats().saved | signedMoney }}</span> saved this
+              period
             } @else {
               <span>No savings added this period</span>
             }
@@ -216,7 +217,9 @@ type Range = 'week' | 'month' | 'year';
               <div class="tx-title">{{ t.label }}</div>
               <div class="tx-sub">
                 {{ t.occurred_on | date: 'MMM d' }}
-                @if (t.notes) { · {{ t.notes }} }
+                @if (t.notes) {
+                  · {{ t.notes }}
+                }
               </div>
             </div>
             <div
@@ -265,7 +268,9 @@ type Range = 'week' | 'month' | 'year';
         overflow: hidden;
         text-overflow: ellipsis;
       }
-      .hero-amount.money-negative { color: var(--app-negative); }
+      .hero-amount.money-negative {
+        color: var(--app-negative);
+      }
 
       .range-toggle {
         flex: 0 0 auto;
@@ -274,6 +279,12 @@ type Range = 'week' | 'month' | 'year';
         padding: 0 10px !important;
         line-height: 28px !important;
         font-size: 12px !important;
+      }
+      .range-fallback {
+        margin-top: 6px;
+        font-size: 11px;
+        color: var(--app-ink-muted, #64748b);
+        font-weight: 500;
       }
 
       .chart-wrap {
@@ -324,8 +335,13 @@ type Range = 'week' | 'month' | 'year';
         place-items: center;
         flex: 0 0 auto;
       }
-      .savings-badge lucide-icon { width: 22px; height: 22px; }
-      .savings-info { min-width: 0; }
+      .savings-badge lucide-icon {
+        width: 22px;
+        height: 22px;
+      }
+      .savings-info {
+        min-width: 0;
+      }
       .savings-amount {
         font-size: clamp(20px, 5.5vw, 24px);
         font-weight: 700;
@@ -352,7 +368,10 @@ type Range = 'week' | 'month' | 'year';
         padding: 0 16px !important;
         height: 40px !important;
       }
-      .move-savings-btn lucide-icon { width: 16px; height: 16px; }
+      .move-savings-btn lucide-icon {
+        width: 16px;
+        height: 16px;
+      }
 
       /* ---------- Owed row --------------------------------------------- */
       .owed-row {
@@ -430,7 +449,10 @@ type Range = 'week' | 'month' | 'year';
         place-items: center;
         color: #fff;
       }
-      .tile-icon lucide-icon { width: 22px; height: 22px; }
+      .tile-icon lucide-icon {
+        width: 22px;
+        height: 22px;
+      }
       .tile-name {
         font-size: 13px;
         color: var(--app-ink-muted);
@@ -461,7 +483,9 @@ type Range = 'week' | 'month' | 'year';
         border: 1px solid var(--app-hairline);
         box-shadow: var(--app-shadow-sm);
       }
-      .tx-row.last { border-bottom: 0; }
+      .tx-row.last {
+        border-bottom: 0;
+      }
       .tx-icon {
         width: 40px;
         height: 40px;
@@ -470,16 +494,29 @@ type Range = 'week' | 'month' | 'year';
         place-items: center;
         color: #fff;
       }
-      .tx-icon lucide-icon { width: 22px; height: 22px; }
-      .tx-title { font-size: 14px; font-weight: 600; color: var(--app-ink); }
-      .tx-sub { font-size: 12px; color: var(--app-ink-muted); margin-top: 2px; }
+      .tx-icon lucide-icon {
+        width: 22px;
+        height: 22px;
+      }
+      .tx-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--app-ink);
+      }
+      .tx-sub {
+        font-size: 12px;
+        color: var(--app-ink-muted);
+        margin-top: 2px;
+      }
       .tx-amount {
         font-size: 15px;
         font-weight: 700;
         font-variant-numeric: tabular-nums;
       }
 
-      .w-full { width: 100%; }
+      .w-full {
+        width: 100%;
+      }
 
       .starting-balance-banner {
         margin-bottom: 16px;
@@ -507,7 +544,10 @@ type Range = 'week' | 'month' | 'year';
         place-items: center;
         flex: 0 0 auto;
       }
-      .banner-badge lucide-icon { width: 18px; height: 18px; }
+      .banner-badge lucide-icon {
+        width: 18px;
+        height: 18px;
+      }
       .banner-info h3 {
         margin: 0;
         font-size: 14px;
@@ -543,8 +583,13 @@ type Range = 'week' | 'month' | 'year';
         align-items: center;
         gap: 3px;
       }
-      .edit-balance-btn lucide-icon { width: 12px; height: 12px; }
-      .edit-balance-btn:hover { text-decoration: underline; }
+      .edit-balance-btn lucide-icon {
+        width: 12px;
+        height: 12px;
+      }
+      .edit-balance-btn:hover {
+        text-decoration: underline;
+      }
     `,
   ],
 })
@@ -569,21 +614,37 @@ export class DashboardPage {
 
   readonly recentEnriched = computed(() => {
     const catMap = this.categoryMap();
-    return this.txService.transactions().filter((t) => t.source !== 'wallet_recharge').slice(0, 6).map((t) => {
-      const cat = t.category_id ? catMap.get(t.category_id) : undefined;
-      const isSavings = isSavingsCategory(cat);
-      const isTransfer = t.source === 'transfer';
-       const label = isTransfer
-         ? (t.direction === 'in' ? 'Transfer in' : 'Transfer out')
-         : (t.source === 'wallet_spend' ? 'Wallet spending' : (cat?.name ?? (t.direction === 'in' ? 'Income' : 'Expense')));
-      return {
-        ...t,
-        label,
-        isSavings,
-         icon: isTransfer ? 'arrow-left-right' : (t.source === 'wallet_spend' ? 'wallet' : getCategoryIcon(label)),
-         color: isTransfer ? '#6366f1' : (t.source === 'wallet_spend' ? '#475569' : getCategoryColor(label)),
-      };
-    });
+    return this.txService
+      .transactions()
+      .filter((t) => t.source !== 'wallet_recharge')
+      .slice(0, 6)
+      .map((t) => {
+        const cat = t.category_id ? catMap.get(t.category_id) : undefined;
+        const isSavings = isSavingsCategory(cat);
+        const isTransfer = t.source === 'transfer';
+        const label = isTransfer
+          ? t.direction === 'in'
+            ? 'Transfer in'
+            : 'Transfer out'
+          : t.source === 'wallet_spend'
+            ? 'Wallet spending'
+            : (cat?.name ?? (t.direction === 'in' ? 'Income' : 'Expense'));
+        return {
+          ...t,
+          label,
+          isSavings,
+          icon: isTransfer
+            ? 'arrow-left-right'
+            : t.source === 'wallet_spend'
+              ? 'wallet'
+              : getCategoryIcon(label),
+          color: isTransfer
+            ? '#6366f1'
+            : t.source === 'wallet_spend'
+              ? '#475569'
+              : getCategoryColor(label),
+        };
+      });
   });
 
   readonly theyOweTotal = this.debtsService.theyOweYouTotal;
@@ -593,9 +654,11 @@ export class DashboardPage {
   readonly bannerDismissed = computed(() => {
     const userId = this.auth.user()?.id;
     if (!userId) return this._bannerDismissed();
-    return this._bannerDismissed() ||
+    return (
+      this._bannerDismissed() ||
       (typeof localStorage !== 'undefined' &&
-        localStorage.getItem(`rupa:${userId}:dismiss_balance_banner`) === 'true');
+        localStorage.getItem(`rupa:${userId}:dismiss_balance_banner`) === 'true')
+    );
   });
 
   readonly showBalanceBanner = computed(() => {
@@ -646,6 +709,7 @@ export class DashboardPage {
     }
 
     // Fallback: if 'month' is selected and current month has 0 transactions, show last 30 days
+    let rangeUsed: Range | 'last30' = range;
     if (range === 'month' && spent === 0 && received === 0 && saved === 0 && txs.length > 0) {
       const past30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
       for (const t of txs) {
@@ -668,9 +732,10 @@ export class DashboardPage {
           received += amt;
         }
       }
+      rangeUsed = 'last30';
     }
 
-    return { spent, received, saved };
+    return { spent, received, saved, rangeUsed };
   });
 
   openSetBalance(): void {
@@ -716,7 +781,10 @@ export class DashboardPage {
     let max = -Infinity;
     let idx = -1;
     for (let i = 0; i < c.length; i++) {
-      if (c[i].value > max) { max = c[i].value; idx = i; }
+      if (c[i].value > max) {
+        max = c[i].value;
+        idx = i;
+      }
     }
     return max > 0 ? idx : null;
   });
@@ -738,13 +806,13 @@ export class DashboardPage {
     const totals = new Map<string, number>();
     for (const t of txs) {
       if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
-       if (t.direction !== 'out') continue;
-       if (t.source === 'wallet_spend') {
-         const walletId = '__wallet_spending__';
-         totals.set(walletId, (totals.get(walletId) ?? 0) + Number(t.amount));
-         continue;
-       }
-       if (!t.category_id) continue;
+      if (t.direction !== 'out') continue;
+      if (t.source === 'wallet_spend') {
+        const walletId = '__wallet_spending__';
+        totals.set(walletId, (totals.get(walletId) ?? 0) + Number(t.amount));
+        continue;
+      }
+      if (!t.category_id) continue;
       const cat = catMap.get(t.category_id);
       if (cat?.kind === 'savings') continue; // Exclude savings from spending top tiles
       const [ty, tm] = t.occurred_on.split('-').map(Number);
@@ -754,7 +822,7 @@ export class DashboardPage {
     return [...totals.entries()]
       .map(([id, amount]) => ({
         id,
-         name: id === '__wallet_spending__' ? 'Wallet spending' : (catMap.get(id)?.name ?? 'Other'),
+        name: id === '__wallet_spending__' ? 'Wallet spending' : (catMap.get(id)?.name ?? 'Other'),
         amount,
       }))
       .sort((a, b) => b.amount - a.amount)
@@ -784,9 +852,7 @@ export class DashboardPage {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const catsMap = new Map(
-      this.categoriesService.categories().map((c) => [c.id, c.kind]),
-    );
+    const catsMap = new Map(this.categoriesService.categories().map((c) => [c.id, c.kind]));
 
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(today);
@@ -815,9 +881,7 @@ export class DashboardPage {
     const buckets: ChartPoint[] = [];
     const today = new Date();
 
-    const catsMap = new Map(
-      this.categoriesService.categories().map((c) => [c.id, c.kind]),
-    );
+    const catsMap = new Map(this.categoriesService.categories().map((c) => [c.id, c.kind]));
 
     for (let i = months - 1; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);

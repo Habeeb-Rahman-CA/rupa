@@ -1,4 +1,13 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  signal,
+  AfterViewInit,
+  OnDestroy,
+  ElementRef,
+  ViewChild,
+} from '@angular/core';
 import { DatePipe } from '@angular/common';
 
 import { MatButtonModule } from '@angular/material/button';
@@ -17,8 +26,17 @@ import { SelectFieldComponent, SelectOption } from '../../shared/components/sele
 import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
-import { BankAccount, Category, Transaction, isSavingsCategory } from '../../core/models/domain.models';
-import { getCategoryColor, getCategoryIcon, isWalletSpendingCategory } from '../../shared/utils/category-utils';
+import {
+  BankAccount,
+  Category,
+  Transaction,
+  isSavingsCategory,
+} from '../../core/models/domain.models';
+import {
+  getCategoryColor,
+  getCategoryIcon,
+  isWalletSpendingCategory,
+} from '../../shared/utils/category-utils';
 import { errText } from '../../shared/utils/error-utils';
 import {
   filterTransactions,
@@ -57,10 +75,7 @@ export interface DayGroup {
     SelectFieldComponent,
   ],
   template: `
-    <app-page-header
-      title="Transactions"
-      subtitle="Every entry, newest first"
-    />
+    <app-page-header title="Transactions" subtitle="Every entry, newest first" />
 
     @if (transactions().length > 0) {
       <div class="filter-toolbar" [class.has-filters]="filtersActive()">
@@ -75,16 +90,10 @@ export interface DayGroup {
           @if (filtersActive()) {
             <span class="active-filter-badge">Active</span>
           }
-          <lucide-icon
-            class="filter-chevron"
-            [class.open]="filtersOpen()"
-            name="chevron-down"
-          />
+          <lucide-icon class="filter-chevron" [class.open]="filtersOpen()" name="chevron-down" />
         </button>
         @if (filtersActive()) {
-          <button type="button" class="clear-filter-btn" (click)="clearFilters()">
-            Clear
-          </button>
+          <button type="button" class="clear-filter-btn" (click)="clearFilters()">Clear</button>
         }
       </div>
 
@@ -144,7 +153,10 @@ export interface DayGroup {
           </div>
         </div>
         <div class="summary-detail">
-          {{ filteredTransactions().length }} transaction{{ filteredTransactions().length === 1 ? '' : 's' }} shown
+          {{ filteredTransactions().length }} transaction{{
+            filteredTransactions().length === 1 ? '' : 's'
+          }}
+          shown
         </div>
       </section>
     }
@@ -155,7 +167,11 @@ export interface DayGroup {
       <app-empty-state
         icon="receipt"
         [title]="filtersActive() ? 'No matching transactions' : 'No transactions yet'"
-        [message]="filtersActive() ? 'Try changing or clearing your filters.' : 'Tap the + button to add your first one.'"
+        [message]="
+          filtersActive()
+            ? 'Try changing or clearing your filters.'
+            : 'Tap the + button to add your first one.'
+        "
       />
     } @else {
       @for (g of groups(); track g.date) {
@@ -198,18 +214,24 @@ export interface DayGroup {
           </ul>
         </section>
       }
+
+      @if (hasMore() && !isLoading()) {
+        <div class="load-sentinel" #loadSentinel></div>
+      }
     }
   `,
   styles: [
     `
-      .day { margin-bottom: 20px; }
+      .day {
+        margin-bottom: 20px;
+      }
       .filter-toolbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 12px;
         min-height: 42px;
-        margin: 0 0 10px;
+        margin: 0;
         padding: 0 4px;
         background: var(--app-surface);
         border-radius: var(--app-radius-md);
@@ -232,20 +254,25 @@ export interface DayGroup {
       .filter-toolbar.has-filters .filter-toggle {
         color: var(--app-accent);
       }
-      .filter-toggle > lucide-icon:first-child { width: 16px; height: 16px; }
+      .filter-toggle > lucide-icon:first-child {
+        width: 16px;
+        height: 16px;
+      }
       .filter-chevron {
         width: 15px;
         height: 15px;
-        transition: transform .15s ease;
+        transition: transform 0.15s ease;
       }
-      .filter-chevron.open { transform: rotate(180deg); }
+      .filter-chevron.open {
+        transform: rotate(180deg);
+      }
       .active-filter-badge {
         padding: 2px 7px;
         border-radius: 999px;
         background: var(--app-accent);
         color: #fff;
         font-size: 10px;
-        letter-spacing: .02em;
+        letter-spacing: 0.02em;
       }
       .clear-filter-btn {
         border: 0;
@@ -258,7 +285,9 @@ export interface DayGroup {
         font-weight: 600;
         cursor: pointer;
       }
-      .clear-filter-btn:hover { background: var(--app-accent-soft); }
+      .clear-filter-btn:hover {
+        background: var(--app-accent-soft);
+      }
       .filter-panel {
         padding: 12px;
         margin-bottom: 14px;
@@ -296,7 +325,7 @@ export interface DayGroup {
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: .04em;
+        letter-spacing: 0.04em;
       }
       .summary-value {
         overflow: hidden;
@@ -361,8 +390,16 @@ export interface DayGroup {
         width: 22px;
         height: 22px;
       }
-      .tx-title { font-size: 14px; font-weight: 600; color: var(--app-ink); }
-      .tx-sub { font-size: 12px; color: var(--app-ink-muted); margin-top: 2px; }
+      .tx-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--app-ink);
+      }
+      .tx-sub {
+        font-size: 12px;
+        color: var(--app-ink-muted);
+        margin-top: 2px;
+      }
       .tx-amount {
         font-size: 15px;
         font-weight: 700;
@@ -381,6 +418,14 @@ export interface DayGroup {
           font-size: 13px;
         }
       }
+      .load-sentinel {
+        width: 100%;
+        height: 40px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
     `,
   ],
 })
@@ -390,6 +435,9 @@ export class TransactionsPage {
   private readonly bankAccountsService = inject(BankAccountsService);
   private readonly dialog = inject(MatDialog);
   private readonly snack = inject(MatSnackBar);
+
+  @ViewChild('loadSentinel') private readonly sentinelEl!: ElementRef;
+  private observer: IntersectionObserver | null = null;
 
   readonly selectedCategoryId = signal<string | null>(null);
   readonly fromDate = signal<Date | null>(null);
@@ -414,13 +462,39 @@ export class TransactionsPage {
 
   readonly transactions = this.service.transactions;
   readonly isLoading = this.service.isLoading;
+  readonly hasMore = this.service.hasMore;
+
+  async loadMore(): Promise<void> {
+    await this.service.loadMoreTransactions();
+  }
+
+  ngAfterViewInit(): void {
+    if (typeof window === 'undefined' || !this.sentinelEl) return;
+    this.observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && this.hasMore() && !this.isLoading()) {
+            void this.loadMore();
+          }
+        }
+      },
+      { root: null, rootMargin: '100px', threshold: 0.1 },
+    );
+    this.observer.observe(this.sentinelEl.nativeElement);
+  }
+
+  ngOnDestroy(): void {
+    this.observer?.disconnect();
+    this.observer = null;
+  }
 
   readonly categoryOptions = computed<SelectOption<string>[]>(() => [
     { value: '', label: 'All categories', icon: 'layers-3' },
     { value: WALLET_CATEGORY_ID, label: 'Wallet spending', icon: 'wallet' },
     // The system "Wallet spending" category is already listed above as the
     // built-in wallet entry — skip it so the option never appears twice.
-    ...this.categoriesService.categories()
+    ...this.categoriesService
+      .categories()
       .slice()
       .filter((category) => !isWalletSpendingCategory(category))
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -452,7 +526,13 @@ export class TransactionsPage {
   );
 
   readonly savingsCategoryIds = computed(
-    () => new Set(this.categoriesService.categories().filter((c) => isSavingsCategory(c)).map((c) => c.id)),
+    () =>
+      new Set(
+        this.categoriesService
+          .categories()
+          .filter((c) => isSavingsCategory(c))
+          .map((c) => c.id),
+      ),
   );
 
   readonly filteredSummary = computed(() =>
@@ -471,10 +551,12 @@ export class TransactionsPage {
       const isSavings = isSavingsCategory(cat);
       const label =
         t.source === 'transfer'
-          ? (t.direction === 'in' ? 'Transfer in' : 'Transfer out')
+          ? t.direction === 'in'
+            ? 'Transfer in'
+            : 'Transfer out'
           : t.source === 'wallet_spend'
             ? 'Wallet spending'
-          : (cat?.name ?? (t.direction === 'in' ? 'Income' : 'Expense'));
+            : (cat?.name ?? (t.direction === 'in' ? 'Income' : 'Expense'));
 
       let bankName = '';
       if (t.payment_mode === 'cash') bankName = 'Cash';
@@ -488,12 +570,22 @@ export class TransactionsPage {
       if (bankName) parts.push(bankName);
       const subText = parts.join(' • ');
 
-      const icon = t.source === 'transfer'
-        ? 'arrow-left-right'
-        : (t.source === 'wallet_spend' ? 'wallet' : (isSavings ? 'piggy-bank' : getCategoryIcon(label)));
-      const color = t.source === 'transfer'
-        ? '#6366f1'
-        : (t.source === 'wallet_spend' ? '#475569' : (isSavings ? '#0ea5e9' : getCategoryColor(label)));
+      const icon =
+        t.source === 'transfer'
+          ? 'arrow-left-right'
+          : t.source === 'wallet_spend'
+            ? 'wallet'
+            : isSavings
+              ? 'piggy-bank'
+              : getCategoryIcon(label);
+      const color =
+        t.source === 'transfer'
+          ? '#6366f1'
+          : t.source === 'wallet_spend'
+            ? '#475569'
+            : isSavings
+              ? '#0ea5e9'
+              : getCategoryColor(label);
 
       const enriched: EnrichedTransaction = {
         ...t,
@@ -531,12 +623,10 @@ export class TransactionsPage {
   }
 
   async confirmRemove(t: EnrichedTransaction): Promise<void> {
-    if (
-      t.source === 'transfer' ||
-      t.source === 'wallet_recharge' ||
-      t.source === 'wallet_spend'
-    ) {
-      this.snack.open('This linked entry must be managed from its dedicated screen.', undefined, { duration: 3000 });
+    if (t.source === 'transfer' || t.source === 'wallet_recharge' || t.source === 'wallet_spend') {
+      this.snack.open('This linked entry must be managed from its dedicated screen.', undefined, {
+        duration: 3000,
+      });
       return;
     }
     const ok = await openConfirm(this.dialog, {
