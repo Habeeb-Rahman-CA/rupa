@@ -1,22 +1,15 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LucideAngularModule } from 'lucide-angular';
 
-import { InterestEntry } from '../../core/models/domain.models';
-import { BankAccountsService } from '../../core/services/bank-accounts.service';
 import { InterestService, RecordInterestDisposalInput } from '../../core/services/interest.service';
 import { DateFieldComponent } from '../../shared/components/date-field.component';
-import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
+import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { errorText } from '../../shared/utils/error-utils';
 import { isGreaterCurrency, roundCurrency } from '../../shared/utils/currency-utils';
-
-export interface RecordDisposalDialogData {
-  /** Pre-select the entry this disposal covers (when opened from an entry card). */
-  entry?: InterestEntry;
-}
 
 @Component({
   selector: 'app-record-disposal-dialog',
@@ -26,7 +19,7 @@ export interface RecordDisposalDialogData {
     MatButtonModule,
     LucideAngularModule,
     DateFieldComponent,
-    SelectFieldComponent,
+    SignedMoneyPipe,
     TextFieldComponent,
   ],
   template: `
@@ -42,23 +35,11 @@ export interface RecordDisposalDialogData {
 
       <mat-dialog-content class="dialog-content">
         <div class="form-grid">
-          @if (entryOptions().length > 1) {
-            <div class="full">
-              <app-select-field
-                label="Interest entry"
-                placeholder="Select the interest being disposed"
-                [options]="entryOptions()"
-                [value]="entryId()"
-                [invalid]="touched() && !entryId()"
-                (valueChange)="entryId.set($any($event) || null)"
-              />
-            </div>
-          } @else {
-            <div class="full entry-chip">
-              <lucide-icon name="percent" />
-              <span>{{ entryLabel(entryId()) }}</span>
-            </div>
-          }
+          <div class="full balance-chip">
+            <lucide-icon name="percent" />
+            <span>Available balance</span>
+            <strong>{{ remaining() | signedMoney }}</strong>
+          </div>
 
           <app-text-field
             label="Amount"
@@ -98,14 +79,15 @@ export interface RecordDisposalDialogData {
             <lucide-icon name="shield-check" />
             <span>
               A disposal is money given away — it is never counted as a personal expense
-              and will not appear in expenses or reports.
+              and will not appear in expenses or reports. The amount is applied to your
+              oldest interest first.
             </span>
           </div>
 
           @if (touched() && overRemaining()) {
             <div class="full error-notice">
               <lucide-icon name="alert-circle" />
-              <span>Amount cannot exceed the remaining interest of ₹{{ remaining().toFixed(2) }}.</span>
+              <span>Amount cannot exceed the available balance of ₹{{ remaining().toFixed(2) }}.</span>
             </div>
           }
         </div>
@@ -134,7 +116,7 @@ export interface RecordDisposalDialogData {
       .dialog-content { max-height: 75vh; padding: 16px !important; }
       .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
       .full { grid-column: 1 / -1; }
-      .entry-chip {
+      .balance-chip {
         display: flex;
         align-items: center;
         gap: 8px;
@@ -142,11 +124,17 @@ export interface RecordDisposalDialogData {
         border: 1px solid var(--app-hairline);
         border-radius: 13px;
         background: var(--app-input-bg);
-        color: var(--app-ink);
-        font-size: 13px;
+        color: var(--app-ink-muted);
+        font-size: 12px;
         font-weight: 600;
       }
-      .entry-chip lucide-icon { width: 16px; height: 16px; color: var(--app-accent); }
+      .balance-chip lucide-icon { width: 16px; height: 16px; color: var(--app-accent); }
+      .balance-chip strong {
+        margin-left: auto;
+        color: var(--app-ink);
+        font-size: 15px;
+        font-variant-numeric: tabular-nums;
+      }
       .hint, .error-notice {
         display: flex;
         align-items: flex-start;
@@ -169,48 +157,29 @@ export interface RecordDisposalDialogData {
 })
 export class RecordDisposalDialogComponent {
   private readonly ref = inject(MatDialogRef<RecordDisposalDialogComponent>);
-  private readonly data = inject<RecordDisposalDialogData>(MAT_DIALOG_DATA, { optional: true }) ?? {};
   private readonly interestService = inject(InterestService);
-  private readonly bankAccountsService = inject(BankAccountsService);
   private readonly snack = inject(MatSnackBar);
 
   readonly submitting = signal(false);
   readonly touched = signal(false);
-  readonly entryId = signal<string | null>(this.initialEntryId());
-  readonly amount = signal<number | null>(
-    this.remainingFor(this.entryId()),
-  );
+  /** Prefill the whole balance — the common case is disposing everything. */
+  readonly amount = signal<number | null>(this.initialAmount());
   readonly occurredOn = signal<Date | null>(new Date());
   readonly notes = signal('');
 
-  /** Entries that still have interest left to dispose. */
-  readonly entryOptions = computed<SelectOption<string>[]>(() =>
-    this.interestService
-      .entries()
-      .filter((entry) => this.interestService.remainingForEntry(entry) > 0)
-      .map((entry) => ({
-        value: entry.id,
-        label: this.entryLabel(entry.id),
-        icon: 'percent',
-      })),
+  /** The overall accumulated interest balance available to give away. */
+  readonly remaining = computed(() =>
+    roundCurrency(this.interestService.pendingBalance()),
   );
-
-  readonly remaining = computed(() => {
-    const entry = this.entry();
-    if (!entry) return 0;
-    return roundCurrency(this.interestService.remainingForEntry(entry));
-  });
 
   readonly overRemaining = computed(() => {
     const amount = this.amount();
-    if (!amount || !this.entryId()) return false;
+    if (!amount) return false;
     return isGreaterCurrency(roundCurrency(amount), this.remaining());
   });
 
-  remainingHint(): string | undefined {
-    const entry = this.entry();
-    if (!entry) return undefined;
-    return `Remaining interest: ₹${this.remaining().toFixed(2)}`;
+  remainingHint(): string {
+    return `Available to dispose: ₹${this.remaining().toFixed(2)}`;
   }
 
   amountValid(): boolean {
@@ -219,25 +188,11 @@ export class RecordDisposalDialogComponent {
   }
 
   canSave(): boolean {
-    return !!this.entryId() && this.amountValid() && !!this.occurredOn();
+    return this.remaining() > 0 && this.amountValid() && !!this.occurredOn();
   }
 
   toNumber(value: string | number | null): number | null {
     return value === '' || value == null ? null : Number(value);
-  }
-
-  entryLabel(entryId: string | null): string {
-    const entry = this.interestService.entries().find((item) => item.id === entryId);
-    if (!entry) return 'Interest entry';
-    const account = this.bankAccountsService
-      .bankAccounts()
-      .find((item) => item.id === entry.bank_account_id);
-    const bank = account ? `${account.bank_name}` : 'Bank';
-    const [year, month, day] = entry.occurred_on.split('-').map(Number);
-    const on = new Date(year, month - 1, day);
-    const dateLabel = `${on.toLocaleString('en', { month: 'short' })} ${on.getDate()}, ${on.getFullYear()}`;
-    const remaining = this.interestService.remainingForEntry(entry);
-    return `${bank} · ${dateLabel} · ₹${Number(entry.amount).toFixed(2)} (₹${remaining.toFixed(2)} left)`;
   }
 
   async save(): Promise<void> {
@@ -247,7 +202,6 @@ export class RecordDisposalDialogComponent {
 
     try {
       const input: RecordInterestDisposalInput = {
-        entry_id: this.entryId()!,
         amount: Number(this.amount()),
         occurred_on: toIsoDate(this.occurredOn()!)!,
         notes: this.notes().trim() || null,
@@ -267,24 +221,9 @@ export class RecordDisposalDialogComponent {
     this.ref.close();
   }
 
-  private entry(): InterestEntry | undefined {
-    const id = this.entryId();
-    if (!id) return undefined;
-    return this.interestService.entries().find((item) => item.id === id);
-  }
-
-  private initialEntryId(): string | null {
-    if (this.data.entry) return this.data.entry.id;
-    // Opened without a pre-selected entry: pick it when exactly one is pending.
-    const open = this.interestService
-      .entries()
-      .filter((entry) => this.interestService.remainingForEntry(entry) > 0);
-    return open.length === 1 ? open[0].id : null;
-  }
-
-  private remainingFor(entryId: string | null): number | null {
-    const entry = this.interestService.entries().find((item) => item.id === entryId);
-    return entry ? roundCurrency(this.interestService.remainingForEntry(entry)) : null;
+  private initialAmount(): number | null {
+    const pending = roundCurrency(this.interestService.pendingBalance());
+    return pending > 0 ? pending : null;
   }
 }
 

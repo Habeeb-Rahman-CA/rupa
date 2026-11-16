@@ -16,25 +16,16 @@ export interface CreateInterestEntryInput {
   notes?: string | null;
 }
 
+/**
+ * A disposal against the overall accumulated interest balance. The amount is
+ * allocated across entries internally (oldest first), so the caller never
+ * picks a specific entry.
+ */
 export interface RecordInterestDisposalInput {
-  entry_id: string;
   amount: number;
   occurred_on?: string;
   notes?: string | null;
 }
-
-export interface InterestPeriodSummary {
-  key: string;
-  label: string;
-  received: number;
-  disposed: number;
-  pending: number;
-}
-
-const MONTH_LABELS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
 
 /**
  * Interest (Riba) tracker service.
@@ -65,17 +56,6 @@ export class InterestService {
     roundCurrency(sumAmounts(this._entries().map((entry) => Number(entry.amount)))),
   );
 
-  /** Amount separated — entries acted upon (separated or already disposed). */
-  readonly totalSeparated = computed(() =>
-    roundCurrency(
-      sumAmounts(
-        this._entries()
-          .filter((entry) => entry.stage !== 'received')
-          .map((entry) => Number(entry.amount)),
-      ),
-    ),
-  );
-
   /** Total disposed — sum of all disposal records. */
   readonly totalDisposed = computed(() =>
     roundCurrency(sumAmounts(this._disposals().map((disposal) => Number(disposal.amount)))),
@@ -84,14 +64,6 @@ export class InterestService {
   /** Received yet to be given away: received − disposed (never negative). */
   readonly pendingBalance = computed(() =>
     roundCurrency(Math.max(0, this.totalReceived() - this.totalDisposed())),
-  );
-
-  readonly monthlySummaries = computed<InterestPeriodSummary[]>(() =>
-    this.buildSummaries('month'),
-  );
-
-  readonly yearlySummaries = computed<InterestPeriodSummary[]>(() =>
-    this.buildSummaries('year'),
   );
 
   constructor() {
@@ -223,66 +195,55 @@ export class InterestService {
     }
   }
 
-  /** Advance an entry from “received” to “separated” (money set aside). */
-  async markSeparated(id: string): Promise<void> {
-    this.ensureAvailable();
-    const current = this._entries().find((entry) => entry.id === id);
-    if (!current || current.stage !== 'received') return;
-
-    const patch: Pick<InterestEntry, 'stage' | 'separated_on' | 'updated_at'> = {
-      stage: 'separated',
-      separated_on: todayIso(),
-      updated_at: new Date().toISOString(),
-    };
-    this._entries.update((list) =>
-      list.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-    );
-
-    const { error } = await this.supabase.client
-      .from('interest_entries')
-      .update({ stage: patch.stage, separated_on: patch.separated_on, updated_at: patch.updated_at })
-      .eq('id', id)
-      .eq('owner_id', this.requireUserId());
-    if (error) {
-      this._entries.update((list) =>
-        list.map((item) => (item.id === id ? { ...item, ...current } : item)),
-      );
-      console.error('Failed to separate interest entry', error);
-      throw error;
-    }
-  }
-
   // -------------------------------------------------------------- disposals
 
-  async recordDisposal(input: RecordInterestDisposalInput): Promise<InterestDisposal> {
+  /**
+   * Record a disposal against the overall accumulated interest balance.
+   *
+   * `interest_disposals.entry_id` is NOT NULL, so the amount is split across
+   * entries automatically — oldest entries first (FIFO) — until the full
+   * amount is covered. Entries whose share is fully covered move to the
+   * `disposed` stage.
+   */
+  async recordDisposal(input: RecordInterestDisposalInput): Promise<InterestDisposal[]> {
     this.ensureAvailable();
-    const entry = this._entries().find((item) => item.id === input.entry_id);
-    if (!entry) throw new Error('Interest entry not found.');
 
     const amount = roundCurrency(input.amount ?? 0);
     if (!(amount > 0)) throw new Error('Amount must be greater than zero.');
-    this.assertWithinRemaining(entry.id, amount);
+    const pending = this.pendingBalance();
+    if (isGreaterCurrency(amount, pending)) {
+      throw new Error(
+        `Disposal cannot exceed the available balance of ₹${pending.toFixed(2)}.`,
+      );
+    }
 
+    const occurredOn = input.occurred_on ?? todayIso();
+    const notes = input.notes?.trim() || null;
     const ownerId = this.requireUserId();
+
+    const allocations = this.allocateOldestFirst(amount);
+    const rows = allocations.map((allocation) => ({
+      owner_id: ownerId,
+      entry_id: allocation.entryId,
+      occurred_on: occurredOn,
+      amount: allocation.amount,
+      notes,
+    }));
+
     const { data, error } = await this.supabase.client
       .from('interest_disposals')
-      .insert({
-        owner_id: ownerId,
-        entry_id: entry.id,
-        occurred_on: input.occurred_on ?? todayIso(),
-        amount,
-        notes: input.notes?.trim() || null,
-      })
-      .select()
-      .single();
+      .insert(rows)
+      .select();
     if (error) {
       console.error('Failed to record interest disposal', error);
       throw error;
     }
 
-    const created = data as InterestDisposal;
-    this._disposals.update((list) => [created, ...list]);
-    await this.syncEntryStage(entry.id, created.occurred_on);
+    const created = (data ?? []) as InterestDisposal[];
+    this._disposals.update((list) => [...created, ...list]);
+    for (const allocation of allocations) {
+      await this.syncEntryStage(allocation.entryId);
+    }
     return created;
   }
 
@@ -303,17 +264,32 @@ export class InterestService {
     return roundCurrency(Math.max(0, Number(entry.amount) - this.disposedForEntry(entry.id)));
   }
 
-  private assertWithinRemaining(entryId: string, amount: number): void {
-    const entry = this._entries().find((item) => item.id === entryId);
-    if (!entry) throw new Error('Interest entry not found.');
-    const remaining = roundCurrency(
-      Number(entry.amount) - this.disposedForEntry(entryId),
-    );
-    if (isGreaterCurrency(amount, remaining)) {
-      throw new Error(
-        `Disposal cannot exceed the remaining interest of ₹${remaining.toFixed(2)} for this entry.`,
+  /**
+   * Split `amount` across the entries with balance left to dispose, oldest
+   * first, so the whole amount is always covered (callers validate against
+   * `pendingBalance` first).
+   */
+  private allocateOldestFirst(
+    amount: number,
+  ): { entryId: string; amount: number }[] {
+    const open = this._entries()
+      .filter((entry) => this.remainingForEntry(entry) > 0)
+      .sort(
+        (a, b) =>
+          a.occurred_on.localeCompare(b.occurred_on) ||
+          a.created_at.localeCompare(b.created_at),
       );
+
+    const allocations: { entryId: string; amount: number }[] = [];
+    let left = roundCurrency(amount);
+    for (const entry of open) {
+      if (left <= 0) break;
+      const share = roundCurrency(Math.min(left, this.remainingForEntry(entry)));
+      if (share <= 0) continue;
+      allocations.push({ entryId: entry.id, amount: share });
+      left = roundCurrency(left - share);
     }
+    return allocations;
   }
 
   private assertNoDuplicate(
@@ -336,39 +312,27 @@ export class InterestService {
 
   /**
    * Recompute an entry's stage from its disposal records:
-   * fully covered → disposed, partially covered (or manually separated) →
-   * separated, nothing covered → received.
+   * fully covered → disposed, otherwise → received (the "separated" stage is
+   * no longer part of the flow).
    */
-  private async syncEntryStage(entryId: string, hintDate?: string): Promise<void> {
+  private async syncEntryStage(entryId: string): Promise<void> {
     const entry = this._entries().find((item) => item.id === entryId);
     if (!entry) return;
 
     const disposed = this.disposedForEntry(entryId);
-    const amount = Number(entry.amount);
-    let stage: InterestStage;
-    if (disposed >= amount - 0.000001) {
-      stage = 'disposed';
-    } else if (disposed > 0 || entry.separated_on) {
-      stage = 'separated';
-    } else {
-      stage = 'received';
-    }
-
-    // A disposal implies the money was separated at some point.
-    const separatedOn =
-      entry.separated_on ?? (stage !== 'received' ? hintDate ?? todayIso() : null);
-
-    if (stage === entry.stage && separatedOn === entry.separated_on) return;
+    const stage: InterestStage =
+      disposed >= Number(entry.amount) - 0.000001 ? 'disposed' : 'received';
+    if (stage === entry.stage) return;
 
     const previous = entry;
-    const patch = { stage, separated_on: separatedOn, updated_at: new Date().toISOString() };
+    const patch = { stage, updated_at: new Date().toISOString() };
     this._entries.update((list) =>
       list.map((item) => (item.id === entryId ? { ...item, ...patch } : item)),
     );
 
     const { error } = await this.supabase.client
       .from('interest_entries')
-      .update({ stage, separated_on: separatedOn, updated_at: patch.updated_at })
+      .update({ stage, updated_at: patch.updated_at })
       .eq('id', entryId)
       .eq('owner_id', this.requireUserId());
     if (error) {
@@ -377,47 +341,6 @@ export class InterestService {
       );
       console.error('Failed to sync interest entry stage', error);
     }
-  }
-
-  private buildSummaries(granularity: 'month' | 'year'): InterestPeriodSummary[] {
-    const buckets = new Map<string, InterestPeriodSummary>();
-
-    const keyFor = (occurredOn: string): string =>
-      granularity === 'month' ? occurredOn.slice(0, 7) : occurredOn.slice(0, 4);
-
-    const labelFor = (key: string): string => {
-      if (granularity === 'year') return key;
-      const [year, month] = key.split('-').map(Number);
-      return `${MONTH_LABELS[month - 1]} ${year}`;
-    };
-
-    const bucketFor = (occurredOn: string): InterestPeriodSummary => {
-      const key = keyFor(occurredOn);
-      let bucket = buckets.get(key);
-      if (!bucket) {
-        bucket = { key, label: labelFor(key), received: 0, disposed: 0, pending: 0 };
-        buckets.set(key, bucket);
-      }
-      return bucket;
-    };
-
-    for (const entry of this._entries()) {
-      const bucket = bucketFor(entry.occurred_on);
-      bucket.received = roundCurrency(bucket.received + Number(entry.amount));
-    }
-    for (const disposal of this._disposals()) {
-      const bucket = bucketFor(disposal.occurred_on);
-      bucket.disposed = roundCurrency(bucket.disposed + Number(disposal.amount));
-    }
-
-    const summaries = [...buckets.values()].map((bucket) => ({
-      ...bucket,
-      received: roundCurrency(bucket.received),
-      disposed: roundCurrency(bucket.disposed),
-      pending: roundCurrency(Math.max(0, bucket.received - bucket.disposed)),
-    }));
-    summaries.sort((a, b) => b.key.localeCompare(a.key));
-    return granularity === 'month' ? summaries.slice(0, 12) : summaries;
   }
 
   private requireUserId(): string {
