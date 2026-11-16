@@ -15,7 +15,7 @@ export interface CreateTransactionInput {
   notes?: string | null;
   payment_mode?: PaymentMode;
   bank_account_id?: string | null;
-  source?: 'manual' | 'debt' | 'event' | 'opening' | 'subscription';
+  source?: 'manual' | 'debt' | 'opening' | 'subscription';
   source_ref_id?: string | null;
 }
 
@@ -339,30 +339,6 @@ export class TransactionsService {
               .update(patch)
               .eq('id', dp.debt_id);
           }
-        }
-      }
-
-      // Clean up event_expenses referencing this transaction if any
-      const { data: eventExpenses } = await this.supabase.client
-        .from('event_expenses')
-        .select('id')
-        .eq('transaction_id', id);
-
-      if (eventExpenses && eventExpenses.length > 0) {
-        for (const ee of eventExpenses) {
-          await this.supabase.client.from('event_expenses').delete().eq('id', ee.id);
-        }
-      }
-
-      // Clean up event_settlements referencing this transaction if any
-      const { data: eventSettlements } = await this.supabase.client
-        .from('event_settlements')
-        .select('id')
-        .eq('transaction_id', id);
-
-      if (eventSettlements && eventSettlements.length > 0) {
-        for (const es of eventSettlements) {
-          await this.supabase.client.from('event_settlements').delete().eq('id', es.id);
         }
       }
 

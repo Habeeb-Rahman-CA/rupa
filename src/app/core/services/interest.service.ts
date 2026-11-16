@@ -312,8 +312,7 @@ export class InterestService {
 
   /**
    * Recompute an entry's stage from its disposal records:
-   * fully covered → disposed, otherwise → received (the "separated" stage is
-   * no longer part of the flow).
+   * fully covered → disposed, otherwise → received.
    */
   private async syncEntryStage(entryId: string): Promise<void> {
     const entry = this._entries().find((item) => item.id === entryId);

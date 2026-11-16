@@ -3,7 +3,6 @@ export type TxSource =
   | 'manual'
   | 'debt'
   | 'opening'
-  | 'event'
   | 'transfer'
   | 'wallet_recharge'
   | 'wallet_spend'
@@ -110,7 +109,7 @@ export interface MoneyHeldTransaction {
 }
 
 /** Interest (Riba) tracker — kept fully separate from personal finance. */
-export type InterestStage = 'received' | 'separated' | 'disposed';
+export type InterestStage = 'received' | 'disposed';
 
 export interface InterestEntry {
   id: string;
@@ -119,7 +118,6 @@ export interface InterestEntry {
   occurred_on: string;
   amount: number;
   stage: InterestStage;
-  separated_on: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -131,9 +129,6 @@ export interface InterestDisposal {
   entry_id: string;
   occurred_on: string;
   amount: number;
-  /** Legacy fields — the app now records a free-text note only. */
-  recipient: string | null;
-  purpose: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

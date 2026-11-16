@@ -246,7 +246,7 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
       .list-head .count { color: var(--app-ink-muted); font-size: 12px; }
       .entry-list {
         list-style: none;
-        margin: 0;
+        margin: 0 0 16px 0;
         padding: 0;
         display: flex;
         flex-direction: column;

@@ -17,7 +17,6 @@ describe('InterestService', () => {
     occurred_on: '2026-11-01',
     amount: 100,
     stage: 'received',
-    separated_on: null,
     notes: null,
     created_at: '2026-11-01T00:00:00.000Z',
     updated_at: '2026-11-01T00:00:00.000Z',
@@ -30,8 +29,6 @@ describe('InterestService', () => {
     entry_id: 'entry-1',
     occurred_on: '2026-11-05',
     amount: 40,
-    recipient: 'Masjid',
-    purpose: 'Building fund',
     notes: null,
     created_at: '2026-11-05T00:00:00.000Z',
     updated_at: '2026-11-05T00:00:00.000Z',
@@ -68,7 +65,7 @@ describe('InterestService', () => {
       [
         entry({ id: 'e1', amount: 100, stage: 'received' }),
         entry({ id: 'e2', amount: 50, stage: 'received' }),
-        entry({ id: 'e3', amount: 60, stage: 'disposed', separated_on: '2026-11-02' }),
+        entry({ id: 'e3', amount: 60, stage: 'disposed' }),
       ],
       [disposal({ id: 'd1', entry_id: 'e3', amount: 60 })],
     );
