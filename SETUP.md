@@ -73,8 +73,16 @@ See `src/app/features/` — one folder per feature. We'll build in this order:
 4. Categories & People (master data screens)
 5. Transactions (add expense/income)
 6. Debts
-7. Events (trips/functions)
-8. Reports (monthly spending)
+7. Reports (monthly spending)
+8. Interest tracker
+9. Wallets & Bank Accounts
+10. Subscriptions
+11. Money Held
+12. Budgets
+13. Transfers
+14. People
+15. Settings (app lock, MPIN, OpenRouter)
+16. Push notifications
 
 ## 8. Web Push notifications (one-time backend setup)
 

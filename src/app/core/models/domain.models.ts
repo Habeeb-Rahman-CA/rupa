@@ -18,7 +18,10 @@ export interface Category {
   created_at: string;
 }
 
-const SAVINGS_PREFIX = 'rupa_savings_cat_';
+function savingsPrefix(userId: string): string {
+  return `rupa:${userId}:savings_cat_`;
+}
+
 const inMemorySavingsCategories = new Set<string>();
 
 function safeGetLocalStorage(): Storage | null {
@@ -29,28 +32,28 @@ function safeGetLocalStorage(): Storage | null {
   }
 }
 
-export function markAsSavingsCategory(id: string): void {
-  if (!id) return;
+export function markAsSavingsCategory(id: string, userId: string): void {
+  if (!id || !userId) return;
   inMemorySavingsCategories.add(id);
   const storage = safeGetLocalStorage();
   if (storage) {
     try {
-      storage.setItem(SAVINGS_PREFIX + id, 'true');
+      storage.setItem(savingsPrefix(userId) + id, 'true');
     } catch (err) {
       console.warn('Failed to persist savings category to localStorage', err);
     }
   }
 }
 
-export function isSavingsCategory(cat: Category | null | undefined): boolean {
+export function isSavingsCategory(cat: Category | null | undefined, userId?: string): boolean {
   if (!cat) return false;
   if (cat.kind === 'savings') return true;
   if (cat.id && inMemorySavingsCategories.has(cat.id)) return true;
 
   const storage = safeGetLocalStorage();
-  if (storage && cat.id) {
+  if (storage && cat.id && userId) {
     try {
-      if (storage.getItem(SAVINGS_PREFIX + cat.id) === 'true') {
+      if (storage.getItem(savingsPrefix(userId) + cat.id) === 'true') {
         inMemorySavingsCategories.add(cat.id);
         return true;
       }

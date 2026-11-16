@@ -2,7 +2,9 @@ import { Injectable, effect, inject, signal } from '@angular/core';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 
-const LOCAL_KEY_STORAGE = 'rupa_openrouter_api_key';
+function legacyKeyStorage(userId: string): string {
+  return `rupa:${userId}:openrouter_api_key`;
+}
 
 export interface AppSettings {
   id?: string;
@@ -49,13 +51,13 @@ export class AppSettingsService {
 
     if (data?.openrouter_api_key) {
       this._openRouterApiKey.set(data.openrouter_api_key);
-      this.clearLegacyKey();
+      this.clearLegacyKey(user.id);
       return;
     }
 
     // Import the key saved by older builds only when the database has no key.
     // The legacy key is removed only after Supabase confirms the upsert.
-    const legacyKey = this.getLegacyKey();
+    const legacyKey = this.getLegacyKey(user.id);
     if (!legacyKey) {
       this._openRouterApiKey.set('');
       return;
@@ -88,7 +90,7 @@ export class AppSettingsService {
     }
 
     this._openRouterApiKey.set(legacyKey);
-    this.clearLegacyKey();
+    this.clearLegacyKey(user.id);
   }
 
   async saveOpenRouterApiKey(apiKey: string): Promise<void> {
@@ -112,21 +114,21 @@ export class AppSettingsService {
     }
 
     this._openRouterApiKey.set(trimmed);
-    this.clearLegacyKey();
+    this.clearLegacyKey(user.id);
   }
 
-  private getLegacyKey(): string {
+  private getLegacyKey(userId: string): string {
     if (typeof localStorage === 'undefined') return '';
     return (
-      localStorage.getItem(LOCAL_KEY_STORAGE)?.trim() ||
+      localStorage.getItem(legacyKeyStorage(userId))?.trim() ||
       localStorage.getItem('openrouter_api_key')?.trim() ||
       ''
     );
   }
 
-  private clearLegacyKey(): void {
+  private clearLegacyKey(userId: string): void {
     if (typeof localStorage === 'undefined') return;
-    localStorage.removeItem(LOCAL_KEY_STORAGE);
+    localStorage.removeItem(legacyKeyStorage(userId));
     localStorage.removeItem('openrouter_api_key');
   }
 }

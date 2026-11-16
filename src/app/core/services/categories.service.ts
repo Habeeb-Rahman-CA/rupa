@@ -62,7 +62,7 @@ export class CategoriesService {
           return;
         }
         const categories = ((data ?? []) as Category[]).map((c) => {
-          if (isSavingsCategory(c)) {
+          if (isSavingsCategory(c, this.requireUserId())) {
             return { ...c, kind: 'savings' as const };
           }
           return c;
@@ -109,7 +109,7 @@ export class CategoriesService {
     };
 
     if (kind === 'savings') {
-      markAsSavingsCategory(created.id);
+      markAsSavingsCategory(created.id, ownerId);
     }
     this._categories.update((list) => [...list, created]);
     return created;

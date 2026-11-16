@@ -452,7 +452,7 @@ export class TransactionsPage {
   );
 
   readonly savingsCategoryIds = computed(
-    () => new Set(this.categoriesService.categories().filter(isSavingsCategory).map((c) => c.id)),
+    () => new Set(this.categoriesService.categories().filter((c) => isSavingsCategory(c)).map((c) => c.id)),
   );
 
   readonly filteredSummary = computed(() =>

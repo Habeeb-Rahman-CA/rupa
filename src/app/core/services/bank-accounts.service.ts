@@ -4,7 +4,9 @@ import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { TransactionsService } from './transactions.service';
 
-const LOCAL_STORAGE_KEY = 'rupa_bank_accounts';
+function legacyStorageKey(userId: string): string {
+  return `rupa:${userId}:bank_accounts`;
+}
 
 @Injectable({ providedIn: 'root' })
 export class BankAccountsService {
@@ -66,7 +68,7 @@ export class BankAccountsService {
         // One-time migration for cards created by older versions of the app.
         // Existing remote rows win when the same id already exists, so a
         // successful migration cannot overwrite newer database data.
-        const legacyCards = this.getLegacyCards();
+        const legacyCards = this.getLegacyCards(ownerId);
         const cardsToMigrate = legacyCards
           .filter((card) => !remoteList.some((remote) => remote.id === card.id))
           .map((card) => ({ ...card, owner_id: ownerId }));
@@ -107,8 +109,8 @@ export class BankAccountsService {
         // Only clear the legacy storage after the database has accepted all
         // legacy records. If migration failed, the data remains available for
         // a later retry instead of being silently discarded.
-        if (this.hasLegacyStorage()) {
-          this.clearLegacyCards();
+        if (this.hasLegacyStorage(ownerId)) {
+          this.clearLegacyCards(ownerId);
         }
 
         this._bankAccounts.set(remoteList);
@@ -326,10 +328,10 @@ export class BankAccountsService {
     }
   }
 
-  private getLegacyCards(): BankAccount[] {
+  private getLegacyCards(userId: string): BankAccount[] {
     try {
       if (typeof localStorage === 'undefined') return [];
-      const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+      const local = localStorage.getItem(legacyStorageKey(userId));
       if (local) {
         const parsed = JSON.parse(local) as BankAccount[];
         if (Array.isArray(parsed)) {
@@ -347,19 +349,19 @@ export class BankAccountsService {
     return [];
   }
 
-  private clearLegacyCards(): void {
+  private clearLegacyCards(userId: string): void {
     try {
       if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        localStorage.removeItem(legacyStorageKey(userId));
       }
     } catch (err) {
       console.warn('Could not clear legacy bank accounts from localStorage', err);
     }
   }
 
-  private hasLegacyStorage(): boolean {
+  private hasLegacyStorage(userId: string): boolean {
     try {
-      return typeof localStorage !== 'undefined' && localStorage.getItem(LOCAL_STORAGE_KEY) !== null;
+      return typeof localStorage !== 'undefined' && localStorage.getItem(legacyStorageKey(userId)) !== null;
     } catch {
       return false;
     }

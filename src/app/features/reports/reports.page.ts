@@ -1234,13 +1234,14 @@ export class ReportsPage {
       const cat = t.category_id ? catMap.get(t.category_id) : undefined;
       if (!isSavingsCategory(cat)) continue;
       const key = t.category_id ?? '__savings__';
-      const amt = Number(t.amount);
+      const amt = t.direction === 'out' ? Number(t.amount) : -Number(t.amount);
       totals.set(key, (totals.get(key) ?? 0) + amt);
       sum += amt;
     }
-    if (sum === 0) return [];
+    if (sum <= 0) return [];
 
     return [...totals.entries()]
+      .filter(([, amount]) => amount > 0)
       .map(([id, amount]) => {
         const cat = catMap.get(id);
         const name = cat?.name ?? 'Savings';

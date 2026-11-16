@@ -13,6 +13,7 @@ import {
   LineChartComponent,
   ChartPoint,
 } from '../../shared/components/line-chart.component';
+import { AuthService } from '../../core/services/auth.service';
 import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
 import { DebtsService } from '../../core/services/debts.service';
@@ -552,6 +553,7 @@ export class DashboardPage {
   private readonly categoriesService = inject(CategoriesService);
   private readonly debtsService = inject(DebtsService);
   private readonly bottomSheet = inject(MatBottomSheet);
+  private readonly auth = inject(AuthService);
 
   readonly balance = this.txService.balance;
   readonly monthly = this.txService.monthly;
@@ -587,10 +589,14 @@ export class DashboardPage {
   readonly theyOweTotal = this.debtsService.theyOweYouTotal;
   readonly youOweTotal = this.debtsService.youOweTotal;
 
-  readonly bannerDismissed = signal(
-    typeof localStorage !== 'undefined' &&
-      localStorage.getItem('rupa_dismiss_balance_banner') === 'true',
-  );
+  private readonly _bannerDismissed = signal(false);
+  readonly bannerDismissed = computed(() => {
+    const userId = this.auth.user()?.id;
+    if (!userId) return this._bannerDismissed();
+    return this._bannerDismissed() ||
+      (typeof localStorage !== 'undefined' &&
+        localStorage.getItem(`rupa:${userId}:dismiss_balance_banner`) === 'true');
+  });
 
   readonly showBalanceBanner = computed(() => {
     return this.openingBalance() === null && !this.bannerDismissed();
@@ -683,10 +689,11 @@ export class DashboardPage {
   }
 
   dismissBalanceBanner(): void {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('rupa_dismiss_balance_banner', 'true');
+    const userId = this.auth.user()?.id;
+    if (userId && typeof localStorage !== 'undefined') {
+      localStorage.setItem(`rupa:${userId}:dismiss_balance_banner`, 'true');
     }
-    this.bannerDismissed.set(true);
+    this._bannerDismissed.set(true);
   }
 
   // Chart data based on range.

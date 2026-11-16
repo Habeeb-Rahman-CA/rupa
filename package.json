@@ -15,8 +15,13 @@
     "preview": "ng serve --configuration production",
     "test": "ng test --watch=false --browsers=ChromeHeadless",
     "test:watch": "ng test",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
+    "lint": "npm run typecheck",
     "icons": "powershell -ExecutionPolicy Bypass -File ./scripts/gen-icons.ps1",
-    "clean": "powershell -Command \"Remove-Item -Recurse -Force ./dist, ./.angular\""
+    "icons:linux": "magick convert public/rupa-icon.png -resize 72x72 public/icons/icon-72x72.png && magick convert public/rupa-icon.png -resize 96x96 public/icons/icon-96x96.png && magick convert public/rupa-icon.png -resize 128x128 public/icons/icon-128x128.png && magick convert public/rupa-icon.png -resize 144x144 public/icons/icon-144x144.png && magick convert public/rupa-icon.png -resize 152x152 public/icons/icon-152x152.png && magick convert public/rupa-icon.png -resize 192x192 public/icons/icon-192x192.png && magick convert public/rupa-icon.png -resize 384x384 public/icons/icon-384x384.png && magick convert public/rupa-icon.png -resize 512x512 public/icons/icon-512x512.png && magick convert public/rupa-icon.png -resize 180x180 public/apple-touch-icon.png",
+    "clean": "rm -rf dist ./.angular",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "prettier": {
     "printWidth": 100,
@@ -61,6 +66,7 @@
     "karma-jasmine-html-reporter": "~2.1.0",
     "postcss": "^8.5.26",
     "tailwindcss": "^3.4.19",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "prettier": "^3.5.0"
   }
 }

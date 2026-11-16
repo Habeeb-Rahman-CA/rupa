@@ -349,7 +349,7 @@ export class TransactionsService {
           const card = bankAccountsService.bankAccounts().find((c) => c.id === removed.bank_account_id);
           if (card && card.balance !== undefined) {
             const revertDelta = removed.direction === 'in' ? -Number(removed.amount) : Number(removed.amount);
-            const newBalance = Math.max(0, roundCurrency(card.balance + revertDelta));
+            const newBalance = roundCurrency(card.balance + revertDelta);
             await bankAccountsService.update(card.id, { balance: newBalance });
           }
         } catch (err) {

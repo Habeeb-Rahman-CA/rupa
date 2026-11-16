@@ -155,11 +155,41 @@ export class AuthService {
   }
 
   async signOut(): Promise<void> {
+    const userId = this._session()?.user?.id;
     this._session.set(null);
+    this.clearUserLocalStorage(userId);
     try {
       await this.supabase.client.auth.signOut();
     } catch {
       // Ignore network errors on signout
+    }
+  }
+
+  private clearUserLocalStorage(userId: string | null | undefined): void {
+    if (!userId || typeof localStorage === 'undefined') return;
+    const prefix = `rupa:${userId}:`;
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix)) {
+        keysToRemove.push(key);
+      }
+    }
+    for (const key of keysToRemove) {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // Ignore individual removal failures
+      }
+    }
+    // Also remove the legacy unscoped keys to avoid cross-user leakage
+    try {
+      localStorage.removeItem('rupa_bank_accounts');
+      localStorage.removeItem('rupa_openrouter_api_key');
+      localStorage.removeItem('openrouter_api_key');
+      localStorage.removeItem('rupa_dismiss_balance_banner');
+    } catch {
+      // Ignore
     }
   }
 
