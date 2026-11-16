@@ -5,7 +5,6 @@ import { SupabaseService } from './supabase.service';
 import { CategoriesService } from './categories.service';
 import { DebtsService } from './debts.service';
 import { BankAccountsService } from './bank-accounts.service';
-import { roundCurrency } from '../../shared/utils/currency-utils';
 
 export interface CreateTransactionInput {
   amount: number;
@@ -149,13 +148,12 @@ export class TransactionsService {
 
     const unassignedIds = unassigned.map((t) => t.id);
     try {
-      const res = await this.supabase.client
-        .from('transactions')
-        .update({ payment_mode: 'bank', bank_account_id: bankAccountId })
-        .in('id', unassignedIds);
-
-      if (res.error) {
-        console.error('Failed to map bank transactions to the primary account', res.error);
+      const { error: mapErr } = await this.supabase.client.rpc(
+        'assign_transactions_to_account',
+        { p_account_id: bankAccountId, p_transaction_ids: unassignedIds },
+      );
+      if (mapErr) {
+        console.error('Failed to map bank transactions to the primary account', mapErr);
       }
     } catch {
       console.error('Failed to map bank transactions to the primary account');
@@ -242,51 +240,35 @@ export class TransactionsService {
       } catch {}
     }
 
-    const payload = {
-      owner_id: ownerId,
-      amount: input.amount,
-      direction: input.direction,
-      occurred_on: input.occurred_on ?? todayIso(),
-      category_id: input.category_id ?? null,
-      notes: input.notes?.trim() || null,
-      source: input.source ?? ('manual' as const),
-      source_ref_id: input.source_ref_id ?? null,
-      payment_mode: mode,
-      bank_account_id: targetBankAccountId,
-    };
-
-    const { data, error } = await this.supabase.client
-      .from('transactions')
-      .insert(payload)
-      .select()
-      .single();
+    const { data, error } = await this.supabase.client.rpc(
+      'create_transaction_with_balance_update',
+      {
+        p_owner_id: ownerId,
+        p_amount: input.amount,
+        p_direction: input.direction,
+        p_occurred_on: input.occurred_on ?? todayIso(),
+        p_category_id: input.category_id ?? null,
+        p_notes: input.notes?.trim() || null,
+        p_source: input.source ?? ('manual' as const),
+        p_source_ref_id: input.source_ref_id ?? null,
+        p_payment_mode: mode,
+        p_bank_account_id: targetBankAccountId,
+      },
+    );
 
     if (error) {
       console.error('Failed to create transaction', error);
       throw error;
     }
 
-    const created = data as Transaction;
-
-    // Update bank card balance if bank_account_id is provided
-    if (targetBankAccountId && mode === 'bank') {
-      try {
-        const bankAccountsService = this.injector.get(BankAccountsService);
-        const card = bankAccountsService.bankAccounts().find((c) => c.id === targetBankAccountId);
-        if (card && card.balance !== undefined) {
-          const delta = input.direction === 'in' ? input.amount : -input.amount;
-          await bankAccountsService.update(card.id, {
-            balance: roundCurrency(card.balance + delta),
-          });
-        }
-      } catch (err) {
-        console.error('Failed to update bank account balance', err);
-      }
+    const created = (data as Transaction[])?.[0];
+    if (!created) {
+      throw new Error('Transaction was not returned after creation.');
     }
 
-    this._transactions.update((list) => [created!, ...list]);
-    this.applyToTotals(created!, +1);
-    return created!;
+    this._transactions.update((list) => [created, ...list]);
+    this.applyToTotals(created, +1);
+    return created;
   }
 
   async delete(id: string): Promise<void> {
@@ -342,28 +324,14 @@ export class TransactionsService {
         }
       }
 
-      // Revert bank card balance if transaction was linked to a bank account
-      if (removed.payment_mode === 'bank' && removed.bank_account_id) {
-        try {
-          const bankAccountsService = this.injector.get(BankAccountsService);
-          const card = bankAccountsService.bankAccounts().find((c) => c.id === removed.bank_account_id);
-          if (card && card.balance !== undefined) {
-            const revertDelta = removed.direction === 'in' ? -Number(removed.amount) : Number(removed.amount);
-            const newBalance = roundCurrency(card.balance + revertDelta);
-            await bankAccountsService.update(card.id, { balance: newBalance });
-          }
-        } catch (err) {
-          console.error('Failed to revert bank account balance on transaction deletion', err);
-        }
-      }
+      // Atomic delete: reverts bank balance and removes the transaction row
+      // in the same database transaction.
+      const { error: delErr } = await this.supabase.client.rpc(
+        'delete_transaction_with_balance_update',
+        { p_transaction_id: id },
+      );
 
-      // Delete transaction row
-      const { error } = await this.supabase.client
-        .from('transactions')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      if (delErr) throw delErr;
 
       // Refresh DebtsService if present
       try {

@@ -41,7 +41,7 @@ create table if not exists public.transactions (
   category_id    uuid references public.categories(id) on delete set null,
   notes          text,
   source         text not null default 'manual'
-                   check (source in ('manual','debt','opening')),
+                   check (source in ('manual','debt','opening','transfer','wallet_recharge','wallet_spend','subscription')),
   source_ref_id  uuid,
   created_at     timestamptz not null default now()
 );

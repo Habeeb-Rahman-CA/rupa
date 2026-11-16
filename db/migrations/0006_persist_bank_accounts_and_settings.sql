@@ -219,7 +219,7 @@ end $$;
 alter table public.transactions
   drop constraint if exists transactions_source_check,
   add constraint transactions_source_check
-    check (source in ('manual', 'debt', 'event', 'opening'));
+    check (source in ('manual', 'debt', 'opening', 'transfer', 'wallet_recharge', 'wallet_spend', 'subscription'));
 
 create index if not exists transactions_bank_account_idx
   on public.transactions (bank_account_id)
