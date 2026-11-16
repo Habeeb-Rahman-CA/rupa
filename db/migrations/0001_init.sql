@@ -14,7 +14,7 @@ create table if not exists public.categories (
   id          uuid primary key default gen_random_uuid(),
   owner_id    uuid not null references auth.users(id) on delete cascade,
   name        text not null,
-  kind        text not null check (kind in ('income','expense')),
+  kind        text not null check (kind in ('income','expense','savings')),
   created_at  timestamptz not null default now(),
   unique (owner_id, name, kind)
 );
@@ -41,7 +41,7 @@ create table if not exists public.transactions (
   category_id    uuid references public.categories(id) on delete set null,
   notes          text,
   source         text not null default 'manual'
-                   check (source in ('manual','debt','event')),
+                   check (source in ('manual','debt','opening')),
   source_ref_id  uuid,
   created_at     timestamptz not null default now()
 );
