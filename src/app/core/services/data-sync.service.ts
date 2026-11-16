@@ -1,4 +1,4 @@
-import { Injectable, effect, inject } from '@angular/core';
+import { Injectable, effect, inject, Injector } from '@angular/core';
 import { AuthService } from './auth.service';
 import { CategoriesService } from './categories.service';
 import { PeopleService } from './people.service';
@@ -7,7 +7,6 @@ import { DebtsService } from './debts.service';
 import { MoneyHeldService } from './money-held.service';
 import { TransfersService } from './transfers.service';
 import { WalletsService } from './wallets.service';
-import { AppSettingsService } from './app-settings.service';
 
 import { BankAccountsService } from './bank-accounts.service';
 import { SubscriptionsService } from './subscriptions.service';
@@ -19,30 +18,15 @@ import { OfflineQueueService } from './offline-queue.service';
 @Injectable({ providedIn: 'root' })
 export class DataSyncService {
   private readonly auth = inject(AuthService);
-  private readonly categoriesService = inject(CategoriesService);
-  private readonly peopleService = inject(PeopleService);
-  private readonly bankAccountsService = inject(BankAccountsService);
-  private readonly transactionsService = inject(TransactionsService);
-  private readonly debtsService = inject(DebtsService);
-  private readonly moneyHeldService = inject(MoneyHeldService);
-  private readonly transfersService = inject(TransfersService);
-  private readonly walletsService = inject(WalletsService);
-  // Instantiate settings during the authenticated shell bootstrap so legacy
-  // localStorage settings are migrated even before bill scanning is opened.
-  private readonly appSettingsService = inject(AppSettingsService);
-  private readonly subscriptionsService = inject(SubscriptionsService);
-  private readonly interestService = inject(InterestService);
-  // Budget usage reads the transaction ledger — phase 2 keeps it consistent.
-  private readonly budgetsService = inject(BudgetsService);
-  // Loads push preferences and reconciles this device's subscription
-  // (never requests permission — that only happens on an explicit tap).
-  private readonly pushService = inject(PushService);
+  private readonly injector = inject(Injector);
   private readonly offlineQueue = inject(OfflineQueueService);
 
   private syncPromise: Promise<void> | null = null;
 
   constructor() {
-    // Whenever user is authenticated, trigger orchestrated 2-phase data load
+    // Whenever user is authenticated, trigger orchestrated 2-phase data load.
+    // Services are injected lazily inside syncAll() so they are not all
+    // instantiated at app boot — only when sync actually runs.
     effect(() => {
       if (this.auth.isAuthenticated()) {
         void this.syncAll();
@@ -59,26 +43,40 @@ export class DataSyncService {
     if (!this.auth.isAuthenticated()) return;
     if (this.syncPromise) return this.syncPromise;
 
+    // Lazily inject services so they are not instantiated until sync runs.
+    const categoriesService = this.injector.get(CategoriesService);
+    const peopleService = this.injector.get(PeopleService);
+    const bankAccountsService = this.injector.get(BankAccountsService);
+    const transactionsService = this.injector.get(TransactionsService);
+    const debtsService = this.injector.get(DebtsService);
+    const moneyHeldService = this.injector.get(MoneyHeldService);
+    const transfersService = this.injector.get(TransfersService);
+    const walletsService = this.injector.get(WalletsService);
+    const subscriptionsService = this.injector.get(SubscriptionsService);
+    const interestService = this.injector.get(InterestService);
+    const budgetsService = this.injector.get(BudgetsService);
+    const pushService = this.injector.get(PushService);
+
     this.syncPromise = (async () => {
       try {
         // Phase 1: Master lookups
         await Promise.all([
-          this.categoriesService.load(),
-          this.peopleService.load(),
-          this.bankAccountsService.load(),
+          categoriesService.load(),
+          peopleService.load(),
+          bankAccountsService.load(),
         ]);
 
         // Phase 2: Relational ledger records
         await Promise.all([
-          this.transactionsService.refresh(),
-          this.debtsService.load(),
-          this.moneyHeldService.load(),
-          this.transfersService.load(),
-          this.walletsService.load(),
-          this.subscriptionsService.load(),
-          this.interestService.load(),
-          this.budgetsService.load(),
-          this.pushService.init(),
+          transactionsService.refresh(),
+          debtsService.load(),
+          moneyHeldService.load(),
+          transfersService.load(),
+          walletsService.load(),
+          subscriptionsService.load(),
+          interestService.load(),
+          budgetsService.load(),
+          pushService.init(),
         ]);
       } catch (err) {
         console.error('Coordinated data sync failed', err);

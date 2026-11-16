@@ -12,7 +12,8 @@ const HASH_BYTES = 32;
 
 /** Wrong attempts before a temporary lockout. */
 const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 30_000;
+const LOCKOUT_BASE_MS = 30_000;
+const MAX_LOCKOUT_MS = 300_000;
 
 /** Pages reachable while locked (public routes — no app data behind them). */
 const PUBLIC_PATHS = ['/login', '/lock', '/terms'];
@@ -30,6 +31,7 @@ interface MpinRecord {
   autoLockSeconds: number;
   failedAttempts: number;
   lockUntil: number | null;
+  lockoutCount: number;
 }
 
 export type MpinVerifyResult = {
@@ -67,10 +69,9 @@ export class MpinService {
   readonly autoLockSeconds = signal(60);
   readonly failedAttempts = signal(0);
   readonly lockUntil = signal<number | null>(null);
+  readonly lockoutCount = signal(0);
 
-  readonly attemptsLeft = computed(() =>
-    Math.max(0, MAX_ATTEMPTS - this.failedAttempts()),
-  );
+  readonly attemptsLeft = computed(() => Math.max(0, MAX_ATTEMPTS - this.failedAttempts()));
   readonly isLockingOut = computed(() => {
     const until = this.lockUntil();
     return until !== null && until > Date.now();
@@ -98,6 +99,7 @@ export class MpinService {
     this.pinLength.set(record.pinLength);
     this.autoLockSeconds.set(record.autoLockSeconds);
     this.failedAttempts.set(record.failedAttempts);
+    this.lockoutCount.set(record.lockoutCount ?? 0);
     // Fresh launch with MPIN on → start locked (unless still cooling down,
     // in which case the lockout continues from where it was left).
     this.lockUntil.set(record.lockUntil);
@@ -154,6 +156,7 @@ export class MpinService {
     this.isLocked.set(false);
     this.failedAttempts.set(0);
     this.lockUntil.set(null);
+    this.lockoutCount.set(0);
     this.persistAttemptState();
   }
 
@@ -177,6 +180,13 @@ export class MpinService {
       return { ok: false, attemptsLeft: 0, lockUntil: record.lockUntil };
     }
 
+    // If a previous lockout has expired, reset the attempt counter so the user
+    // gets a fresh set of attempts after the cool-down period.
+    let currentAttempts = record.failedAttempts;
+    if (record.lockUntil !== null && record.lockUntil <= now) {
+      currentAttempts = 0;
+    }
+
     const expected = base64ToBytes(record.hash);
     const actual = await derivePinHash(pin, base64ToBytes(record.salt));
     const matches = constantTimeEqual(expected, actual);
@@ -184,20 +194,32 @@ export class MpinService {
     if (matches) {
       this.failedAttempts.set(0);
       this.lockUntil.set(null);
+      this.lockoutCount.set(0);
       this.persistAttemptState();
       this.isLocked.set(false);
       return { ok: true, attemptsLeft: MAX_ATTEMPTS, lockUntil: null };
     }
 
-    const attempts = record.failedAttempts + 1;
-    const lockUntil = attempts >= MAX_ATTEMPTS ? now + LOCKOUT_MS : null;
-    this.failedAttempts.set(attempts >= MAX_ATTEMPTS ? 0 : attempts);
-    this.lockUntil.set(lockUntil);
+    const attempts = currentAttempts + 1;
+    if (attempts >= MAX_ATTEMPTS) {
+      // Lockout triggered: keep failedAttempts at MAX (never reset to 0),
+      // increment lockoutCount, and apply exponential backoff.
+      const nextLockoutCount = (record.lockoutCount ?? 0) + 1;
+      const lockoutMs = Math.min(
+        LOCKOUT_BASE_MS * Math.pow(2, nextLockoutCount - 1),
+        MAX_LOCKOUT_MS,
+      );
+      this.failedAttempts.set(MAX_ATTEMPTS);
+      this.lockoutCount.set(nextLockoutCount);
+      this.lockUntil.set(now + lockoutMs);
+      this.persistAttemptState();
+      return { ok: false, attemptsLeft: 0, lockUntil: now + lockoutMs };
+    }
+
+    this.failedAttempts.set(attempts);
+    this.lockUntil.set(null);
     this.persistAttemptState();
 
-    if (lockUntil !== null) {
-      return { ok: false, attemptsLeft: 0, lockUntil };
-    }
     return {
       ok: false,
       attemptsLeft: MAX_ATTEMPTS - attempts,
@@ -220,6 +242,7 @@ export class MpinService {
       autoLockSeconds: record?.autoLockSeconds ?? this.autoLockSeconds(),
       failedAttempts: 0,
       lockUntil: null,
+      lockoutCount: 0,
     };
     writeRecord(next);
     this.isConfigured.set(true);
@@ -240,6 +263,7 @@ export class MpinService {
     this.isLocked.set(false);
     this.failedAttempts.set(0);
     this.lockUntil.set(null);
+    this.lockoutCount.set(0);
   }
 
   /** Persist the auto-lock timeout (seconds: 0 | 60 | 300). */
@@ -302,10 +326,7 @@ function randomBytes(length: number): Uint8Array {
 }
 
 function toBuffer(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength,
-  ) as ArrayBuffer;
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
