@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal, WritableSignal } from '@angular/core';
 import { SwPush } from '@angular/service-worker';
 
 import { environment } from '../../../environments/environment';
@@ -6,7 +6,7 @@ import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { errorText } from '../../shared/utils/error-utils';
 
-export type PushCategory = 'renewals' | 'low_balance';
+export type PushCategory = 'renewals' | 'low_balance' | 'budget';
 
 export type PushCategoryState = 'on' | 'off' | 'unknown';
 
@@ -54,6 +54,7 @@ export class PushService {
 
   readonly renewalsEnabled = signal(true);
   readonly lowBalanceEnabled = signal(true);
+  readonly budgetEnabled = signal(true);
 
   readonly status = computed<PushStatus>(() => {
     if (!this.isSupported) return 'unsupported';
@@ -69,6 +70,15 @@ export class PushService {
   readonly lowBalanceState = computed<PushCategoryState>(() =>
     this.lowBalanceEnabled() ? 'on' : 'off',
   );
+  readonly budgetState = computed<PushCategoryState>(() =>
+    this.budgetEnabled() ? 'on' : 'off',
+  );
+
+  private readonly categorySignals: Record<PushCategory, WritableSignal<boolean>> = {
+    renewals: this.renewalsEnabled,
+    low_balance: this.lowBalanceEnabled,
+    budget: this.budgetEnabled,
+  };
 
   private initialized = false;
   private watchingRotation = false;
@@ -98,6 +108,7 @@ export class PushService {
     );
     this.renewalsEnabled.set(true);
     this.lowBalanceEnabled.set(true);
+    this.budgetEnabled.set(true);
     this.message.set(null);
   }
 
@@ -248,7 +259,7 @@ export class PushService {
   // ------------------------------------------------------------ preferences
 
   async setCategory(category: PushCategory, enabled: boolean): Promise<void> {
-    const signal_ = category === 'renewals' ? this.renewalsEnabled : this.lowBalanceEnabled;
+    const signal_ = this.categorySignals[category];
     const previous = signal_();
     signal_.set(enabled);
     const userId = this.auth.user()?.id;
@@ -283,6 +294,7 @@ export class PushService {
       // No row = category enabled (opt-out model; matches the backend).
       this.renewalsEnabled.set(rows.find((r) => r.category === 'renewals')?.enabled ?? true);
       this.lowBalanceEnabled.set(rows.find((r) => r.category === 'low_balance')?.enabled ?? true);
+      this.budgetEnabled.set(rows.find((r) => r.category === 'budget')?.enabled ?? true);
     } catch (error: unknown) {
       console.error('Failed to load push preferences', error);
     }

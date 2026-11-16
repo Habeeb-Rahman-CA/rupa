@@ -12,6 +12,7 @@ import { AppSettingsService } from './app-settings.service';
 import { BankAccountsService } from './bank-accounts.service';
 import { SubscriptionsService } from './subscriptions.service';
 import { InterestService } from './interest.service';
+import { BudgetsService } from './budgets.service';
 import { PushService } from './push.service';
 
 @Injectable({ providedIn: 'root' })
@@ -30,6 +31,8 @@ export class DataSyncService {
   private readonly appSettingsService = inject(AppSettingsService);
   private readonly subscriptionsService = inject(SubscriptionsService);
   private readonly interestService = inject(InterestService);
+  // Budget usage reads the transaction ledger — phase 2 keeps it consistent.
+  private readonly budgetsService = inject(BudgetsService);
   // Loads push preferences and reconciles this device's subscription
   // (never requests permission — that only happens on an explicit tap).
   private readonly pushService = inject(PushService);
@@ -72,6 +75,7 @@ export class DataSyncService {
           this.walletsService.load(),
           this.subscriptionsService.load(),
           this.interestService.load(),
+          this.budgetsService.load(),
           this.pushService.init(),
         ]);
       } catch (err) {

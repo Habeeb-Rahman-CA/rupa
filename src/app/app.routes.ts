@@ -70,6 +70,11 @@ export const routes: Routes = [
           import('./features/subscriptions/subscriptions.page').then((m) => m.SubscriptionsPage),
       },
       {
+        path: 'budgets',
+        loadComponent: () =>
+          import('./features/budgets/budgets.page').then((m) => m.BudgetsPage),
+      },
+      {
         path: 'interest',
         loadComponent: () =>
           import('./features/interest/interest.page').then((m) => m.InterestPage),

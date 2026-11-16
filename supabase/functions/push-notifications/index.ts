@@ -7,7 +7,8 @@
 // Two modes:
 //   1. Scheduled (pg_cron + pg_net): header `x-cron-secret` must match the
 //      random secret seeded into push_config by migration 0017. Runs the
-//      renewal + low-balance checks and pushes to every subscribed device.
+//      renewal, low-balance and budget-threshold checks and pushes to every
+//      subscribed device.
 //   2. Test (the app): `Authorization: Bearer <user JWT>` (sent automatically
 //      by supabase-js `functions.invoke`) and body `{ action: "test" }`.
 //      Sends one test notification to the caller's own devices.
@@ -34,7 +35,7 @@ const APP_TIME_ZONE = Deno.env.get('APP_TIME_ZONE') ?? 'Asia/Kolkata';
 const RENEWAL_WINDOW_DAYS = 3;
 
 /** Notification categories the user can toggle in the app. */
-type Category = 'renewals' | 'low_balance';
+type Category = 'renewals' | 'low_balance' | 'budget';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -47,6 +48,24 @@ interface Device {
   endpoint: string;
   p256dh: string;
   auth: string;
+}
+
+interface BudgetRow {
+  id: string;
+  owner_id: string;
+  name: string;
+  category_id: string | null;
+  amount: number | string;
+  start_date: string;
+  end_date: string;
+  thresholds: number[];
+}
+
+interface BudgetAlert {
+  budget: BudgetRow;
+  spent: number;
+  /** Every milestone the spending has reached, ascending (last = highest). */
+  crossed: number[];
 }
 
 interface PushPayload {
@@ -241,6 +260,138 @@ async function sendToOwner(
   return sent;
 }
 
+// --------------------------- budget accounting ------------------------------
+// Mirrors computeBudgetSpent + isSavingsCategory in
+// src/app/shared/utils/budget-utils.ts and domain.models.ts — keep in sync.
+
+const NON_SPEND_SOURCES = new Set(['opening', 'transfer', 'wallet_recharge']);
+
+const SAVINGS_NAME_HINTS = [
+  'saving', 'emergency', 'mutual', 'gold', 'fixed deposit',
+  'sip', 'nps', 'fd', 'investment', 'stock', 'share', 'bond',
+];
+
+/** kind === 'savings' or a legacy savings-style category name. */
+function isSavingsLike(category: { name: string; kind: string } | undefined): boolean {
+  if (!category) return false;
+  if (category.kind === 'savings') return true;
+  const name = (category.name || '').toLowerCase();
+  return SAVINGS_NAME_HINTS.some((hint) => name.includes(hint));
+}
+
+/**
+ * Spent amount for one budget period — the app's rules:
+ * actual expenses only; transfers / wallet recharges / opening rows
+ * excluded; wallet spending counted once; refunds (incoming money in an
+ * expense category) netted; each transaction id counted at most once.
+ */
+function computeBudgetSpent(
+  budget: { category_id: string | null; start_date: string; end_date: string },
+  transactions: Array<{
+    id: string;
+    amount: number | string;
+    direction: string;
+    source: string;
+    category_id: string | null;
+    occurred_on: string;
+  }>,
+  categories: Array<{ id: string; name: string; kind: string }>,
+): number {
+  const categoryById = new Map(categories.map((c) => [c.id, c]));
+  const seen = new Set<string>();
+  let spent = 0;
+
+  for (const t of transactions) {
+    if (NON_SPEND_SOURCES.has(t.source)) continue;
+    if (!t.occurred_on) continue;
+    if (t.occurred_on < budget.start_date || t.occurred_on > budget.end_date) continue;
+    if (seen.has(t.id)) continue;
+    seen.add(t.id);
+
+    const amount = Number(t.amount);
+    if (!(amount > 0)) continue;
+
+    if (budget.category_id !== null) {
+      if (t.category_id !== budget.category_id) continue;
+      if (t.direction === 'out') spent += amount;
+      else if (t.direction === 'in') spent -= amount;
+      continue;
+    }
+
+    const category = t.category_id ? categoryById.get(t.category_id) : undefined;
+    if (isSavingsLike(category)) continue;
+    if (t.direction === 'out') {
+      spent += amount;
+    } else if (t.direction === 'in' && category?.kind === 'expense') {
+      spent -= amount; // refund of a purchase
+    }
+  }
+
+  return Math.max(0, Math.round(spent * 100) / 100);
+}
+
+/** Current-period budgets with milestones → their crossed thresholds. */
+async function findBudgetAlerts(
+  admin: SupabaseClient,
+  budgets: BudgetRow[],
+): Promise<BudgetAlert[]> {
+  if (budgets.length === 0) return [];
+
+  const ownerIds = [...new Set(budgets.map((b) => b.owner_id))];
+  const minStart = budgets.map((b) => String(b.start_date)).sort()[0];
+  const maxEnd = budgets.map((b) => String(b.end_date)).sort().slice(-1)[0];
+
+  const [txResult, catResult] = await Promise.all([
+    admin
+      .from('transactions')
+      .select('id, owner_id, amount, direction, source, category_id, occurred_on')
+      .in('owner_id', ownerIds)
+      .gte('occurred_on', minStart)
+      .lte('occurred_on', maxEnd),
+    admin
+      .from('categories')
+      .select('id, owner_id, name, kind')
+      .in('owner_id', ownerIds),
+  ]);
+
+  if (txResult.error || catResult.error) {
+    console.error('push: budget queries failed', txResult.error ?? catResult.error);
+    return [];
+  }
+
+  const transactionsByOwner = new Map<string, any[]>();
+  for (const row of txResult.data ?? []) {
+    const list = transactionsByOwner.get(row.owner_id) ?? [];
+    list.push(row);
+    transactionsByOwner.set(row.owner_id, list);
+  }
+  const categoriesByOwner = new Map<string, any[]>();
+  for (const row of catResult.data ?? []) {
+    const list = categoriesByOwner.get(row.owner_id) ?? [];
+    list.push(row);
+    categoriesByOwner.set(row.owner_id, list);
+  }
+
+  const alerts: BudgetAlert[] = [];
+  for (const budget of budgets) {
+    const spent = computeBudgetSpent(
+      budget,
+      transactionsByOwner.get(budget.owner_id) ?? [],
+      categoriesByOwner.get(budget.owner_id) ?? [],
+    );
+    const amount = Number(budget.amount);
+    if (!(amount > 0)) continue;
+
+    const crossed = (Array.isArray(budget.thresholds) ? budget.thresholds : [])
+      .filter((pct) => Number.isFinite(pct) && spent >= (amount * pct) / 100)
+      .sort((a, b) => a - b);
+    if (crossed.length === 0) continue;
+
+    alerts.push({ budget, spent, crossed });
+  }
+  return alerts;
+}
+
 async function runScheduled(admin: SupabaseClient): Promise<Response> {
   const today = dayIso(0);
   const windowEnd = dayIso(RENEWAL_WINDOW_DAYS); // exclusive → 3 days incl. today
@@ -260,8 +411,15 @@ async function runScheduled(admin: SupabaseClient): Promise<Response> {
     .select('id, owner_id, name, balance, minimum_balance')
     .gt('minimum_balance', 0);
 
-  if (subsError || walletsError) {
-    console.error('push: scheduled queries failed', subsError ?? walletsError);
+  // ---- 3. Budgets in their current period (thresholds checked below) ------
+  const { data: budgetRows, error: budgetsError } = await admin
+    .from('budgets')
+    .select('id, owner_id, name, category_id, amount, start_date, end_date, thresholds')
+    .lte('start_date', today)
+    .gte('end_date', today);
+
+  if (subsError || walletsError || budgetsError) {
+    console.error('push: scheduled queries failed', subsError ?? walletsError ?? budgetsError);
     return json(500, { error: 'scheduled queries failed' });
   }
 
@@ -269,9 +427,18 @@ async function runScheduled(admin: SupabaseClient): Promise<Response> {
   const lowWallets = (wallets ?? []).filter(
     (w) => Number(w.balance) <= Number(w.minimum_balance),
   );
+  // Only budgets with at least one alert milestone configured.
+  const currentBudgets = ((budgetRows ?? []) as unknown as BudgetRow[]).filter(
+    (b) => Array.isArray(b.thresholds) && b.thresholds.length > 0,
+  );
+  const budgetAlerts = await findBudgetAlerts(admin, currentBudgets);
 
   const ownerIds = [
-    ...new Set([...renewals, ...lowWallets].map((row) => row.owner_id)),
+    ...new Set(
+      [...renewals, ...lowWallets, ...budgetAlerts.map((a) => a.budget)].map(
+        (row) => row.owner_id,
+      ),
+    ),
   ];
 
   const [prefs, deviceMap] = await Promise.all([
@@ -330,11 +497,60 @@ async function runScheduled(admin: SupabaseClient): Promise<Response> {
     });
   }
 
-  // Keep the de-duplication log small.
-  const cutoff = new Date(Date.now() - 90 * 86_400_000).toISOString();
+  // ---- 4. Budget threshold alerts ------------------------------------------
+  // Claim every milestone the spending has reached (so a lower one can never
+  // fire later), but send only the highest — one notification per jump.
+  for (const alert of budgetAlerts) {
+    const { budget, spent, crossed } = alert;
+    if (!categoryEnabled(prefs, budget.owner_id, 'budget')) continue;
+
+    const highest = crossed[crossed.length - 1];
+    let highestWon = false;
+    for (const pct of crossed) {
+      const ref = `budget:${budget.id}:${String(budget.start_date)}:${pct}`;
+      const won = await claim(admin, budget.owner_id, 'budget', ref);
+      if (won) {
+        claimed++;
+        if (pct === highest) highestWon = true;
+      }
+    }
+    if (!highestWon) continue;
+
+    const over = highest >= 100;
+    const devices = deviceMap.get(budget.owner_id) ?? [];
+    sent += await sendToOwner(admin, devices, budget.owner_id, {
+      notification: {
+        title: over
+          ? `Budget exceeded: ${budget.name}`
+          : `Budget at ${highest}%: ${budget.name}`,
+        body: over
+          ? `${fmtAmount(spent)} spent of ${fmtAmount(budget.amount)} limit`
+          : `${fmtAmount(spent)} of ${fmtAmount(budget.amount)} spent`,
+        tag: `budget-${budget.id}`,
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/icon-96x96.png',
+        requireInteraction: true,
+        data: {
+          url: '/budgets',
+          onActionClick: {
+            default: { url: '/budgets', operation: 'navigateLastFocusedOrOpen' },
+          },
+        },
+      },
+    });
+  }
+
+  // Keep the de-duplication log small. Budget periods can run up to a year,
+  // so claims must survive longer than the old 90-day window.
+  const cutoff = new Date(Date.now() - 400 * 86_400_000).toISOString();
   await admin.from('push_notification_log').delete().lt('created_at', cutoff);
 
-  return json(200, { mode: 'scheduled', candidates: renewals.length + lowWallets.length, claimed, sent });
+  return json(200, {
+    mode: 'scheduled',
+    candidates: renewals.length + lowWallets.length + budgetAlerts.length,
+    claimed,
+    sent,
+  });
 }
 
 async function runTest(admin: SupabaseClient, userId: string): Promise<Response> {

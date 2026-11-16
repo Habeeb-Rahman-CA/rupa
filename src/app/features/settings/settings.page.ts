@@ -129,6 +129,19 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
             aria-label="Low balance alerts"
           />
         </li>
+        <li class="category-row">
+          <div class="category-text">
+            <span class="category-name">Budget alerts</span>
+            <span class="category-desc">Warn me as spending approaches a budget limit</span>
+          </div>
+          <mat-slide-toggle
+            color="primary"
+            [checked]="push.budgetEnabled()"
+            [disabled]="push.busy()"
+            (change)="setCategory('budget', $event.checked)"
+            aria-label="Budget alerts"
+          />
+        </li>
       </ul>
 
       <ul class="notes">

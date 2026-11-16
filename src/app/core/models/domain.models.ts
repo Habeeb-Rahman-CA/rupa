@@ -335,3 +335,24 @@ export interface SubscriptionPriceChange {
   notes: string | null;
   created_at: string;
 }
+
+export type BudgetPeriod = 'weekly' | 'monthly' | 'yearly' | 'custom';
+
+export interface Budget {
+  id: string;
+  owner_id: string;
+  name: string;
+  /** null → overall spending limit; set → limit for that expense category. */
+  category_id: string | null;
+  amount: number;
+  period: BudgetPeriod;
+  /** Local date-only bounds of the budget period (inclusive). */
+  start_date: string;
+  end_date: string;
+  /** When true, the app creates the next period's budget after end_date. */
+  recurring: boolean;
+  /** Push milestones as percentages of `amount` (subset of 50/75/90/100). */
+  thresholds: number[];
+  created_at: string;
+  updated_at: string;
+}
