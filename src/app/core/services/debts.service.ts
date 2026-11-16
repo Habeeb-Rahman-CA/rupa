@@ -3,6 +3,7 @@ import { Debt, DebtDirection, PaymentMode, Transaction } from '../models/domain.
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { TransactionsService } from './transactions.service';
+import { OfflineQueueService } from './offline-queue.service';
 import { isGreaterCurrency } from '../../shared/utils/currency-utils';
 
 export type DebtTransactionImpact = 'default' | 'income' | 'expense' | 'none';
@@ -32,6 +33,7 @@ export class DebtsService {
   private readonly supabase = inject(SupabaseService);
   private readonly auth = inject(AuthService);
   private readonly txService = inject(TransactionsService);
+  private readonly offlineQueue = inject(OfflineQueueService);
 
   private readonly _debts = signal<Debt[]>([]);
   private readonly _isLoading = signal(false);
@@ -39,9 +41,7 @@ export class DebtsService {
   readonly debts = this._debts.asReadonly();
   readonly isLoading = this._isLoading.asReadonly();
 
-  readonly openDebts = computed(() =>
-    this._debts().filter((d) => Number(d.outstanding) > 0),
-  );
+  readonly openDebts = computed(() => this._debts().filter((d) => Number(d.outstanding) > 0));
 
   readonly theyOweYouTotal = computed(() =>
     this.openDebts()
@@ -61,6 +61,49 @@ export class DebtsService {
         void this.load();
       } else {
         this._debts.set([]);
+      }
+    });
+
+    // Register offline-sync handler for the debts table.
+    this.offlineQueue.registerHandler('debts', async (action) => {
+      const p = action.payload as Record<string, unknown>;
+      if (action.type === 'create') {
+        const { data, error } = await this.supabase.client
+          .from('debts')
+          .insert({
+            owner_id: p['owner_id'] as string,
+            person_id: p['person_id'] as string,
+            direction: p['direction'],
+            principal: Number(p['amount']),
+            outstanding: Number(p['amount']),
+            reason: p['reason'] as string | null,
+            opened_on: p['opened_on'] as string,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        const created = data as Debt;
+        // Replace optimistic local entry with server version.
+        this._debts.update((list) => list.map((d) => (d.id === p['localId'] ? created : d)));
+      } else if (action.type === 'delete') {
+        const { error } = await this.supabase.client
+          .from('debts')
+          .delete()
+          .eq('id', p['id'] as string)
+          .eq('owner_id', this.auth.user()?.id);
+        if (error) throw error;
+        this._debts.update((list) => list.filter((d) => d.id !== p['id']));
+      } else if (action.type === 'update' && p['debt_id']) {
+        const { error } = await this.supabase.client.from('debt_payments').insert({
+          debt_id: p['debt_id'],
+          amount: Number(p['amount']),
+          paid_on: p['paid_on'] as string,
+          transaction_id: p['transaction_id'] as string,
+          notes: p['notes'] as string | null,
+        });
+        if (error) throw error;
+        // Refresh debts to recalculate outstanding.
+        void this.load();
       }
     });
   }
@@ -104,6 +147,42 @@ export class DebtsService {
     if (!(input.amount > 0)) throw new Error('Amount must be greater than zero.');
     const ownerId = this.requireUserId();
     const openedOn = input.opened_on ?? todayIso();
+
+    // Offline path: enqueue debt creation and apply optimistically.
+    if (!this.offlineQueue.isOnline()) {
+      const localId = `local_${crypto.randomUUID?.() ?? Date.now().toString(36)}`;
+      const impact = input.impact ?? 'default';
+      const optimistic: Debt = {
+        id: localId,
+        owner_id: ownerId,
+        person_id: input.person_id,
+        direction: input.direction,
+        principal: input.amount,
+        outstanding: input.amount,
+        reason: input.reason?.trim() || null,
+        opened_on: openedOn,
+        closed_on: null,
+        created_at: new Date().toISOString(),
+      } as Debt;
+
+      await this.offlineQueue.enqueue({
+        type: 'create',
+        table: 'debts',
+        payload: {
+          localId,
+          owner_id: ownerId,
+          person_id: input.person_id,
+          direction: input.direction,
+          amount: input.amount,
+          reason: input.reason?.trim() || null,
+          opened_on: openedOn,
+        },
+      });
+
+      this._debts.update((list) => [optimistic, ...list]);
+      return optimistic;
+    }
+
     const impact = input.impact ?? 'default';
 
     let txDirection: 'in' | 'out' | null = null;
@@ -230,7 +309,10 @@ export class DebtsService {
       .select()
       .single();
     if (updErr) {
-      console.error('Failed to update debt outstanding, rolling back payment & transaction', updErr);
+      console.error(
+        'Failed to update debt outstanding, rolling back payment & transaction',
+        updErr,
+      );
       try {
         await this.supabase.client.from('debt_payments').delete().eq('transaction_id', tx.id);
       } catch {}
@@ -238,9 +320,7 @@ export class DebtsService {
       throw updErr;
     }
 
-    this._debts.update((list) =>
-      list.map((d) => (d.id === debt.id ? (updated as Debt) : d)),
-    );
+    this._debts.update((list) => list.map((d) => (d.id === debt.id ? (updated as Debt) : d)));
     await this.txService.refresh();
   }
 
@@ -252,6 +332,19 @@ export class DebtsService {
 
     // 1. Optimistic removal from signal for immediate UI update
     this._debts.update((list) => list.filter((d) => d.id !== id));
+
+    // Offline path: enqueue debt deletion and skip linked-transaction cleanup.
+    if (!this.offlineQueue.isOnline()) {
+      await this.offlineQueue.enqueue({
+        type: 'delete',
+        table: 'debts',
+        payload: {
+          id,
+          owner_id: debt.owner_id,
+        },
+      });
+      return;
+    }
 
     // 2. Fetch linked transactions
     const { data: txRows } = await this.supabase.client
@@ -298,12 +391,18 @@ export class DebtsService {
     try {
       await this.txService.delete(txId);
     } catch (err) {
-      console.error(`Rollback warning: Failed to delete transaction ${txId} via service, attempting direct DB cleanup`, err);
+      console.error(
+        `Rollback warning: Failed to delete transaction ${txId} via service, attempting direct DB cleanup`,
+        err,
+      );
       try {
         await this.supabase.client.from('transactions').delete().eq('id', txId);
         await this.txService.refresh();
       } catch (fallbackErr) {
-        console.error(`Rollback error: Final fallback cleanup for transaction ${txId} failed`, fallbackErr);
+        console.error(
+          `Rollback error: Final fallback cleanup for transaction ${txId} failed`,
+          fallbackErr,
+        );
       }
     }
   }

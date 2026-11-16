@@ -10,6 +10,7 @@ import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { PeopleService } from './people.service';
 import { BankAccountsService } from './bank-accounts.service';
+import { OfflineQueueService } from './offline-queue.service';
 import { roundCurrency } from '../../shared/utils/currency-utils';
 
 export interface RecordMoneyHeldInput {
@@ -38,6 +39,7 @@ export class MoneyHeldService {
   private readonly auth = inject(AuthService);
   private readonly peopleService = inject(PeopleService);
   private readonly bankAccountsService = inject(BankAccountsService);
+  private readonly offlineQueue = inject(OfflineQueueService);
 
   private readonly _heldPeople = signal<MoneyHeldPerson[]>([]);
   private readonly _transactions = signal<MoneyHeldTransaction[]>([]);
@@ -83,6 +85,39 @@ export class MoneyHeldService {
         this._heldPeople.set([]);
         this._transactions.set([]);
         this._isAvailable.set(true);
+      }
+    });
+
+    // Register offline-sync handler for money_held_transactions table.
+    this.offlineQueue.registerHandler('money_held_transactions', async (action) => {
+      const p = action.payload as Record<string, unknown>;
+      if (action.type === 'create') {
+        const { data, error } = await this.supabase.client
+          .from('money_held_transactions')
+          .insert({
+            owner_id: p['owner_id'] as string,
+            held_person_id: p['held_person_id'] as string,
+            direction: p['direction'],
+            amount: Number(p['amount']),
+            occurred_on: p['occurred_on'] as string,
+            payment_mode: p['payment_mode'],
+            bank_account_id: p['bank_account_id'] as string | null,
+            notes: p['notes'] as string | null,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        const created = data as MoneyHeldTransaction;
+        this._transactions.update((list) => list.map((t) => (t.id === p['localId'] ? created : t)));
+        await this.adjustBankBalance(created, 1);
+      } else if (action.type === 'delete') {
+        const { error } = await this.supabase.client
+          .from('money_held_transactions')
+          .delete()
+          .eq('id', p['id'] as string)
+          .eq('owner_id', this.auth.user()?.id);
+        if (error) throw error;
+        this._transactions.update((list) => list.filter((t) => t.id !== (p['id'] as string)));
       }
     });
   }
@@ -174,6 +209,44 @@ export class MoneyHeldService {
 
     const ownerId = this.requireUserId();
     const paymentMode = input.payment_mode ?? 'cash';
+
+    // Offline path: enqueue money-held record and apply optimistically.
+    if (!this.offlineQueue.isOnline()) {
+      const localId = `local_${crypto.randomUUID?.() ?? Date.now().toString(36)}`;
+      const occurredOn = input.occurred_on ?? todayIso();
+      const optimistic: MoneyHeldTransaction = {
+        id: localId,
+        owner_id: ownerId,
+        held_person_id: input.held_person_id,
+        direction: input.direction,
+        amount: input.amount,
+        occurred_on: occurredOn,
+        payment_mode: paymentMode,
+        bank_account_id: input.bank_account_id ?? null,
+        notes: input.notes?.trim() || null,
+        created_at: new Date().toISOString(),
+      } as MoneyHeldTransaction;
+
+      await this.offlineQueue.enqueue({
+        type: 'create',
+        table: 'money_held_transactions',
+        payload: {
+          localId,
+          owner_id: ownerId,
+          held_person_id: input.held_person_id,
+          direction: input.direction,
+          amount: input.amount,
+          occurred_on: occurredOn,
+          payment_mode: paymentMode,
+          bank_account_id: input.bank_account_id ?? null,
+          notes: input.notes?.trim() || null,
+        },
+      });
+
+      this._transactions.update((list) => [optimistic, ...list]);
+      return optimistic;
+    }
+
     const { data, error } = await this.supabase.client
       .from('money_held_transactions')
       .insert({
@@ -212,6 +285,20 @@ export class MoneyHeldService {
     }
 
     this._transactions.update((list) => list.filter((item) => item.id !== record.id));
+
+    // Offline path: enqueue deletion, skip bank balance adjust (reconciled on sync).
+    if (!this.offlineQueue.isOnline()) {
+      await this.offlineQueue.enqueue({
+        type: 'delete',
+        table: 'money_held_transactions',
+        payload: {
+          id: record.id,
+          owner_id: record.owner_id,
+        },
+      });
+      return;
+    }
+
     await this.adjustBankBalance(record, -1);
 
     const { error } = await this.supabase.client
@@ -228,9 +315,9 @@ export class MoneyHeldService {
 
   private async adjustBankBalance(record: MoneyHeldTransaction, sign: 1 | -1): Promise<void> {
     if (record.payment_mode !== 'bank' || !record.bank_account_id) return;
-    const account = this.bankAccountsService.bankAccounts().find(
-      (item) => item.id === record.bank_account_id,
-    );
+    const account = this.bankAccountsService
+      .bankAccounts()
+      .find((item) => item.id === record.bank_account_id);
     if (!account || account.balance === undefined) return;
 
     const directionSign = record.direction === 'received' ? 1 : -1;
@@ -257,7 +344,11 @@ export class MoneyHeldService {
 
   private handleMissingSchema(error: { code?: string; message?: string }): boolean {
     const message = error.message?.toLowerCase() ?? '';
-    if (error.code !== 'PGRST205' && error.code !== '42P01' && !message.includes('could not find the table')) {
+    if (
+      error.code !== 'PGRST205' &&
+      error.code !== '42P01' &&
+      !message.includes('could not find the table')
+    ) {
       return false;
     }
     this._isAvailable.set(false);
@@ -265,10 +356,7 @@ export class MoneyHeldService {
   }
 }
 
-function sumByDirection(
-  records: MoneyHeldTransaction[],
-  direction: MoneyHeldDirection,
-): number {
+function sumByDirection(records: MoneyHeldTransaction[], direction: MoneyHeldDirection): number {
   return roundCurrency(
     records
       .filter((record) => record.direction === direction)

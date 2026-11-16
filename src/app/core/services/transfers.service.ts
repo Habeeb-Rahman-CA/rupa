@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { BankAccountsService } from './bank-accounts.service';
 import { SupabaseService } from './supabase.service';
 import { TransactionsService } from './transactions.service';
+import { OfflineQueueService } from './offline-queue.service';
 import { roundCurrency } from '../../shared/utils/currency-utils';
 
 export interface AccountTransferInput {
@@ -21,6 +22,7 @@ export class TransfersService {
   private readonly auth = inject(AuthService);
   private readonly bankAccountsService = inject(BankAccountsService);
   private readonly transactionsService = inject(TransactionsService);
+  private readonly offlineQueue = inject(OfflineQueueService);
 
   private readonly _transfers = signal<AccountTransfer[]>([]);
   private readonly _isLoading = signal(false);
@@ -38,6 +40,32 @@ export class TransfersService {
       } else {
         this._transfers.set([]);
         this._isAvailable.set(true);
+      }
+    });
+
+    // Register offline-sync handler for transfers table.
+    this.offlineQueue.registerHandler('transfers', async (action) => {
+      const p = action.payload as Record<string, unknown>;
+      if (action.type === 'create') {
+        const { data, error } = await this.supabase.client.rpc('create_account_transfer', {
+          p_source_account_id: p['source_account_id'] as string,
+          p_destination_account_id: p['destination_account_id'] as string,
+          p_amount: roundCurrency(Number(p['amount'])),
+          p_occurred_on: p['occurred_on'] as string,
+          p_notes: p['notes'] as string | null,
+        });
+        if (error) throw error;
+        const created = this.firstTransfer(data);
+        if (!created) throw new Error('The transfer was not returned after sync.');
+        this._transfers.update((list) => list.map((t) => (t.id === p['localId'] ? created : t)));
+        await this.refreshDependents();
+      } else if (action.type === 'delete') {
+        const { error } = await this.supabase.client.rpc('delete_account_transfer', {
+          p_transfer_id: p['id'] as string,
+        });
+        if (error) throw error;
+        this._transfers.update((list) => list.filter((t) => t.id !== (p['id'] as string)));
+        await this.refreshDependents();
       }
     });
   }
@@ -82,6 +110,40 @@ export class TransfersService {
   async create(input: AccountTransferInput): Promise<AccountTransfer> {
     this.ensureAvailable();
     this.validateInput(input);
+
+    // Offline path: enqueue transfer creation and apply optimistically.
+    if (!this.offlineQueue.isOnline()) {
+      const ownerId = this.auth.user()?.id;
+      if (!ownerId) throw new Error('Not signed in.');
+      const localId = `local_${crypto.randomUUID?.() ?? Date.now().toString(36)}`;
+      const optimistic: AccountTransfer = {
+        id: localId,
+        owner_id: ownerId,
+        source_account_id: input.source_account_id,
+        destination_account_id: input.destination_account_id,
+        amount: roundCurrency(input.amount),
+        occurred_on: input.occurred_on ?? todayIso(),
+        notes: input.notes?.trim() || null,
+        created_at: new Date().toISOString(),
+      } as AccountTransfer;
+
+      await this.offlineQueue.enqueue({
+        type: 'create',
+        table: 'transfers',
+        payload: {
+          localId,
+          source_account_id: input.source_account_id,
+          destination_account_id: input.destination_account_id,
+          amount: input.amount,
+          occurred_on: input.occurred_on ?? todayIso(),
+          notes: input.notes?.trim() || null,
+        },
+      });
+
+      this._transfers.update((list) => [optimistic, ...list]);
+      await this.refreshDependents();
+      return optimistic;
+    }
 
     const { data, error } = await this.supabase.client.rpc('create_account_transfer', {
       p_source_account_id: input.source_account_id,
@@ -129,6 +191,25 @@ export class TransfersService {
     const current = this._transfers().find((transfer) => transfer.id === id);
     if (!current) return;
 
+    // Offline path: enqueue transfer deletion.
+    if (!this.offlineQueue.isOnline()) {
+      await this.offlineQueue.enqueue({
+        type: 'delete',
+        table: 'transfers',
+        payload: {
+          id,
+          source_account_id: current.source_account_id,
+          destination_account_id: current.destination_account_id,
+          amount: Number(current.amount),
+          occurred_on: current.occurred_on,
+          notes: current.notes ?? null,
+        },
+      });
+      this._transfers.update((list) => list.filter((item) => item.id !== id));
+      await this.refreshDependents();
+      return;
+    }
+
     const { error } = await this.supabase.client.rpc('delete_account_transfer', {
       p_transfer_id: id,
     });
@@ -168,10 +249,7 @@ export class TransfersService {
   }
 
   private async refreshDependents(): Promise<void> {
-    await Promise.all([
-      this.bankAccountsService.load(),
-      this.transactionsService.refresh(),
-    ]);
+    await Promise.all([this.bankAccountsService.load(), this.transactionsService.refresh()]);
   }
 
   private ensureAvailable(): void {
@@ -196,7 +274,9 @@ export class TransfersService {
   private firstTransfer(data: unknown): AccountTransfer | null {
     if (!data) return null;
     const row = Array.isArray(data) ? data[0] : data;
-    return row && typeof row === 'object' ? this.normalizeTransfer(row as Record<string, unknown>) : null;
+    return row && typeof row === 'object'
+      ? this.normalizeTransfer(row as Record<string, unknown>)
+      : null;
   }
 
   private normalizeTransfer(row: Record<string, unknown>): AccountTransfer {

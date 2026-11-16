@@ -2,11 +2,13 @@ import { Injectable, effect, inject, signal } from '@angular/core';
 import { Person } from '../models/domain.models';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
+import { OfflineQueueService } from './offline-queue.service';
 
 @Injectable({ providedIn: 'root' })
 export class PeopleService {
   private readonly supabase = inject(SupabaseService);
   private readonly auth = inject(AuthService);
+  private readonly offlineQueue = inject(OfflineQueueService);
 
   private readonly _people = signal<Person[]>([]);
   private readonly _isLoading = signal(false);
@@ -20,6 +22,37 @@ export class PeopleService {
         void this.load();
       } else {
         this._people.set([]);
+      }
+    });
+
+    // Register offline-sync handler for the people table.
+    this.offlineQueue.registerHandler('people', async (action) => {
+      const p = action.payload as Record<string, unknown>;
+      if (action.type === 'create') {
+        const { data, error } = await this.supabase.client
+          .from('people')
+          .insert({
+            owner_id: p['owner_id'] as string,
+            name: p['name'] as string,
+            phone: p['phone'] as string | null,
+            notes: p['notes'] as string | null,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        const created = data as Person;
+        this._people.update((list) =>
+          [...list.map((person) => (person.id === p['localId'] ? created : person))].sort(byName),
+        );
+      } else if (action.type === 'delete') {
+        const { error } = await this.supabase.client
+          .from('people')
+          .delete()
+          .eq('id', p['id'] as string)
+          .eq('owner_id', this.auth.user()?.id);
+        if (error) throw error;
+        const deleteId = p['id'] as string;
+        this._people.update((list) => list.filter((person) => person.id !== deleteId));
       }
     });
   }
@@ -60,6 +93,35 @@ export class PeopleService {
     if (!trimmed) throw new Error('Name is required.');
 
     const ownerId = this.requireUserId();
+
+    // Offline path: enqueue person creation and apply optimistically.
+    if (!this.offlineQueue.isOnline()) {
+      const localId = `local_${crypto.randomUUID?.() ?? Date.now().toString(36)}`;
+      const optimistic: Person = {
+        id: localId,
+        owner_id: ownerId,
+        name: trimmed,
+        phone: phone?.trim() || null,
+        notes: notes?.trim() || null,
+        created_at: new Date().toISOString(),
+      } as Person;
+
+      await this.offlineQueue.enqueue({
+        type: 'create',
+        table: 'people',
+        payload: {
+          localId,
+          owner_id: ownerId,
+          name: trimmed,
+          phone: phone?.trim() || null,
+          notes: notes?.trim() || null,
+        },
+      });
+
+      this._people.update((list) => [...list, optimistic].sort(byName));
+      return optimistic;
+    }
+
     const { data, error } = await this.supabase.client
       .from('people')
       .insert({
@@ -85,6 +147,19 @@ export class PeopleService {
 
     // 1. Optimistic removal for instant UI feedback
     this._people.update((list) => list.filter((p) => p.id !== id));
+
+    // Offline path: enqueue person deletion.
+    if (!this.offlineQueue.isOnline()) {
+      await this.offlineQueue.enqueue({
+        type: 'delete',
+        table: 'people',
+        payload: {
+          id,
+          owner_id: person.owner_id,
+        },
+      });
+      return;
+    }
 
     const { error } = await this.supabase.client.from('people').delete().eq('id', id);
     if (error) {

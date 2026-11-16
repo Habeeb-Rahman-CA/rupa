@@ -5,6 +5,7 @@ import { SupabaseService } from './supabase.service';
 import { CategoriesService } from './categories.service';
 import { DebtsService } from './debts.service';
 import { BankAccountsService } from './bank-accounts.service';
+import { OfflineQueueService, OfflineAction, OfflineActionType } from './offline-queue.service';
 
 export interface CreateTransactionInput {
   amount: number;
@@ -32,6 +33,7 @@ export class TransactionsService {
   private readonly auth = inject(AuthService);
   private readonly categoriesService = inject(CategoriesService);
   private readonly injector = inject(Injector);
+  private readonly offlineQueue = inject(OfflineQueueService);
 
   private readonly _transactions = signal<Transaction[]>([]);
   private readonly _balance = signal<number>(0);
@@ -64,7 +66,8 @@ export class TransactionsService {
         t.source === 'transfer' ||
         t.source === 'wallet_recharge' ||
         !t.occurred_on
-      ) continue;
+      )
+        continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);
       if (ty !== y || tm !== m) continue;
 
@@ -122,6 +125,39 @@ export class TransactionsService {
         }
       } catch {}
     });
+
+    // Register offline-sync handler for the transactions table.
+    this.offlineQueue.registerHandler('transactions', async (action) => {
+      const p = action.payload as Record<string, unknown>;
+      if (action.type === 'create') {
+        const { data, error } = await this.supabase.client.rpc(
+          'create_transaction_with_balance_update',
+          {
+            p_owner_id: p['owner_id'] as string,
+            p_amount: Number(p['amount']),
+            p_direction: p['direction'] as TxDirection,
+            p_occurred_on: p['occurred_on'] as string,
+            p_category_id: p['category_id'] as string | null,
+            p_notes: p['notes'] as string | null,
+            p_source: p['source'] as string,
+            p_source_ref_id: p['source_ref_id'] as string | null,
+            p_payment_mode: p['payment_mode'] as PaymentMode,
+            p_bank_account_id: p['bank_account_id'] as string | null,
+          },
+        );
+        if (error) throw error;
+        const created = (data as Transaction[])?.[0];
+        if (!created) throw new Error('Transaction was not returned after sync.');
+        // Replace the optimistic local entry with the server version.
+        this._transactions.update((list) => list.map((t) => (t.id === p['localId'] ? created : t)));
+      } else if (action.type === 'delete') {
+        const { error } = await this.supabase.client.rpc('delete_transaction_with_balance_update', {
+          p_transaction_id: p['id'] as string,
+        });
+        if (error) throw error;
+        this._transactions.update((list) => list.filter((t) => t.id !== p['id']));
+      }
+    });
   }
 
   async mapUnassignedTransactionsToPrimary(bankAccountId: string): Promise<void> {
@@ -129,9 +165,7 @@ export class TransactionsService {
     // Only bank-mode transactions are eligible for migration. Older cash
     // transactions have no bank_account_id by design and must not be silently
     // reassigned to a newly-created primary account.
-    const unassigned = current.filter(
-      (t) => t.payment_mode === 'bank' && !t.bank_account_id,
-    );
+    const unassigned = current.filter((t) => t.payment_mode === 'bank' && !t.bank_account_id);
     if (unassigned.length === 0) return;
 
     const updatedList = current.map((t) => {
@@ -148,10 +182,10 @@ export class TransactionsService {
 
     const unassignedIds = unassigned.map((t) => t.id);
     try {
-      const { error: mapErr } = await this.supabase.client.rpc(
-        'assign_transactions_to_account',
-        { p_account_id: bankAccountId, p_transaction_ids: unassignedIds },
-      );
+      const { error: mapErr } = await this.supabase.client.rpc('assign_transactions_to_account', {
+        p_account_id: bankAccountId,
+        p_transaction_ids: unassignedIds,
+      });
       if (mapErr) {
         console.error('Failed to map bank transactions to the primary account', mapErr);
       }
@@ -174,11 +208,7 @@ export class TransactionsService {
     this._isLoading.set(true);
     this.refreshPromise = (async () => {
       try {
-        await Promise.all([
-          this.loadTransactions(),
-          this.loadBalance(),
-          this.loadOpeningBalance(),
-        ]);
+        await Promise.all([this.loadTransactions(), this.loadBalance(), this.loadOpeningBalance()]);
         try {
           const bankAccountsService = this.injector.get(BankAccountsService);
           const primary = bankAccountsService.primaryAccount();
@@ -240,13 +270,57 @@ export class TransactionsService {
       } catch {}
     }
 
+    const occurredOn = input.occurred_on ?? todayIso();
+
+    // Offline path: enqueue for later sync and apply optimistically to local state.
+    if (!this.offlineQueue.isOnline()) {
+      const localId = `local_${crypto.randomUUID?.() ?? Date.now().toString(36)}`;
+      const optimistic: Transaction = {
+        id: localId,
+        owner_id: ownerId,
+        occurred_on: occurredOn,
+        amount: input.amount,
+        direction: input.direction,
+        category_id: input.category_id ?? null,
+        notes: input.notes?.trim() || null,
+        source: input.source ?? ('manual' as const),
+        source_ref_id: input.source_ref_id ?? null,
+        payment_mode: mode,
+        bank_account_id: targetBankAccountId,
+        created_at: new Date().toISOString(),
+      };
+
+      await this.offlineQueue.enqueue({
+        type: 'create',
+        table: 'transactions',
+        payload: {
+          ...input,
+          localId,
+          owner_id: ownerId,
+          occurred_on: occurredOn,
+          amount: input.amount,
+          direction: input.direction,
+          category_id: input.category_id ?? null,
+          notes: input.notes?.trim() || null,
+          source: input.source ?? ('manual' as const),
+          source_ref_id: input.source_ref_id ?? null,
+          payment_mode: mode,
+          bank_account_id: targetBankAccountId,
+        },
+      });
+
+      this._transactions.update((list) => [optimistic, ...list]);
+      this.applyToTotals(optimistic, +1);
+      return optimistic;
+    }
+
     const { data, error } = await this.supabase.client.rpc(
       'create_transaction_with_balance_update',
       {
         p_owner_id: ownerId,
         p_amount: input.amount,
         p_direction: input.direction,
-        p_occurred_on: input.occurred_on ?? todayIso(),
+        p_occurred_on: occurredOn,
         p_category_id: input.category_id ?? null,
         p_notes: input.notes?.trim() || null,
         p_source: input.source ?? ('manual' as const),
@@ -286,6 +360,22 @@ export class TransactionsService {
     this._transactions.update((list) => list.filter((t) => t.id !== id));
     this.applyToTotals(removed, -1);
 
+    // Offline path: enqueue for later sync, skip online-only debt_payment cleanup.
+    if (!this.offlineQueue.isOnline()) {
+      await this.offlineQueue.enqueue({
+        type: 'delete',
+        table: 'transactions',
+        payload: {
+          id,
+          payment_mode: removed.payment_mode,
+          bank_account_id: removed.bank_account_id,
+          direction: removed.direction,
+          amount: Number(removed.amount),
+        },
+      });
+      return;
+    }
+
     try {
       // Clean up debt_payments referencing this transaction if any
       const { data: debtPayments } = await this.supabase.client
@@ -309,17 +399,20 @@ export class TransactionsService {
               .select('amount')
               .eq('debt_id', dp.debt_id);
 
-            const totalPaid = (remainingPayments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
-            const restoredOutstanding = Math.max(0, Math.round((Number(debt.principal) - totalPaid + Number.EPSILON) * 100) / 100);
+            const totalPaid = (remainingPayments ?? []).reduce(
+              (sum, p) => sum + Number(p.amount),
+              0,
+            );
+            const restoredOutstanding = Math.max(
+              0,
+              Math.round((Number(debt.principal) - totalPaid + Number.EPSILON) * 100) / 100,
+            );
             const patch: Record<string, unknown> = { outstanding: restoredOutstanding };
             if (restoredOutstanding > 0) {
               patch['closed_on'] = null;
             }
 
-            await this.supabase.client
-              .from('debts')
-              .update(patch)
-              .eq('id', dp.debt_id);
+            await this.supabase.client.from('debts').update(patch).eq('id', dp.debt_id);
           }
         }
       }
@@ -405,7 +498,7 @@ export class TransactionsService {
           .update({
             amount: absAmount,
             direction,
-            occurred_on: '2000-01-01',
+            occurred_on: todayIso(),
             source: 'opening',
             notes: 'Opening balance',
           })
@@ -413,16 +506,14 @@ export class TransactionsService {
         if (updErr) throw updErr;
       }
     } else if (absAmount > 0) {
-      const { error: insErr } = await this.supabase.client
-        .from('transactions')
-        .insert({
-          owner_id: ownerId,
-          amount: absAmount,
-          direction,
-          occurred_on: '2000-01-01',
-          notes: 'Opening balance',
-          source: 'opening',
-        });
+      const { error: insErr } = await this.supabase.client.from('transactions').insert({
+        owner_id: ownerId,
+        amount: absAmount,
+        direction,
+        occurred_on: todayIso(),
+        notes: 'Opening balance',
+        source: 'opening',
+      });
       if (insErr) throw insErr;
     }
 

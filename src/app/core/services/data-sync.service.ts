@@ -14,6 +14,7 @@ import { SubscriptionsService } from './subscriptions.service';
 import { InterestService } from './interest.service';
 import { BudgetsService } from './budgets.service';
 import { PushService } from './push.service';
+import { OfflineQueueService } from './offline-queue.service';
 
 @Injectable({ providedIn: 'root' })
 export class DataSyncService {
@@ -36,6 +37,7 @@ export class DataSyncService {
   // Loads push preferences and reconciles this device's subscription
   // (never requests permission — that only happens on an explicit tap).
   private readonly pushService = inject(PushService);
+  private readonly offlineQueue = inject(OfflineQueueService);
 
   private syncPromise: Promise<void> | null = null;
 
@@ -82,6 +84,8 @@ export class DataSyncService {
         console.error('Coordinated data sync failed', err);
       } finally {
         this.syncPromise = null;
+        // Process any pending offline actions now that we're back online / synced.
+        void this.offlineQueue.processQueue();
       }
     })();
 

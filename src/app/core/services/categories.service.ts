@@ -1,19 +1,25 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
-import { Category, CategoryKind, isSavingsCategory, markAsSavingsCategory } from '../models/domain.models';
+import {
+  Category,
+  CategoryKind,
+  isSavingsCategory,
+  markAsSavingsCategory,
+} from '../models/domain.models';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
+import { OfflineQueueService } from './offline-queue.service';
 
 const DEFAULT_CATEGORIES: Array<{ name: string; kind: CategoryKind }> = [
-  { name: 'Salary',          kind: 'income' },
-  { name: 'PF',              kind: 'income' },
-  { name: 'Food',            kind: 'expense' },
-  { name: 'Rent',            kind: 'expense' },
-  { name: 'Fuel',            kind: 'expense' },
-  { name: 'Groceries',       kind: 'expense' },
-  { name: 'Bills',           kind: 'expense' },
-  { name: 'Emergency Fund',  kind: 'savings' },
-  { name: 'Mutual Funds',    kind: 'savings' },
-  { name: 'Gold & FDs',      kind: 'savings' },
+  { name: 'Salary', kind: 'income' },
+  { name: 'PF', kind: 'income' },
+  { name: 'Food', kind: 'expense' },
+  { name: 'Rent', kind: 'expense' },
+  { name: 'Fuel', kind: 'expense' },
+  { name: 'Groceries', kind: 'expense' },
+  { name: 'Bills', kind: 'expense' },
+  { name: 'Emergency Fund', kind: 'savings' },
+  { name: 'Mutual Funds', kind: 'savings' },
+  { name: 'Gold & FDs', kind: 'savings' },
   { name: 'General Savings', kind: 'savings' },
 ];
 
@@ -21,6 +27,7 @@ const DEFAULT_CATEGORIES: Array<{ name: string; kind: CategoryKind }> = [
 export class CategoriesService {
   private readonly supabase = inject(SupabaseService);
   private readonly auth = inject(AuthService);
+  private readonly offlineQueue = inject(OfflineQueueService);
 
   private readonly _categories = signal<Category[]>([]);
   private readonly _isLoading = signal(false);
@@ -35,6 +42,36 @@ export class CategoriesService {
         void this.load();
       } else {
         this._categories.set([]);
+      }
+    });
+
+    // Register offline-sync handler for the categories table.
+    this.offlineQueue.registerHandler('categories', async (action) => {
+      const p = action.payload as Record<string, unknown>;
+      if (action.type === 'create') {
+        const { data, error } = await this.supabase.client
+          .from('categories')
+          .insert({
+            owner_id: p['owner_id'] as string,
+            name: p['name'] as string,
+            kind: p['kind'],
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        const created = { ...(data as Category), kind: p['kind'] as CategoryKind };
+        if (p['kind'] === 'savings') {
+          markAsSavingsCategory(created.id, p['owner_id'] as string);
+        }
+        this._categories.update((list) => list.map((c) => (c.id === p['localId'] ? created : c)));
+      } else if (action.type === 'delete') {
+        const { error } = await this.supabase.client
+          .from('categories')
+          .delete()
+          .eq('id', p['id'] as string)
+          .eq('owner_id', this.auth.user()?.id);
+        if (error) throw error;
+        this._categories.update((list) => list.filter((c) => c.id !== p['id']));
       }
     });
   }
@@ -83,6 +120,32 @@ export class CategoriesService {
 
     const ownerId = this.requireUserId();
 
+    // Offline path: enqueue category creation and apply optimistically.
+    if (!this.offlineQueue.isOnline()) {
+      const localId = `local_${crypto.randomUUID?.() ?? Date.now().toString(36)}`;
+      const optimistic: Category = {
+        id: localId,
+        owner_id: ownerId,
+        name: trimmed,
+        kind,
+        created_at: new Date().toISOString(),
+      } as Category;
+
+      await this.offlineQueue.enqueue({
+        type: 'create',
+        table: 'categories',
+        payload: {
+          localId,
+          owner_id: ownerId,
+          name: trimmed,
+          kind,
+        },
+      });
+
+      this._categories.update((list) => [...list, optimistic]);
+      return optimistic;
+    }
+
     let result = await this.supabase.client
       .from('categories')
       .insert({ owner_id: ownerId, name: trimmed, kind })
@@ -124,10 +187,20 @@ export class CategoriesService {
     // 1. Optimistic removal for instant UI feedback
     this._categories.update((list) => list.filter((c) => c.id !== id));
 
-    const { error } = await this.supabase.client
-      .from('categories')
-      .delete()
-      .eq('id', id);
+    // Offline path: enqueue category deletion.
+    if (!this.offlineQueue.isOnline()) {
+      await this.offlineQueue.enqueue({
+        type: 'delete',
+        table: 'categories',
+        payload: {
+          id,
+          owner_id: category.owner_id,
+        },
+      });
+      return;
+    }
+
+    const { error } = await this.supabase.client.from('categories').delete().eq('id', id);
     if (error) {
       console.error('Failed to delete category', error);
       // Revert on failure at the exact original index to preserve list order

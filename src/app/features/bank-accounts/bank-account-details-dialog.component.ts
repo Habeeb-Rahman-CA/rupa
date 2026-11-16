@@ -12,19 +12,11 @@ export interface BankAccountDetailsData {
 @Component({
   selector: 'app-bank-account-details-dialog',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatDialogModule,
-    MatButtonModule,
-    LucideAngularModule,
-  ],
+  imports: [CommonModule, MatDialogModule, MatButtonModule, LucideAngularModule],
   template: `
     <div class="dialog-container">
       <div class="dialog-header">
         <div class="header-main">
-          <div class="icon-badge" [class.credit]="card.card_type === 'credit'">
-            <lucide-icon [name]="card.card_type === 'credit' ? 'credit-card' : 'building-2'" />
-          </div>
           <div>
             <h2 mat-dialog-title class="dialog-title">{{ card.bank_name }}</h2>
             <p class="dialog-subtitle">{{ card.account_name }}</p>
@@ -42,9 +34,7 @@ export interface BankAccountDetailsData {
             <span class="bank-tag">{{ card.bank_name }}</span>
             <span class="type-tag">{{ card.card_type | uppercase }}</span>
           </div>
-          <div class="card-number">
-            •••• •••• •••• {{ card.card_number_masked }}
-          </div>
+          <div class="card-number">•••• •••• •••• {{ card.card_number_masked }}</div>
           <div class="card-bottom">
             <div class="card-holder">
               <span class="lbl">HOLDER</span>
@@ -95,41 +85,49 @@ export interface BankAccountDetailsData {
           @if (card.balance !== undefined) {
             <div class="detail-item full-width highlight">
               <span class="detail-label">Current Card Balance</span>
-              <span class="detail-value amount">₹{{ card.balance | number:'1.2-2' }}</span>
+              <span class="detail-value amount">₹{{ card.balance | number: '1.2-2' }}</span>
             </div>
           }
 
           @if (card.credit_limit) {
             <div class="detail-item highlight">
               <span class="detail-label">Credit Limit</span>
-              <span class="detail-value amount">₹{{ card.credit_limit | number:'1.2-2' }}</span>
+              <span class="detail-value amount">₹{{ card.credit_limit | number: '1.2-2' }}</span>
             </div>
           }
         </div>
       </mat-dialog-content>
 
-      <div mat-dialog-actions class="dialog-actions">
+      <mat-dialog-actions align="end" class="dialog-actions">
         <button mat-button mat-dialog-close class="btn-secondary">Close</button>
         <button mat-flat-button (click)="onEdit()" class="btn-primary">
-          <lucide-icon name="pencil" />
           <span>Edit Details</span>
         </button>
-      </div>
+      </mat-dialog-actions>
     </div>
   `,
   styles: [
     `
+      h2 {
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        line-height: 1.2 !important;
+      }
       .dialog-container {
-        padding: 24px;
+        padding: 4px;
         max-width: 480px;
         background: var(--app-surface, #ffffff);
         color: var(--app-ink, #0f172a);
+        font-family: inherit;
       }
       .dialog-header {
         display: flex;
-        align-items: center;
         justify-content: space-between;
-        margin-bottom: 20px;
+        align-items: flex-start;
+        padding: 0 16px 12px 16px;
+        border-bottom: 1px solid var(--app-hairline, #e2e8f0);
       }
       .header-main {
         display: flex;
@@ -177,19 +175,40 @@ export interface BankAccountDetailsData {
         flex-direction: column;
         gap: 16px;
       }
-      .card-badge[data-theme='emerald'] { background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); }
-      .card-badge[data-theme='indigo'] { background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%); }
-      .card-badge[data-theme='rose'] { background: linear-gradient(135deg, #881337 0%, #4c0519 100%); }
-      .card-badge[data-theme='amber'] { background: linear-gradient(135deg, #78350f 0%, #451a03 100%); }
-      .card-badge[data-theme='violet'] { background: linear-gradient(135deg, #581c87 0%, #3b0764 100%); }
+      .card-badge[data-theme='emerald'] {
+        background: linear-gradient(135deg, #064e3b 0%, #022c22 100%);
+      }
+      .card-badge[data-theme='indigo'] {
+        background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%);
+      }
+      .card-badge[data-theme='rose'] {
+        background: linear-gradient(135deg, #881337 0%, #4c0519 100%);
+      }
+      .card-badge[data-theme='amber'] {
+        background: linear-gradient(135deg, #78350f 0%, #451a03 100%);
+      }
+      .card-badge[data-theme='violet'] {
+        background: linear-gradient(135deg, #581c87 0%, #3b0764 100%);
+      }
 
       .card-top {
         display: flex;
         justify-content: space-between;
         align-items: center;
       }
-      .bank-tag { font-weight: 700; font-size: 14px; letter-spacing: 0.5px; }
-      .type-tag { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: rgba(255, 255, 255, 0.2); text-transform: uppercase; }
+      .bank-tag {
+        font-weight: 700;
+        font-size: 14px;
+        letter-spacing: 0.5px;
+      }
+      .type-tag {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 99px;
+        background: rgba(255, 255, 255, 0.2);
+        text-transform: uppercase;
+      }
 
       .card-number {
         font-family: monospace;
@@ -203,9 +222,28 @@ export interface BankAccountDetailsData {
         justify-content: space-between;
         align-items: flex-end;
       }
-      .lbl { font-size: 9px; color: rgba(255, 255, 255, 0.6); display: block; letter-spacing: 0.5px; }
-      .val { font-size: 12px; font-weight: 600; text-transform: uppercase; }
-      .card-net { font-size: 12px; font-weight: 800; font-style: italic; }
+      .lbl {
+        font-size: 9px;
+        color: rgba(255, 255, 255, 0.6);
+        display: block;
+        letter-spacing: 0.5px;
+      }
+      .val {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+      .card-net {
+        font-size: 12px;
+        font-weight: 800;
+        font-style: italic;
+      }
+
+      .dialog-content {
+        padding-top: 16px !important;
+        padding-bottom: 16px !important;
+        min-width: 300px;
+      }
 
       /* Grid */
       .details-grid {
@@ -222,30 +260,48 @@ export interface BankAccountDetailsData {
         flex-direction: column;
         gap: 4px;
       }
-      .detail-item.full-width { grid-column: span 2; }
-      .detail-item.highlight { background: rgba(99, 102, 241, 0.05); border-color: rgba(99, 102, 241, 0.2); }
-      .detail-label { font-size: 11px; font-weight: 600; color: var(--app-ink-muted, #64748b); text-transform: uppercase; }
-      .detail-value { font-size: 14px; font-weight: 600; color: var(--app-ink, #0f172a); }
-      .detail-value.mono { font-family: monospace; }
-      .detail-value.amount { font-size: 16px; font-weight: 700; color: #10b981; }
+      .detail-item.full-width {
+        grid-column: span 2;
+      }
+      .detail-item.highlight {
+        background: rgba(99, 102, 241, 0.05);
+        border-color: rgba(99, 102, 241, 0.2);
+      }
+      .detail-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--app-ink-muted, #64748b);
+        text-transform: uppercase;
+      }
+      .detail-value {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--app-ink, #0f172a);
+      }
+      .detail-value.mono {
+        font-family: monospace;
+      }
+      .detail-value.amount {
+        font-size: 16px;
+        font-weight: 700;
+        color: #10b981;
+      }
 
       .dialog-actions {
-        margin-top: 24px;
-        padding: 0;
-        display: flex;
-        justify-content: flex-end;
-        gap: 12px;
+        padding-top: 12px;
       }
       .btn-secondary {
-        border-radius: 10px;
+        border-radius: var(--app-radius-md);
+        color: var(--app-ink-muted);
       }
       .btn-primary {
-        border-radius: 10px;
+        border-radius: var(--app-radius-md);
         display: flex;
         align-items: center;
         gap: 8px;
         background: var(--app-ink, #0f172a);
         color: #ffffff;
+        font-weight: 600;
       }
     `,
   ],
