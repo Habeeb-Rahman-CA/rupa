@@ -89,7 +89,7 @@ export interface QuickAddSheetData {
       <input
         #cameraInput
         type="file"
-        accept="image/*"
+        accept="image/*,image/heic,image/heif"
         capture="environment"
         style="display: none"
         (change)="onFileSelected($event)"
@@ -97,7 +97,7 @@ export interface QuickAddSheetData {
       <input
         #galleryInput
         type="file"
-        accept="image/*"
+        accept="image/*,image/heic,image/heif"
         style="display: none"
         (change)="onFileSelected($event)"
       />

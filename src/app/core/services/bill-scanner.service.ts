@@ -197,26 +197,39 @@ export class BillScannerService {
    * plain JPEG works. Other formats pass through untouched.
    *
    * Order: native decode (iOS Safari, recent Android Chrome — also
-   * downscales to ≤2048px) → heic2any WASM decoder (desktop browsers
-   * without HEIC support) → clear error.
+   * downscales to ≤2048px) → heic-decode (modern libheif WASM; handles
+   * current phone variants incl. AVIF-in-HEIF) → heic2any (older libheif,
+   * last resort) → error listing exactly which step failed.
    */
   private async normalizeImage(file: File | Blob): Promise<Blob> {
     if (!this.isHeic(file)) return file;
 
-    const native = await this.transcodeViaCanvas(file);
-    if (native) return native;
+    const failures: string[] = [];
 
+    // 1) Native browser decode — free and fast where supported.
+    const native = await this.transcodeViaCanvas(file);
+    if (native.blob) return native.blob;
+    if (native.error) failures.push(`browser decoder: ${native.error}`);
+
+    // 2) Modern libheif (WASM), lazy-loaded only when we get here.
+    const modern = await this.heicDecodeToJpeg(file);
+    if (modern.blob) return modern.blob;
+    if (modern.error) failures.push(`heic-decode: ${modern.error}`);
+
+    // 3) heic2any — older libheif; still works for classic HEIC files.
     try {
       const { default: heic2any } = await import('heic2any');
       const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
       const converted = Array.isArray(out) ? out[0] : out;
       if (converted) return converted;
+      failures.push('heic2any: no output');
     } catch (err) {
-      console.error('HEIC conversion failed', err);
+      failures.push(`heic2any: ${this.errText(err)}`);
     }
 
     throw new Error(
-      "This HEIC/HEIF photo can't be read in this browser. Convert it to JPEG (or re-take the photo as JPEG) and try again.",
+      `This HEIC/HEIF photo could not be converted (${failures.join(' | ')}). ` +
+        'Convert it to JPEG (or re-take the photo as JPEG) and try again.',
     );
   }
 
@@ -229,14 +242,51 @@ export class BillScannerService {
   }
 
   /**
+   * Step 2 of normalizeImage: decode with heic-decode (modern libheif WASM).
+   *
+   * The buffer MUST be a Uint8Array — heic-decode reads the file brand via
+   * `String.fromCharCode(...buffer.slice(8, 12))`, and spreading an
+   * ArrayBuffer throws "Spread syntax requires ...iterable[Symbol.iterator]
+   * to be a function" before it ever attempts to parse the file.
+   */
+  private async heicDecodeToJpeg(
+    file: Blob,
+  ): Promise<{ blob: Blob | null; error?: string }> {
+    try {
+      const { default: heicDecode } = await import('heic-decode');
+      const bytes = new Uint8Array(await this.toArrayBuffer(file));
+      const { width, height, data } = await heicDecode({ buffer: bytes });
+      const jpeg = await this.rgbaToJpeg(width, height, data);
+      return jpeg ? { blob: jpeg } : { blob: null, error: 'decoded, but JPEG encoding failed' };
+    } catch (err) {
+      return { blob: null, error: this.errText(err) };
+    }
+  }
+
+  /**
    * Decodes the image via an <img> element and re-encodes it as JPEG on a
    * canvas (downscaling to ≤2048px so multi-megapixel photos don't bloat
-   * the payload). Resolves null when the browser can't decode the format.
+   * the payload). Resolves `{ blob: null, error }` with the reason when the
+   * browser can't decode the format, so the final error can show it.
    */
-  private transcodeViaCanvas(file: Blob): Promise<Blob | null> {
+  private transcodeViaCanvas(
+    file: Blob,
+  ): Promise<{ blob: Blob | null; error?: string }> {
     return new Promise((resolve) => {
       const url = URL.createObjectURL(file);
       const img = new Image();
+      let settled = false;
+      const finish = (result: { blob: Blob | null; error?: string }): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        URL.revokeObjectURL(url);
+        resolve(result);
+      };
+      // Some browsers neither load nor error on undecodable formats — never
+      // leave the scan spinner hanging.
+      const timer = setTimeout(() => finish({ blob: null, error: 'decode timed out' }), 10000);
+
       img.onload = () => {
         try {
           const maxDim = 2048;
@@ -248,30 +298,87 @@ export class BillScannerService {
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           if (!ctx) {
-            URL.revokeObjectURL(url);
-            resolve(null);
+            finish({ blob: null, error: 'no canvas context' });
             return;
           }
           ctx.drawImage(img, 0, 0, width, height);
           canvas.toBlob(
-            (blob) => {
-              URL.revokeObjectURL(url);
-              resolve(blob);
-            },
+            (blob) =>
+              finish(blob ? { blob } : { blob: null, error: 'JPEG encode failed' }),
             'image/jpeg',
             0.85,
           );
-        } catch {
-          URL.revokeObjectURL(url);
-          resolve(null);
+        } catch (err) {
+          finish({ blob: null, error: this.errText(err) });
         }
       };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        resolve(null);
-      };
+      img.onerror = () => finish({ blob: null, error: 'image could not be decoded' });
       img.src = url;
     });
+  }
+
+  /** Renders decoded RGBA pixels to a JPEG blob (downscaled ≤2048px). */
+  private async rgbaToJpeg(
+    width: number,
+    height: number,
+    data: Uint8ClampedArray,
+  ): Promise<Blob | null> {
+    try {
+      const source = document.createElement('canvas');
+      source.width = width;
+      source.height = height;
+      const ctx = source.getContext('2d');
+      if (!ctx) return null;
+      // heic-decode returns an ArrayBuffer-backed view (never SharedArrayBuffer).
+      ctx.putImageData(
+        new ImageData(data as Uint8ClampedArray<ArrayBuffer>, width, height),
+        0,
+        0,
+      );
+
+      const maxDim = 2048;
+      if (Math.max(width, height) <= maxDim) return this.canvasToJpeg(source);
+
+      const scale = maxDim / Math.max(width, height);
+      const target = document.createElement('canvas');
+      target.width = Math.max(1, Math.round(width * scale));
+      target.height = Math.max(1, Math.round(height * scale));
+      const tctx = target.getContext('2d');
+      if (!tctx) return null;
+      tctx.drawImage(source, 0, 0, target.width, target.height);
+      return this.canvasToJpeg(target);
+    } catch (err) {
+      console.error('HEIC pixel-to-JPEG conversion failed', err);
+      return null;
+    }
+  }
+
+  private canvasToJpeg(canvas: HTMLCanvasElement): Promise<Blob | null> {
+    return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85));
+  }
+
+  private toArrayBuffer(file: Blob): Promise<ArrayBuffer> {
+    if (typeof file.arrayBuffer === 'function') return file.arrayBuffer();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as ArrayBuffer);
+      reader.onerror = () => reject(reader.error ?? new Error('Could not read file'));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  /** Human-readable text for thrown values incl. libheif's {code, message}. */
+  private errText(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    if (err && typeof err === 'object') {
+      const e = err as { message?: unknown; code?: unknown };
+      const parts = [
+        typeof e.message === 'string' ? e.message : null,
+        e.code != null ? `code ${String(e.code)}` : null,
+      ].filter((p): p is string => p !== null);
+      if (parts.length > 0) return parts.join(' ');
+    }
+    return String(err);
   }
 
   /**

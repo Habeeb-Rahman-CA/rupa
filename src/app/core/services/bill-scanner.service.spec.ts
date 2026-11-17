@@ -56,4 +56,61 @@ describe('BillScannerService HEIC normalization', () => {
     },
     60000,
   );
+
+  // Direct decoder checks: isolate which library handles the fixture so a
+  // future "could not be converted" report points at the right culprit.
+
+  it(
+    'decodes via the service\'s heic-decode step (Uint8Array buffer contract)',
+    async () => {
+      // Regression: the service used to pass an ArrayBuffer, which makes
+      // heic-decode throw "Spread syntax requires ...iterable[Symbol.iterator]"
+      // in its brand check — before ever parsing the file. (The e2e test
+      // passed anyway via the heic2any fallback, masking this.)
+      const service = TestBed.configureTestingModule({
+        providers: [
+          BillScannerService,
+          { provide: AppSettingsService, useValue: {} },
+        ],
+      }).inject(BillScannerService);
+
+      const bytes = Uint8Array.from(atob(HEIC_B64), (c) => c.charCodeAt(0));
+      const file = new File([bytes], 'bill.heic', { type: 'image/heic' });
+
+      const result = await (service as any).heicDecodeToJpeg(file);
+
+      expect(result.error).toBeUndefined();
+      expect(result.blob).not.toBeNull();
+      expect(result.blob.type).toBe('image/jpeg');
+      expect(result.blob.size).toBeGreaterThan(0);
+    },
+    60000,
+  );
+
+  it(
+    'decodes the fixture with modern libheif (heic-decode)',
+    async () => {
+      const decode = (await import('heic-decode')).default;
+      const bytes = Uint8Array.from(atob(HEIC_B64), (c) => c.charCodeAt(0));
+      const { width, height, data } = await decode({ buffer: bytes });
+      expect(width).toBeGreaterThan(0);
+      expect(height).toBeGreaterThan(0);
+      expect(data.length).toBe(width * height * 4);
+    },
+    60000,
+  );
+
+  it(
+    'converts the fixture with heic2any (last-resort decoder)',
+    async () => {
+      const heic2any = (await import('heic2any')).default;
+      const bytes = Uint8Array.from(atob(HEIC_B64), (c) => c.charCodeAt(0));
+      const file = new File([bytes], 'bill.heic', { type: 'image/heic' });
+      const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+      const converted = Array.isArray(out) ? out[0] : out;
+      expect(converted.type).toBe('image/jpeg');
+      expect(converted.size).toBeGreaterThan(0);
+    },
+    60000,
+  );
 });

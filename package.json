@@ -47,6 +47,7 @@
     "@angular/router": "^20.3.0",
     "@angular/service-worker": "^20.3.0",
     "@supabase/supabase-js": "^2.112.4",
+    "heic-decode": "^2.1.0",
     "heic2any": "^0.0.4",
     "lucide-angular": "^1.0.0",
     "rxjs": "~7.8.0",
