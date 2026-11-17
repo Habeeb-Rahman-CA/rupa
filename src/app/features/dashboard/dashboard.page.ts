@@ -86,8 +86,13 @@ type Range = 'week' | 'month' | 'year';
               <span>{{ openingBalance() === null ? 'Set starting balance' : 'Edit' }}</span>
             </button>
           </div>
-          <div class="hero-amount" [class.money-negative]="balance() < 0">
-            {{ balance() | signedMoney }}
+          <div
+            class="hero-amount"
+            [class.money-negative]="balance() < 0"
+            [style.font-size]="balanceFontSize()"
+            [title]="balanceText()"
+          >
+            {{ balanceText() }}
           </div>
         </div>
         <mat-button-toggle-group
@@ -261,7 +266,8 @@ type Range = 'week' | 'month' | 'year';
       }
       .hero-amount {
         margin-top: 4px;
-        font-size: clamp(24px, 6.5vw, 32px);
+        /* font-size is bound inline (balanceFontSize) so long values shrink
+           instead of hitting the ellipsis. */
         font-weight: 700;
         letter-spacing: -0.02em;
         color: var(--app-ink);
@@ -606,6 +612,22 @@ export class DashboardPage {
   readonly monthly = this.txService.monthly;
   readonly openingBalance = this.txService.openingBalance;
   readonly totalSavings = this.txService.totalSavings;
+
+  private readonly moneyPipe = new SignedMoneyPipe();
+
+  /** Full formatted balance — shown as the hover tooltip on the hero card. */
+  readonly balanceText = computed(() => this.moneyPipe.transform(this.balance()));
+
+  /**
+   * Font size for the hero balance: longer values shrink the type instead of
+   * being ellipsed, so the whole amount stays readable. A fixed 16px floor
+   * keeps it legible; the `title` tooltip exposes the exact value regardless.
+   */
+  readonly balanceFontSize = computed(() => {
+    const len = this.balanceText().length;
+    const scale = len <= 14 ? 1 : len <= 18 ? 0.85 : len <= 22 ? 0.72 : 0.6;
+    return `clamp(16px, calc(6.5vw * ${scale}), calc(32px * ${scale}))`;
+  });
   readonly categoryMap = computed(() => {
     const map = new Map<string, Category>();
     for (const c of this.categoriesService.categories()) {
