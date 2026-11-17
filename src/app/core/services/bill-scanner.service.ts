@@ -31,6 +31,13 @@ export const DEFAULT_EXTRACTION_PROMPT =
 export const DEFAULT_AI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
 export const DEFAULT_AI_MODEL = 'gemini-3.8-flash';
 
+const HEIC_MIME_TYPES = new Set([
+  'image/heic',
+  'image/heif',
+  'image/heic-sequence',
+  'image/heif-sequence',
+]);
+
 const PRIORITY_AMOUNT_KEYS = [
   'total_amount',
   'grand_total',
@@ -79,7 +86,8 @@ export class BillScannerService {
       DEFAULT_AI_BASE_URL
     ).replace(/\/+$/, '');
 
-    const imageUrl = await this.toDataUrl(file);
+    const image = await this.normalizeImage(file);
+    const imageUrl = await this.toDataUrl(image);
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -180,6 +188,90 @@ export class BillScannerService {
       void response.body?.cancel();
       await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
     }
+  }
+
+  /**
+   * HEIC/HEIF (the default camera format on iPhone) is transcoded to JPEG
+   * in the browser before upload, because providers don't reliably decode
+   * `data:image/heic` payloads — they silently return unusable output while
+   * plain JPEG works. Other formats pass through untouched.
+   *
+   * Order: native decode (iOS Safari, recent Android Chrome — also
+   * downscales to ≤2048px) → heic2any WASM decoder (desktop browsers
+   * without HEIC support) → clear error.
+   */
+  private async normalizeImage(file: File | Blob): Promise<Blob> {
+    if (!this.isHeic(file)) return file;
+
+    const native = await this.transcodeViaCanvas(file);
+    if (native) return native;
+
+    try {
+      const { default: heic2any } = await import('heic2any');
+      const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+      const converted = Array.isArray(out) ? out[0] : out;
+      if (converted) return converted;
+    } catch (err) {
+      console.error('HEIC conversion failed', err);
+    }
+
+    throw new Error(
+      "This HEIC/HEIF photo can't be read in this browser. Convert it to JPEG (or re-take the photo as JPEG) and try again.",
+    );
+  }
+
+  private isHeic(file: File | Blob): boolean {
+    const type = (file as File).type?.toLowerCase() ?? '';
+    if (HEIC_MIME_TYPES.has(type)) return true;
+    // Some pickers report an empty type — fall back to the file extension.
+    const name = (file as File).name ?? '';
+    return /\.hei[cf]$/i.test(name);
+  }
+
+  /**
+   * Decodes the image via an <img> element and re-encodes it as JPEG on a
+   * canvas (downscaling to ≤2048px so multi-megapixel photos don't bloat
+   * the payload). Resolves null when the browser can't decode the format.
+   */
+  private transcodeViaCanvas(file: Blob): Promise<Blob | null> {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const maxDim = 2048;
+          const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+          const width = Math.max(1, Math.round(img.naturalWidth * scale));
+          const height = Math.max(1, Math.round(img.naturalHeight * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            URL.revokeObjectURL(url);
+            resolve(null);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(
+            (blob) => {
+              URL.revokeObjectURL(url);
+              resolve(blob);
+            },
+            'image/jpeg',
+            0.85,
+          );
+        } catch {
+          URL.revokeObjectURL(url);
+          resolve(null);
+        }
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(null);
+      };
+      img.src = url;
+    });
   }
 
   /**
