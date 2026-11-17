@@ -10,6 +10,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 
+import { ThemeService } from './core/services/theme.service';
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -28,6 +30,7 @@ import { filter } from 'rxjs';
 export class App {
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
+  private readonly theme = inject(ThemeService);
   private timer1: number | null = null;
   private timer2: number | null = null;
   private lastPath: string | null = null;

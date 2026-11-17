@@ -192,7 +192,7 @@ import { errText } from '../../shared/utils/error-utils';
         border-radius: 999px;
         display: grid;
         place-items: center;
-        color: #fff;
+        color: var(--mat-sys-on-primary);
         font-weight: 700;
         font-size: 15px;
       }

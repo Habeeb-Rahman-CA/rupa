@@ -134,7 +134,7 @@ import { TransferSheetComponent, TransferSheetData } from './transfer-sheet.comp
         border: 0;
         border-radius: 999px;
         background: var(--app-ink-dark);
-        color: #fff;
+        color: var(--mat-sys-on-primary);
         cursor: pointer;
         font: inherit;
         font-size: 13px;

@@ -102,7 +102,7 @@ import { LucideAngularModule } from 'lucide-angular';
       }
 
       .df-wrap:focus-visible .df-trigger {
-        background: #fff;
+        background: var(--app-surface);
         border-color: var(--app-accent);
         box-shadow: 0 0 0 2px var(--app-accent-soft);
       }
@@ -121,7 +121,7 @@ import { LucideAngularModule } from 'lucide-angular';
           border-color 0.15s ease;
       }
       .df-trigger.focused {
-        background: #fff;
+        background: var(--app-surface);
         border-color: var(--app-accent);
       }
       .df-trigger.invalid {

@@ -155,7 +155,7 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
         border: 0;
         border-radius: 999px;
         background: var(--app-ink-dark);
-        color: #fff;
+        color: var(--mat-sys-on-primary);
         cursor: pointer;
         font: inherit;
         font-size: 13px;

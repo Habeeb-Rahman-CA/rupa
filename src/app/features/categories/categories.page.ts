@@ -348,7 +348,7 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
         border-radius: 12px;
         display: grid;
         place-items: center;
-        color: #fff;
+        color: var(--app-ink);
       }
       .icon-tile lucide-icon {
         width: 22px;

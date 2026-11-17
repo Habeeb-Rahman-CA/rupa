@@ -234,7 +234,7 @@ export interface DayGroup {
         justify-content: space-between;
         gap: 12px;
         min-height: 42px;
-        margin: 0;
+        margin: 0 0 12px;
         padding: 0 4px;
         background: var(--app-surface);
         border-radius: var(--app-radius-md);
@@ -273,7 +273,7 @@ export interface DayGroup {
         padding: 2px 7px;
         border-radius: 999px;
         background: var(--app-accent);
-        color: #fff;
+        color: var(--mat-sys-on-primary);
         font-size: 10px;
         letter-spacing: 0.02em;
       }
@@ -387,7 +387,7 @@ export interface DayGroup {
         border-radius: 12px;
         display: grid;
         place-items: center;
-        color: #fff;
+        color: var(--app-ink-inverse);
       }
       .tx-icon lucide-icon {
         width: 22px;

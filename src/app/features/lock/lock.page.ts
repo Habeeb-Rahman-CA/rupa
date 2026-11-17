@@ -79,7 +79,7 @@ import { openConfirm } from '../../shared/components/confirm-dialog.component';
         align-items: center;
         justify-content: center;
         padding: 24px 16px;
-        background: var(--app-bg, #fff);
+        background: var(--app-canvas);
       }
       .brand {
         text-align: center;

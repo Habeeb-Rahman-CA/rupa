@@ -159,7 +159,7 @@ export interface ReportDetailData {
         justify-content: center;
       }
       .icon-badge.solid {
-        color: #fff;
+        color: var(--mat-sys-on-primary);
       }
       .icon-badge lucide-icon {
         width: 20px;
@@ -241,7 +241,7 @@ export interface ReportDetailData {
         place-items: center;
       }
       .row-icon.solid {
-        color: #fff;
+        color: var(--mat-sys-on-primary);
       }
       .row-icon.tint {
         background: var(--app-accent-soft);

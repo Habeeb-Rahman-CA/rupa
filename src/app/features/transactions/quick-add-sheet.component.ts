@@ -366,7 +366,7 @@ export interface QuickAddSheetData {
       }
       .scan-btn:hover:not([disabled]) {
         background: var(--app-accent, #6366f1);
-        color: #ffffff;
+        color: var(--mat-sys-on-primary);
         border-color: var(--app-accent, #6366f1);
       }
       .scan-btn[disabled] {

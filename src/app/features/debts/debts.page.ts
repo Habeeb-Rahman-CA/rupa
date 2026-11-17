@@ -221,7 +221,7 @@ import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
         border-radius: 999px;
         display: grid;
         place-items: center;
-        color: #fff;
+        color: var(--mat-sys-on-primary);
         font-weight: 700;
         font-size: 15px;
       }

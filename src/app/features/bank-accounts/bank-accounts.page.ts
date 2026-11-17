@@ -17,7 +17,6 @@ import { LoadingStateComponent } from '../../shared/components/loading-state.com
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
 import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { BankAccountDialogComponent } from './bank-account-dialog.component';
-import { BankAccountDetailsDialogComponent } from './bank-account-details-dialog.component';
 import { CardsTabsComponent } from '../../shared/components/cards-tabs.component';
 
 @Component({
@@ -91,7 +90,6 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
             <div
               class="bank-card"
               [attr.data-theme]="card.theme || 'blue'"
-              (click)="viewDetails(card)"
             >
               <!-- Card Top Header -->
               <div class="card-header">
@@ -658,22 +656,5 @@ export class BankAccountsPage {
         this.snack.open('Could not remove card', 'Dismiss', { duration: 3000 });
       }
     }
-  }
-
-  viewDetails(card: BankAccount): void {
-    const dialogRef = this.dialog.open(BankAccountDetailsDialogComponent, {
-      data: { card },
-      maxWidth: '480px',
-      width: '100%',
-    });
-
-    dialogRef
-      .afterClosed()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((res) => {
-        if (res?.edit) {
-          this.openEditDialog(card);
-        }
-      });
   }
 }

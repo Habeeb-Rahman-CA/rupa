@@ -275,7 +275,7 @@ export interface SubscriptionDialogData {
         cursor: pointer;
         display: grid;
         place-items: center;
-        color: #ffffff;
+        color: var(--mat-sys-on-primary);
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.24);
         transition:
           transform 0.15s ease,
@@ -288,7 +288,7 @@ export interface SubscriptionDialogData {
         transform: scale(1.1);
       }
       .theme-swatch.active {
-        border-color: #ffffff;
+        border-color: var(--mat-sys-on-primary);
         box-shadow:
           0 0 0 2px var(--app-canvas),
           0 0 0 4px var(--app-accent);

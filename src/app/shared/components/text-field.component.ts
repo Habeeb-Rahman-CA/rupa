@@ -93,7 +93,7 @@ let nextFieldId = 0;
       }
 
       .ft-field.focused {
-        background: #fff;
+        background: var(--app-surface);
         border-color: var(--app-accent);
       }
 

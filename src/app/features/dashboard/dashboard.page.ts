@@ -360,7 +360,7 @@ type Range = 'week' | 'month' | 'year';
       }
       .move-savings-btn {
         background: var(--app-ink-dark) !important;
-        color: #fff !important;
+        color: var(--mat-sys-on-primary) !important;
         border-radius: var(--app-radius-md) !important;
         font-weight: 600 !important;
         display: inline-flex !important;
@@ -448,7 +448,7 @@ type Range = 'week' | 'month' | 'year';
         border-radius: 12px;
         display: grid;
         place-items: center;
-        color: #fff;
+        color: var(--app-ink-inverse);
       }
       .tile-icon lucide-icon {
         width: 22px;
@@ -493,7 +493,7 @@ type Range = 'week' | 'month' | 'year';
         border-radius: 12px;
         display: grid;
         place-items: center;
-        color: #fff;
+        color: var(--app-ink-inverse);
       }
       .tx-icon lucide-icon {
         width: 22px;
@@ -540,7 +540,7 @@ type Range = 'week' | 'month' | 'year';
         height: 36px;
         border-radius: 10px;
         background: var(--app-ink-dark);
-        color: #fff;
+        color: var(--mat-sys-on-primary);
         display: grid;
         place-items: center;
         flex: 0 0 auto;

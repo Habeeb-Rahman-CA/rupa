@@ -346,7 +346,7 @@ export interface BankAccountDialogData {
         height: 32px;
         border-radius: 50%;
         background: var(--app-ink-dark);
-        color: #fff;
+        color: var(--mat-sys-on-primary);
         display: grid;
         place-items: center;
         flex-shrink: 0;

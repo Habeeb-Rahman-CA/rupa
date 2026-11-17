@@ -7,14 +7,16 @@
 
 // Minimalist Material 3 theme — indigo accent, tuned for mobile-first iOS-style UI.
 html {
-  @include mat.theme((
-    color: (
-      primary: mat.$violet-palette,
-      tertiary: mat.$violet-palette,
-    ),
-    typography: Inter,
-    density: 0,
-  ));
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$violet-palette,
+        tertiary: mat.$violet-palette,
+      ),
+      typography: Inter,
+      density: 0,
+    )
+  );
 
   // -------- semantic tokens ------------------------------------------------
   --app-canvas: #f5f5f7;
@@ -22,6 +24,8 @@ html {
   --app-ink: #0f1114;
   --app-ink-muted: #6b7280;
   --app-ink-subtle: #9ca3af;
+  // Inverse of --app-ink — for glyphs sitting on a colored tile.
+  --app-ink-inverse: #ffffff;
 
   // Monochrome accent — was indigo, now near-black.
   --app-accent: #0b0d10;
@@ -31,7 +35,7 @@ html {
   --app-positive: #16a34a;
   --app-positive-soft: rgba(22, 163, 74, 0.12);
   --app-negative: #ef4444;
-  --app-negative-soft: rgba(239, 68, 68, 0.10);
+  --app-negative-soft: rgba(239, 68, 68, 0.1);
   --app-savings: #0ea5e9;
   --app-savings-soft: rgba(14, 165, 233, 0.12);
   --app-mint: #16a34a;
@@ -86,28 +90,100 @@ html {
   --app-radius-xl: 24px;
 
   // -------- shadows --------------------------------------------------------
-  --app-shadow-sm: 0 1px 2px rgba(15, 17, 20, 0.04),
-                   0 1px 1px rgba(15, 17, 20, 0.03);
-  --app-shadow-md: 0 4px 16px rgba(15, 17, 20, 0.04),
-                   0 1px 2px rgba(15, 17, 20, 0.03);
-  --app-shadow-lg: 0 10px 30px rgba(15, 17, 20, 0.08),
-                   0 2px 4px rgba(15, 17, 20, 0.04);
-  --app-shadow-modal: 0 30px 60px rgba(15, 17, 20, 0.20),
-                      0 4px 10px rgba(15, 17, 20, 0.08);
+  --app-shadow-sm: 0 1px 2px rgba(15, 17, 20, 0.04), 0 1px 1px rgba(15, 17, 20, 0.03);
+  --app-shadow-md: 0 4px 16px rgba(15, 17, 20, 0.04), 0 1px 2px rgba(15, 17, 20, 0.03);
+  --app-shadow-lg: 0 10px 30px rgba(15, 17, 20, 0.08), 0 2px 4px rgba(15, 17, 20, 0.04);
+  --app-shadow-modal: 0 30px 60px rgba(15, 17, 20, 0.2), 0 4px 10px rgba(15, 17, 20, 0.08);
 
   // -------- backwards-compat aliases ---------------------------------------
   --app-surface-muted: var(--app-canvas);
   --app-border: var(--app-hairline);
 }
 
+// =============================================================================
+// Dark theme overrides
+// =============================================================================
+html[data-theme='dark'] {
+  --app-canvas: #0b0d10;
+  --app-surface: #14161b;
+  --app-ink: #f5f6f8;
+  --app-ink-muted: #9ca3af;
+  --app-ink-subtle: #6b7280;
+  --app-ink-inverse: #0b0d10;
+
+  --app-accent: #e7e7ea;
+  --app-accent-soft: rgba(231, 231, 234, 0.08);
+
+  // Money colors stay vibrant on dark
+  --app-positive: #34d399;
+  --app-positive-soft: rgba(52, 211, 153, 0.14);
+  --app-negative: #f87171;
+  --app-negative-soft: rgba(248, 113, 113, 0.12);
+  --app-savings: #60a5fa;
+  --app-savings-soft: rgba(96, 165, 250, 0.14);
+  --app-mint: #34d399;
+  --app-mint-soft: rgba(52, 211, 153, 0.16);
+  --app-peach: #f87171;
+  --app-peach-soft: rgba(248, 113, 113, 0.14);
+
+  --app-hairline: rgba(255, 255, 255, 0.06);
+  --app-input-bg: #1f2028;
+
+  --app-ink-dark: #e7e7ea;
+  --app-ink-dark-soft: rgba(231, 231, 234, 0.06);
+
+  // Material 3 dark overrides
+  --mat-sys-primary: #e7e7ea;
+  --mat-sys-on-primary: #0b0d10;
+  --mat-sys-primary-container: #2a2d35;
+  --mat-sys-on-primary-container: #e7e7ea;
+  --mat-sys-primary-fixed: #2a2d35;
+  --mat-sys-primary-fixed-dim: #4b4d54;
+  --mat-sys-on-primary-fixed: #e7e7ea;
+  --mat-sys-on-primary-fixed-variant: #c9c9cd;
+  --mat-sys-inverse-primary: #4b4d54;
+
+  --mat-sys-tertiary: #e7e7ea;
+  --mat-sys-on-tertiary: #0b0d10;
+  --mat-sys-tertiary-container: #2a2d35;
+  --mat-sys-on-tertiary-container: #e7e7ea;
+  --mat-sys-tertiary-fixed: #2a2d35;
+  --mat-sys-tertiary-fixed-dim: #4b4d54;
+  --mat-sys-on-tertiary-fixed: #e7e7ea;
+  --mat-sys-on-tertiary-fixed-variant: #c9c9cd;
+
+  --mat-sys-secondary: #9ca3af;
+  --mat-sys-on-secondary: #0b0d10;
+  --mat-sys-secondary-container: #2a2d35;
+  --mat-sys-on-secondary-container: #c9c9cd;
+
+  // Ripple / hover — lighter tint for dark surfaces
+  --mat-sys-primary-state-layer: rgba(231, 231, 234, 0.1);
+  --mat-sys-on-surface-variant: var(--app-ink-muted);
+
+  // Shadows — deeper for dark
+  --app-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2), 0 1px 1px rgba(0, 0, 0, 0.1);
+  --app-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.1);
+  --app-shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.1);
+  --app-shadow-modal: 0 30px 60px rgba(0, 0, 0, 0.35), 0 4px 10px rgba(0, 0, 0, 0.15);
+
+  --app-surface-muted: var(--app-surface);
+  --app-border: var(--app-hairline);
+}
+
 // Global box-sizing so width: 100% + padding never overflows.
 // (Tailwind preflight is disabled, so this replaces its usual reset.)
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 // Prevent iOS Mobile Safari / Android Chrome auto-zoom on input focus in PWA & enforce uniform font-family
-button, input, select, textarea {
+button,
+input,
+select,
+textarea {
   font-family: inherit;
   font-size: 16px;
 }
@@ -116,7 +192,13 @@ body {
   color-scheme: light;
   background-color: var(--app-canvas);
   color: var(--app-ink);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    system-ui,
+    sans-serif;
   font-size: 15px;
   line-height: 1.4;
   letter-spacing: -0.005em;
@@ -148,7 +230,11 @@ html {
   --mat-sys-display-small-font: 'Inter';
 }
 
-html, body { height: 100%; overflow-x: hidden; }
+html,
+body {
+  height: 100%;
+  overflow-x: hidden;
+}
 
 // =============================================================================
 // Lucide icons — global sizing/alignment so <lucide-icon> behaves like text
@@ -182,10 +268,22 @@ lucide-angular {
 // =============================================================================
 // Utility helpers
 // =============================================================================
-.money-positive { color: var(--app-positive); font-variant-numeric: tabular-nums; }
-.money-negative { color: var(--app-negative); font-variant-numeric: tabular-nums; }
-.money-savings  { color: var(--app-savings);  font-variant-numeric: tabular-nums; }
-.money-neutral  { color: var(--app-ink);      font-variant-numeric: tabular-nums; }
+.money-positive {
+  color: var(--app-positive);
+  font-variant-numeric: tabular-nums;
+}
+.money-negative {
+  color: var(--app-negative);
+  font-variant-numeric: tabular-nums;
+}
+.money-savings {
+  color: var(--app-savings);
+  font-variant-numeric: tabular-nums;
+}
+.money-neutral {
+  color: var(--app-ink);
+  font-variant-numeric: tabular-nums;
+}
 
 .app-card {
   background: var(--app-surface);
@@ -227,7 +325,8 @@ lucide-angular {
     color: var(--app-mint);
     flex: 0 0 auto;
 
-    mat-icon, lucide-icon {
+    mat-icon,
+    lucide-icon {
       font-size: 16px;
       width: 16px;
       height: 16px;
@@ -261,11 +360,15 @@ lucide-angular {
 
   &.negative {
     background: var(--app-peach-soft);
-    .chip-icon { color: var(--app-peach); }
+    .chip-icon {
+      color: var(--app-peach);
+    }
   }
   &.savings {
     background: var(--app-savings-soft);
-    .chip-icon { color: var(--app-savings); }
+    .chip-icon {
+      color: var(--app-savings);
+    }
   }
 }
 
@@ -278,20 +381,26 @@ lucide-angular {
   border-radius: 999px;
   border: 0;
   background: var(--app-ink-dark);
-  color: #ffffff;
+  color: var(--mat-sys-on-primary);
   display: grid;
   place-items: center;
   cursor: pointer;
   flex: 0 0 auto;
-  transition: transform .1s ease, opacity .15s ease;
+  transition:
+    transform 0.1s ease,
+    opacity 0.15s ease;
 
   lucide-icon {
     width: 20px;
     height: 20px;
   }
 
-  &:hover:not(:disabled) { opacity: 0.92; }
-  &:active:not(:disabled) { transform: scale(0.96); }
+  &:hover:not(:disabled) {
+    opacity: 0.92;
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.96);
+  }
   &:disabled {
     opacity: 0.4;
     cursor: default;
@@ -311,7 +420,9 @@ lucide-angular {
   color: var(--app-ink-muted);
   font-weight: 500;
   cursor: pointer;
-  transition: background .12s ease, border-color .12s ease;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
 
   &:hover {
     background: var(--app-canvas);
@@ -414,7 +525,9 @@ lucide-angular {
   font-weight: 500 !important;
   color: var(--app-ink) !important;
   letter-spacing: 0 !important;
-  transition: background .12s ease, color .12s ease;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
 
   &:hover:not([disabled]) {
     background: var(--app-canvas) !important;
@@ -439,7 +552,9 @@ lucide-angular {
   &.selected {
     background: var(--app-accent-soft) !important;
     color: var(--app-accent) !important;
-    lucide-icon { color: var(--app-accent); }
+    lucide-icon {
+      color: var(--app-accent);
+    }
   }
 }
 
@@ -462,7 +577,9 @@ lucide-angular {
 // Destructive menu item (Delete etc.) — pair with class="menu-danger"
 .mat-mdc-menu-item.menu-danger {
   color: var(--app-negative) !important;
-  lucide-icon { color: var(--app-negative) !important; }
+  lucide-icon {
+    color: var(--app-negative) !important;
+  }
 
   &:hover:not([disabled]) {
     background: var(--app-negative-soft) !important;
@@ -490,7 +607,7 @@ lucide-angular {
   border: 1px solid var(--app-hairline);
   --mat-datepicker-calendar-container-shape: var(--app-radius-lg);
   --mat-datepicker-calendar-date-selected-state-background-color: var(--app-ink-dark);
-  --mat-datepicker-calendar-date-selected-state-text-color: #ffffff;
+  --mat-datepicker-calendar-date-selected-state-text-color: var(--mat-sys-on-primary);
   --mat-datepicker-calendar-date-today-outline-color: var(--app-ink-dark);
   --mat-datepicker-calendar-date-focus-state-background-color: var(--app-ink-dark-soft);
   --mat-datepicker-calendar-date-hover-state-background-color: var(--app-ink-dark-soft);
@@ -511,9 +628,7 @@ lucide-angular {
 }
 .mat-calendar-body-selected {
   background-color: var(--app-ink-dark) !important;
-  color: #ffffff !important;
-}
-.mat-calendar-body-today:not(.mat-calendar-body-selected) {
+  color: var(--mat-sys-on-primary) !important;
   border-color: var(--app-ink-dark) !important;
 }
 .mat-calendar-body-in-range::before {
@@ -536,6 +651,7 @@ lucide-angular {
 .mat-mdc-snack-bar-container .mdc-snackbar__surface {
   border-radius: var(--app-radius-md) !important;
   background: #1f2028 !important;
+  color: #ffffff !important;
 }
 
 // ---------- Form field (FILL appearance) ------------------------------------
@@ -564,20 +680,26 @@ lucide-angular {
 
   // Kill the default bottom underline entirely
   .mdc-line-ripple::before,
-  .mdc-line-ripple::after { display: none !important; }
-  .mdc-line-ripple { display: none !important; }
+  .mdc-line-ripple::after {
+    display: none !important;
+  }
+  .mdc-line-ripple {
+    display: none !important;
+  }
 
   // The wrapper gets our transparent border ring that turns indigo on focus
   .mat-mdc-text-field-wrapper,
   .mdc-text-field.mdc-text-field--filled {
     border: 1px solid transparent !important;
     border-radius: 14px !important;
-    transition: border-color .15s ease, background-color .15s ease;
+    transition:
+      border-color 0.15s ease,
+      background-color 0.15s ease;
   }
 
   // Focus → white bg + indigo border
   &.mat-focused {
-    --mdc-filled-text-field-container-color: #ffffff;
+    --mdc-filled-text-field-container-color: var(--app-surface);
     .mat-mdc-text-field-wrapper,
     .mdc-text-field.mdc-text-field--filled {
       border-color: var(--app-accent) !important;
@@ -592,7 +714,9 @@ lucide-angular {
     }
   }
 
-  .mat-mdc-form-field-focus-overlay { display: none !important; }
+  .mat-mdc-form-field-focus-overlay {
+    display: none !important;
+  }
 
   input.mat-mdc-input-element,
   .mat-mdc-select-value,
@@ -643,7 +767,9 @@ lucide-angular {
     border: 1px solid transparent !important;
     padding: 0 12px !important;
     min-height: 52px !important;
-    transition: background .15s ease, border-color .15s ease;
+    transition:
+      background 0.15s ease,
+      border-color 0.15s ease;
   }
 
   .mat-mdc-form-field-flex {
@@ -666,12 +792,14 @@ lucide-angular {
     color: var(--app-ink);
   }
 
-  .mat-mdc-form-field-focus-overlay { display: none !important; }
+  .mat-mdc-form-field-focus-overlay {
+    display: none !important;
+  }
 
   // Focused state — white bg + indigo border
   &.mat-focused .mat-mdc-text-field-wrapper,
   &.mat-focused .mdc-text-field.mdc-text-field--outlined {
-    background: #ffffff !important;
+    background: var(--app-surface) !important;
     border-color: var(--app-accent) !important;
   }
 
@@ -705,7 +833,9 @@ lucide-angular {
 }
 
 // ---------- Buttons ---------------------------------------------------------
-.mat-mdc-button, .mat-mdc-outlined-button, .mat-mdc-unelevated-button,
+.mat-mdc-button,
+.mat-mdc-outlined-button,
+.mat-mdc-unelevated-button,
 .mat-mdc-raised-button {
   --mdc-outlined-button-container-shape: 12px;
   --mdc-filled-button-container-shape: 12px;
@@ -716,32 +846,70 @@ lucide-angular {
 }
 
 // Filled ("New", "Add", "Save") — always monochrome dark
+.mat-mdc-filled-button,
+.mat-mdc-filled-button.mat-primary,
+.mat-mdc-filled-button.mat-accent,
+.mat-mdc-filled-button[color='primary'],
+.mat-mdc-filled-button[color='accent'],
 .mat-mdc-unelevated-button,
 .mat-mdc-unelevated-button.mat-primary,
 .mat-mdc-unelevated-button.mat-accent,
-.mat-mdc-unelevated-button[color="primary"],
-.mat-mdc-unelevated-button[color="accent"] {
+.mat-mdc-unelevated-button[color='primary'],
+.mat-mdc-unelevated-button[color='accent'] {
   --mdc-filled-button-container-color: var(--app-ink-dark) !important;
-  --mdc-filled-button-label-text-color: #ffffff !important;
+  --mdc-filled-button-label-text-color: var(--mat-sys-on-primary) !important;
   --mdc-filled-button-disabled-container-color: #e7e7ea !important;
   --mdc-filled-button-disabled-label-text-color: #9ca3af !important;
+  background-color: var(--app-ink-dark) !important;
+  color: var(--mat-sys-on-primary) !important;
 }
 
 // Text ("Cancel", "See all", secondary actions) — dark text
 .mat-mdc-button,
 .mat-mdc-button.mat-primary,
 .mat-mdc-button.mat-accent,
-.mat-mdc-button[color="primary"],
-.mat-mdc-button[color="accent"] {
+.mat-mdc-button[color='primary'],
+.mat-mdc-button[color='accent'] {
   --mdc-text-button-label-text-color: var(--app-ink) !important;
   --mat-mdc-button-persistent-ripple-color: var(--app-ink-dark) !important;
-  --mat-mdc-button-ripple-color: rgba(11, 13, 16, 0.10) !important;
+  --mat-mdc-button-ripple-color: rgba(11, 13, 16, 0.1) !important;
+  color: var(--app-ink) !important;
+}
+
+// Icon buttons — visible in both themes
+.mat-mdc-icon-button {
+  color: var(--app-ink-muted) !important;
+  --mdc-icon-button-label-text-color: var(--app-ink-muted) !important;
+  background-color: transparent !important;
+}
+.theme-toggle.mat-mdc-icon-button {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  padding: 0 !important;
+  flex-shrink: 0 !important;
+  border: 1px solid var(--app-hairline) !important;
+  background: var(--app-canvas) !important;
+  border-radius: var(--app-radius-md) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.theme-toggle.mat-mdc-icon-button:hover {
+  background: var(--app-surface-variant) !important;
+}
+.theme-toggle.mat-mdc-icon-button lucide-icon {
+  width: 20px !important;
+  height: 20px !important;
+  color: var(--app-ink) !important;
+  display: block !important;
 }
 
 // Outlined — dark stroke + dark text
 .mat-mdc-outlined-button,
 .mat-mdc-outlined-button.mat-primary,
-.mat-mdc-outlined-button[color="primary"] {
+.mat-mdc-outlined-button[color='primary'] {
   --mdc-outlined-button-label-text-color: var(--app-ink) !important;
   --mdc-outlined-button-outline-color: var(--app-hairline) !important;
   --mat-mdc-button-persistent-ripple-color: var(--app-ink-dark) !important;
@@ -750,9 +918,9 @@ lucide-angular {
 // Raised
 .mat-mdc-raised-button,
 .mat-mdc-raised-button.mat-primary,
-.mat-mdc-raised-button[color="primary"] {
+.mat-mdc-raised-button[color='primary'] {
   --mdc-protected-button-container-color: var(--app-ink-dark) !important;
-  --mdc-protected-button-label-text-color: #ffffff !important;
+  --mdc-protected-button-label-text-color: var(--mat-sys-on-primary) !important;
 }
 
 // ---------- Icon buttons ----------------------------------------------------
@@ -761,7 +929,9 @@ lucide-angular {
 }
 .row-delete-btn {
   color: var(--app-ink-subtle) !important;
-  transition: color .15s ease, background-color .15s ease !important;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease !important;
 
   &:hover {
     color: var(--app-negative) !important;
@@ -777,7 +947,7 @@ lucide-angular {
   --mdc-chip-outline-color: var(--app-hairline);
   --mdc-chip-hover-state-layer-color: var(--app-canvas);
   --mdc-chip-elevated-container-color: var(--app-surface);
-  --mdc-chip-selected-label-text-color: #ffffff !important;
+  --mdc-chip-selected-label-text-color: var(--mat-sys-on-primary) !important;
   --mdc-chip-elevated-selected-container-color: var(--app-ink-dark) !important;
   --mdc-chip-selected-focus-state-layer-color: var(--app-ink-dark-soft) !important;
   --mdc-chip-selected-hover-state-layer-color: var(--app-ink-dark-soft) !important;
@@ -786,7 +956,7 @@ lucide-angular {
 }
 .mat-mdc-chip-option.mdc-evolution-chip--selected .mdc-evolution-chip__icon--primary,
 .mat-mdc-chip-option.mdc-evolution-chip--selected lucide-icon {
-  color: #ffffff !important;
+  color: var(--mat-sys-on-primary) !important;
 }
 
 // ---------- Toggle group ----------------------------------------------------
@@ -819,7 +989,7 @@ lucide-angular {
   --mdc-checkbox-selected-focus-icon-color: var(--app-ink-dark) !important;
   --mdc-checkbox-selected-hover-icon-color: var(--app-ink-dark) !important;
   --mdc-checkbox-selected-pressed-icon-color: var(--app-ink-dark) !important;
-  --mdc-checkbox-selected-checkmark-color: #ffffff !important;
+  --mdc-checkbox-selected-checkmark-color: var(--mat-sys-on-primary) !important;
   --mdc-checkbox-selected-focus-state-layer-color: var(--app-ink-dark) !important;
   --mdc-checkbox-selected-hover-state-layer-color: var(--app-ink-dark) !important;
   --mdc-checkbox-selected-pressed-state-layer-color: var(--app-ink-dark) !important;
@@ -842,7 +1012,7 @@ lucide-angular {
 
 // ---------- Ripple layer (global) -------------------------------------------
 .mat-ripple-element {
-  background-color: rgba(11, 13, 16, 0.10) !important;
+  background-color: rgba(11, 13, 16, 0.1) !important;
 }
 
 // ---------- Sidenav container (desktop) -------------------------------------
@@ -880,12 +1050,23 @@ lucide-angular {
 }
 
 @keyframes rupa-fade-out {
-  from { opacity: 1; transform: scale(1); }
-  to { opacity: 0; transform: scale(0.985); }
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.985);
+  }
 }
 
 @keyframes rupa-fade-in {
-  from { opacity: 0; transform: scale(1.008); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(1.008);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
-

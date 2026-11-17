@@ -19,6 +19,16 @@
         </a>
         <button
           mat-icon-button
+          class="header-btn theme-btn"
+          type="button"
+          (click)="theme.toggle()"
+          [attr.aria-label]="themeLabel()"
+          [attr.title]="themeLabel()"
+        >
+          <lucide-icon [name]="themeIcon()" />
+        </button>
+        <button
+          mat-icon-button
           class="header-btn"
           [matMenuTriggerFor]="settingsMenu"
           aria-label="Settings"

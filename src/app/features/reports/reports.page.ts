@@ -790,7 +790,7 @@ interface BankReportRow extends BankAccount {
         padding: 2px 6px;
         border-radius: 999px;
         background: var(--app-ink-dark, #0f172a);
-        color: #fff;
+        color: var(--mat-sys-on-primary);
         letter-spacing: 0.04em;
       }
       .bank-subtext {
@@ -860,7 +860,7 @@ interface BankReportRow extends BankAccount {
         padding: 8px 14px;
         border-radius: 999px;
         background: var(--app-ink-dark, #0f172a);
-        color: #fff;
+        color: var(--mat-sys-on-primary);
         font-weight: 600;
         font-size: 13px;
         text-decoration: none;

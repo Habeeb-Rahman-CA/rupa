@@ -6,6 +6,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { PushCategory, PushService, PushStatus } from '../../core/services/push.service';
+import { ThemeService } from '../../core/services/theme.service';
 
 const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
   unsupported: {
@@ -327,11 +328,40 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
         flex: 0 0 auto;
         margin-top: 1px;
       }
+
+      .theme-toggle {
+        flex: 0 0 auto;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+      }
+      .theme-toggle lucide-icon {
+        width: 20px;
+        height: 20px;
+        color: var(--app-ink-muted);
+      }
+
+      .theme-chip {
+        flex: 0 0 auto;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: var(--app-input-bg);
+        color: var(--app-ink-muted);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      .theme-chip[data-theme='dark'] {
+        background: var(--app-positive-soft);
+        color: var(--app-positive);
+      }
     `,
   ],
 })
 export class SettingsPage {
   readonly push = inject(PushService);
+  readonly theme = inject(ThemeService);
 
   statusMeta() {
     return STATUS_META[this.push.status()];

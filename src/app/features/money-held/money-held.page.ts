@@ -179,7 +179,7 @@ import {
         border: 0;
         border-radius: 999px;
         background: var(--app-ink-dark);
-        color: #fff;
+        color: var(--mat-sys-on-primary);
         cursor: pointer;
         font: inherit;
         font-size: 13px;
@@ -273,7 +273,7 @@ import {
         width: 40px;
         height: 40px;
         border-radius: 999px;
-        color: #fff;
+        color: var(--mat-sys-on-primary);
         font-size: 15px;
         font-weight: 700;
         flex: 0 0 auto;

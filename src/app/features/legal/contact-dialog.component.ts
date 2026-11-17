@@ -121,7 +121,7 @@ import { CONTACT_INFO } from '../../core/contact-info';
         height: 40px;
         border-radius: 12px;
         background: var(--app-ink-dark);
-        color: #ffffff;
+        color: var(--mat-sys-on-primary);
         display: grid;
         place-items: center;
         flex: 0 0 auto;
@@ -156,7 +156,7 @@ import { CONTACT_INFO } from '../../core/contact-info';
       }
       .close-btn {
         background: var(--app-ink-dark) !important;
-        color: #ffffff !important;
+        color: var(--mat-sys-on-primary) !important;
         border-radius: var(--app-radius-md) !important;
         font-weight: 600 !important;
       }

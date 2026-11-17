@@ -108,7 +108,7 @@ export interface SelectOption<T = string> {
         text-align: left;
       }
       .sf-trigger.focused {
-        background: #fff;
+        background: var(--app-surface);
         border-color: var(--app-accent);
       }
       .sf-trigger.invalid {

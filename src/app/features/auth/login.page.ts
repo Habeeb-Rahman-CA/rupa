@@ -229,8 +229,8 @@ type Mode = 'login' | 'signup';
           color 0.15s ease;
       }
       .mode-toggle button.active {
-        background: #fff;
-        color: var(--app-ink);
+        background: var(--app-ink-dark);
+        color: var(--mat-sys-on-primary);
         box-shadow: var(--app-shadow-sm);
       }
 
@@ -312,7 +312,7 @@ type Mode = 'login' | 'signup';
         border: 0;
         border-radius: 999px;
         background: var(--app-ink-dark);
-        color: #fff;
+        color: var(--mat-sys-on-primary);
         font-family: inherit;
         font-size: 15px;
         font-weight: 600;
@@ -340,15 +340,15 @@ type Mode = 'login' | 'signup';
       .submit-loading {
         display: inline-flex;
         align-items: center;
-        justify-content: center;
+        justify: center;
         gap: 10px;
-        color: #ffffff;
+        color: var(--mat-sys-on-primary);
       }
 
       .submit-spinner {
-        --mdc-circular-progress-active-indicator-color: #ffffff !important;
+        --mdc-circular-progress-active-indicator-color: var(--mat-sys-on-primary) !important;
         circle {
-          stroke: #ffffff !important;
+          stroke: var(--mat-sys-on-primary) !important;
         }
       }
 

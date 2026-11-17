@@ -24,6 +24,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { AuthService } from '../core/services/auth.service';
+import { ThemeService } from '../core/services/theme.service';
 import { DataSyncService } from '../core/services/data-sync.service';
 import { PwaUpdateService } from '../core/services/pwa-update.service';
 import { TransactionsService } from '../core/services/transactions.service';
@@ -63,6 +64,7 @@ export class ShellComponent implements AfterViewInit {
   private readonly breakpoints = inject(BreakpointObserver);
   private readonly bottomSheet = inject(MatBottomSheet);
   private readonly auth = inject(AuthService);
+  readonly theme = inject(ThemeService);
   private readonly dataSyncService = inject(DataSyncService);
   private readonly pwaUpdateService = inject(PwaUpdateService);
   private readonly transactionsService = inject(TransactionsService);
@@ -108,6 +110,12 @@ export class ShellComponent implements AfterViewInit {
   readonly userEmail = computed(() => this.auth.user()?.email ?? '');
   readonly pwaUpdateAvailable = this.pwaUpdateService.updateAvailable;
   readonly isCheckingPwa = this.pwaUpdateService.isChecking;
+
+  /** Icon for the topbar theme toggle: sun while dark, moon while light. */
+  readonly themeIcon = computed(() => (this.theme.isDark() ? 'sun' : 'moon'));
+  readonly themeLabel = computed(() =>
+    this.theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode',
+  );
 
   readonly displayName = computed(() => {
     const u = this.auth.user();

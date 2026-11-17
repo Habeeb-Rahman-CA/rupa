@@ -63,7 +63,7 @@ export interface ChartPoint {
               [attr.cx]="hx"
               [attr.cy]="hy"
               r="5"
-              fill="#fff"
+              fill="var(--app-ink-dark)"
               [attr.stroke]="strokeColor()"
               stroke-width="2.5"
             />
@@ -139,7 +139,7 @@ export interface ChartPoint {
       }
       .tt-val {
         background: var(--app-ink-dark);
-        color: #fff;
+        color: var(--mat-sys-on-primary);
         padding: 4px 8px;
         border-radius: 8px;
         font-size: 12px;

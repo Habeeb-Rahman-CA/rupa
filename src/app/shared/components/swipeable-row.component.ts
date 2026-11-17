@@ -68,7 +68,7 @@ import { LucideAngularModule } from 'lucide-angular';
         right: 0;
         width: 100%;
         background: var(--app-negative);
-        color: #ffffff;
+        color: var(--mat-sys-on-primary);
         display: flex;
         justify-content: flex-end;
         align-items: center;
@@ -93,7 +93,7 @@ import { LucideAngularModule } from 'lucide-angular';
         gap: 6px;
         font-size: 13px;
         font-weight: 600;
-        color: #ffffff;
+        color: var(--mat-sys-on-primary);
       }
       .delete-action lucide-icon {
         width: 18px;
