@@ -13,13 +13,23 @@ export interface ExtractOptions {
   apiKey?: string;
   model?: string;
   baseUrl?: string;
-  siteUrl?: string;
-  siteName?: string;
 }
 
 export const DEFAULT_EXTRACTION_PROMPT =
   'Output ONLY a JSON object with the merchant name as \'title\' and total expense as \'total_amount\'. ' +
   'No other text. Example: {"title": "Starbucks", "total_amount": "5.50"}';
+
+/**
+ * Built-in AI provider fallbacks, used only when the matching
+ * `app_settings` column is NULL — the runtime values come from Supabase
+ * (ai_base_url / ai_model / ai_api_key / ai_headers, migration 0023), so
+ * changing provider or model never requires a code change.
+ *
+ * Any OpenAI-compatible provider works: the app always POSTs to
+ * `{base_url}/chat/completions` with `Authorization: Bearer <key>`.
+ */
+export const DEFAULT_AI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
+export const DEFAULT_AI_MODEL = 'gemini-3.8-flash';
 
 const PRIORITY_AMOUNT_KEYS = [
   'total_amount',
@@ -39,11 +49,14 @@ export class BillScannerService {
   private readonly appSettings = inject(AppSettingsService);
 
   private getApiKey(): string {
-    return this.appSettings.openRouterApiKey();
+    return this.appSettings.aiApiKey();
   }
 
   /**
-   * Scans a bill image (File or Blob) using OpenRouter Vision API.
+   * Scans a bill image (File or Blob) using the configured AI provider via
+   * its OpenAI-compatible chat completions endpoint. Provider endpoint, model
+   * and extra headers are read from Supabase `app_settings` (see
+   * `AppSettingsService`); per-call `options` override them for tests.
    */
   async extractBill(
     file: File | Blob,
@@ -56,25 +69,26 @@ export class BillScannerService {
 
     const apiKey = options.apiKey || this.getApiKey();
     if (!apiKey) {
-      throw new Error('OpenRouter API key is missing. Please set your key first.');
+      throw new Error('AI API key is missing. Please set your key first.');
     }
 
-    const model = options.model || 'qwen/qwen3-vl-8b-instruct';
-    const baseUrl = options.baseUrl || 'https://openrouter.ai/api/v1';
+    const model = options.model || this.appSettings.aiModel() || DEFAULT_AI_MODEL;
+    const baseUrl = (
+      options.baseUrl ||
+      this.appSettings.aiBaseUrl() ||
+      DEFAULT_AI_BASE_URL
+    ).replace(/\/+$/, '');
 
     const imageUrl = await this.toDataUrl(file);
 
     const headers: Record<string, string> = {
-      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      // Provider-specific extras from app_settings.ai_headers win over the
+      // defaults, so a provider that authenticates differently (x-api-key,
+      // or no Authorization at all) works without a code change.
+      ...(this.appSettings.aiHeaders() ?? {}),
     };
-
-    if (options.siteUrl) {
-      headers['HTTP-Referer'] = options.siteUrl;
-    }
-    if (options.siteName) {
-      headers['X-Title'] = options.siteName;
-    }
 
     const payload = {
       model,
@@ -99,17 +113,20 @@ export class BillScannerService {
 
     const startTime = performance.now();
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
+    const response = await this.postChat(
+      `${baseUrl}/chat/completions`,
       headers,
-      body: JSON.stringify(payload),
-    });
+      JSON.stringify(payload),
+    );
 
     const latencyMs = performance.now() - startTime;
 
     if (!response.ok) {
       const errorBody = await response.text();
-      throw new Error(`OpenRouter API error (${response.status} ${response.statusText}): ${errorBody}`);
+      if (response.status === 429 || response.status === 503) {
+        throw new Error('The AI service is busy right now. Please try again in a moment.');
+      }
+      throw new Error(`AI provider error (${response.status} ${response.statusText}): ${errorBody}`);
     }
 
     const data: any = await response.json();
@@ -139,6 +156,30 @@ export class BillScannerService {
       latency_ms: latencyMs,
       parsed_json: parsed,
     };
+  }
+
+  /**
+   * POSTs to the chat-completions endpoint, retrying transient capacity
+   * errors (429/503) with a short backoff. Gemini demand spikes usually
+   * clear within a couple of seconds, and the scan is a read-only call,
+   * so retrying is safe.
+   */
+  private async postChat(
+    url: string,
+    headers: Record<string, string>,
+    body: string,
+  ): Promise<Response> {
+    const maxAttempts = 3;
+    for (let attempt = 1; ; attempt++) {
+      const response = await fetch(url, { method: 'POST', headers, body });
+      const retriable = response.status === 429 || response.status === 503;
+      if (response.ok || !retriable || attempt >= maxAttempts) {
+        return response;
+      }
+      // Release the unread error body before retrying on this connection.
+      void response.body?.cancel();
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
+    }
   }
 
   /**

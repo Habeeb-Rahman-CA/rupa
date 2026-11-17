@@ -14,7 +14,7 @@
 
 1. In the Supabase dashboard, open **SQL Editor** (left sidebar).
 2. Click **New query**.
-3. Run every file in `db/migrations/` in numeric order, from `0001_init.sql` through the latest migration (`0018_budgets.sql` as of this writing). **Do not skip migrations.** `0001_init.sql` is only the base schema — savings categories, bank accounts, app settings, payment metadata, and additional transaction sources are added by later migrations. Applying only `0001` will cause constraint violations when the app inserts opening balances or savings-category transactions.
+3. Run every file in `db/migrations/` in numeric order, from `0001_init.sql` through the latest migration (`0023_app_settings_ai_provider_config.sql` as of this writing). **Do not skip migrations.** `0001_init.sql` is only the base schema — savings categories, bank accounts, app settings, payment metadata, and additional transaction sources are added by later migrations. Applying only `0001` will cause constraint violations when the app inserts opening balances or savings-category transactions.
    Apply each file as a separate query so a failure identifies the exact migration that needs attention.
 4. Click **Run** for each file. You should see `Success. No rows returned`.
 5. Open **Table Editor** to confirm the tables were created, including `bank_accounts` and `app_settings`.
