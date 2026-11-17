@@ -212,14 +212,28 @@ export class BillScannerService {
     if (native.error) failures.push(`browser decoder: ${native.error}`);
 
     // 2) Modern libheif (WASM), lazy-loaded only when we get here.
-    const modern = await this.heicDecodeToJpeg(file);
+    // Timeout covers the ~2MB lazy chunk download + WASM decode — without
+    // it a stalled load would hang the scan spinner forever.
+    const modern = await this.withTimeout(
+      this.heicDecodeToJpeg(file),
+      30000,
+      'heic-decode',
+    ).catch((err) => ({ blob: null, error: this.errText(err) }));
     if (modern.blob) return modern.blob;
     if (modern.error) failures.push(`heic-decode: ${modern.error}`);
 
     // 3) heic2any — older libheif; still works for classic HEIC files.
+    // Under a CSP without 'unsafe-eval' its emscripten glue throws inside a
+    // callback and the promise never settles — the timeout prevents a hang.
     try {
-      const { default: heic2any } = await import('heic2any');
-      const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+      const out = await this.withTimeout(
+        (async () => {
+          const { default: heic2any } = await import('heic2any');
+          return heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+        })(),
+        15000,
+        'heic2any',
+      );
       const converted = Array.isArray(out) ? out[0] : out;
       if (converted) return converted;
       failures.push('heic2any: no output');
@@ -379,6 +393,31 @@ export class BillScannerService {
       if (parts.length > 0) return parts.join(' ');
     }
     return String(err);
+  }
+
+  /**
+   * Rejects with a descriptive error if `promise` hasn't settled within `ms`.
+   * Guards the WASM conversion steps: a blocked worker or stalled lazy-chunk
+   * download can leave their promises pending forever (observed under a CSP
+   * that blocks blob workers), which would hang the scan spinner.
+   */
+  private withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`${label} timed out after ${ms / 1000}s`)),
+        ms,
+      );
+      promise.then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (err) => {
+          clearTimeout(timer);
+          reject(err);
+        },
+      );
+    });
   }
 
   /**
