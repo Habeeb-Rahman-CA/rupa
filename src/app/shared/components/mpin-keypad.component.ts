@@ -1,4 +1,14 @@
-import { Component, DestroyRef, HostListener, computed, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  HostListener,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { shuffleDigits } from '../utils/random-utils';
@@ -24,6 +34,7 @@ type KeypadCell =
 @Component({
   selector: 'app-mpin-keypad',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule],
   template: `
     <div
@@ -82,7 +93,10 @@ type KeypadCell =
         border: 2px solid var(--app-ink-muted);
         border-radius: 50%;
         background: transparent;
-        transition: background .12s ease, border-color .12s ease, transform .12s ease;
+        transition:
+          background 0.12s ease,
+          border-color 0.12s ease,
+          transform 0.12s ease;
       }
       .dot.filled {
         border-color: var(--app-accent);
@@ -109,29 +123,56 @@ type KeypadCell =
         font-size: 21px;
         font-weight: 600;
         font-variant-numeric: tabular-nums;
-        transition: transform .06s ease, background .12s ease;
+        transition:
+          transform 0.06s ease,
+          background 0.12s ease;
         user-select: none;
         -webkit-tap-highlight-color: transparent;
       }
       .key:active:not(:disabled) {
-        transform: scale(.94);
+        transform: scale(0.94);
         background: var(--app-accent-soft);
       }
-      .key:disabled { opacity: .45; cursor: default; }
-      .key-blank { border: 0; background: transparent; }
-      .util-key lucide-icon { width: 21px; height: 21px; }
-      .util-key { color: var(--app-ink-muted); }
+      .key:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+      .key-blank {
+        border: 0;
+        background: transparent;
+      }
+      .util-key lucide-icon {
+        width: 21px;
+        height: 21px;
+      }
+      .util-key {
+        color: var(--app-ink-muted);
+      }
 
-      .shake { animation: keypad-shake .3s ease; }
+      .shake {
+        animation: keypad-shake 0.3s ease;
+      }
       @keyframes keypad-shake {
-        0%, 100% { transform: translateX(0); }
-        25% { transform: translateX(-7px); }
-        50% { transform: translateX(6px); }
-        75% { transform: translateX(-4px); }
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        25% {
+          transform: translateX(-7px);
+        }
+        50% {
+          transform: translateX(6px);
+        }
+        75% {
+          transform: translateX(-4px);
+        }
       }
 
       @media (max-width: 380px) {
-        .keypad-grid { grid-template-columns: repeat(3, 58px); grid-auto-rows: 52px; }
+        .keypad-grid {
+          grid-template-columns: repeat(3, 58px);
+          grid-auto-rows: 52px;
+        }
       }
     `,
   ],

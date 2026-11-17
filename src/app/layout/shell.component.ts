@@ -1,4 +1,15 @@
-import { AfterViewInit, Component, DestroyRef, ElementRef, HostListener, ViewChild, computed, inject, signal } from '@angular/core';
+import {
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  HostListener,
+  ViewChild,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
@@ -32,6 +43,7 @@ interface NavItem {
 @Component({
   selector: 'app-shell',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterOutlet,
     RouterLink,
@@ -67,29 +79,27 @@ export class ShellComponent implements AfterViewInit {
   readonly isSigningOut = signal(false);
 
   readonly isHandset = toSignal(
-    this.breakpoints
-      .observe([Breakpoints.Handset, Breakpoints.Small])
-      .pipe(map((r) => r.matches)),
+    this.breakpoints.observe([Breakpoints.Handset, Breakpoints.Small]).pipe(map((r) => r.matches)),
     { initialValue: false },
   );
 
   readonly navLeft: NavItem[] = [
-    { path: '/dashboard',    label: 'Home', icon: 'home' },
+    { path: '/dashboard', label: 'Home', icon: 'home' },
     { path: '/transactions', label: 'Txns', icon: 'receipt' },
   ];
   readonly navRight: NavItem[] = [
-    { path: '/debts',         label: 'Owed', icon: 'handshake' },
+    { path: '/debts', label: 'Owed', icon: 'handshake' },
     { path: '/bank-accounts', label: 'Cards', icon: 'credit-card' },
   ];
 
   readonly moreNav: NavItem[] = [
-    { path: '/reports',    label: 'Reports',    icon: 'trending-up' },
+    { path: '/reports', label: 'Reports', icon: 'trending-up' },
     { path: '/subscriptions', label: 'Subscriptions', icon: 'repeat' },
-    { path: '/budgets',    label: 'Budgets',    icon: 'gauge' },
-    { path: '/interest',   label: 'Interest (Riba)', icon: 'percent' },
+    { path: '/budgets', label: 'Budgets', icon: 'gauge' },
+    { path: '/interest', label: 'Interest (Riba)', icon: 'percent' },
     { path: '/categories', label: 'Categories', icon: 'tags' },
-    { path: '/people',     label: 'People',     icon: 'users' },
-    { path: '/settings',   label: 'Settings',   icon: 'settings' },
+    { path: '/people', label: 'People', icon: 'users' },
+    { path: '/settings', label: 'Settings', icon: 'settings' },
     { path: '/settings/app-lock', label: 'App Lock', icon: 'lock' },
   ];
 
@@ -129,7 +139,7 @@ export class ShellComponent implements AfterViewInit {
     this.router.events
       .pipe(
         filter((e): e is NavigationEnd => e instanceof NavigationEnd),
-        takeUntilDestroyed(this.destroyRef)
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe(() => {
         setTimeout(() => this.updatePillPosition(), 0);
@@ -163,7 +173,8 @@ export class ShellComponent implements AfterViewInit {
   onTabClick(event: MouseEvent, path: string): void {
     if (this.router.url.split('?')[0] === path) {
       event.preventDefault();
-      const mainEl = document.querySelector('.mobile-main') || document.querySelector('.desktop-content');
+      const mainEl =
+        document.querySelector('.mobile-main') || document.querySelector('.desktop-content');
       if (mainEl) {
         mainEl.scrollTo({ top: 0, behavior: 'smooth' });
       }

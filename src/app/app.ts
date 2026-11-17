@@ -1,4 +1,11 @@
-import { afterNextRender, Component, DestroyRef, inject, isDevMode } from '@angular/core';
+import {
+  afterNextRender,
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  inject,
+  isDevMode,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
@@ -6,9 +13,17 @@ import { filter } from 'rxjs';
 @Component({
   selector: 'app-root',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterOutlet],
   template: `<router-outlet />`,
-  styles: [`:host { display: block; height: 100%; }`],
+  styles: [
+    `
+      :host {
+        display: block;
+        height: 100%;
+      }
+    `,
+  ],
 })
 export class App {
   private readonly destroyRef = inject(DestroyRef);

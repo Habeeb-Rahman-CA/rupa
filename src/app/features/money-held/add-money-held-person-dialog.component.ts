@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -14,6 +14,7 @@ const NEW_PERSON = '__new__';
 @Component({
   selector: 'app-add-money-held-person-dialog',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MatButtonModule, MatDialogModule, SelectFieldComponent, TextFieldComponent],
   template: `
     <div class="dialog-container">
@@ -93,7 +94,9 @@ const NEW_PERSON = '__new__';
         padding-top: 16px !important;
         padding-bottom: 16px !important;
       }
-      .dialog-actions { padding-top: 12px; }
+      .dialog-actions {
+        padding-top: 12px;
+      }
     `,
   ],
 })
@@ -110,7 +113,9 @@ export class AddMoneyHeldPersonDialogComponent {
   readonly people = this.peopleService.people;
 
   readonly personOptions = computed<SelectOption<string>[]>(() => {
-    const existingHeld = new Set(this.moneyHeldService.heldPeople().map((person) => person.person_id));
+    const existingHeld = new Set(
+      this.moneyHeldService.heldPeople().map((person) => person.person_id),
+    );
     const options = this.people()
       .filter((person) => !existingHeld.has(person.id))
       .map((person) => ({ label: person.name, value: person.id, icon: 'user' }));
@@ -119,9 +124,7 @@ export class AddMoneyHeldPersonDialogComponent {
   });
 
   readonly canSave = computed(() =>
-    this.personId() === NEW_PERSON
-      ? this.newPersonName().trim().length > 0
-      : !!this.personId(),
+    this.personId() === NEW_PERSON ? this.newPersonName().trim().length > 0 : !!this.personId(),
   );
 
   async save(): Promise<void> {
@@ -137,7 +140,9 @@ export class AddMoneyHeldPersonDialogComponent {
       this.snack.open('Person added to Money Held.', undefined, { duration: 2000 });
       this.ref.close({ saved: true, heldPerson });
     } catch (error: unknown) {
-      this.snack.open(errorText(error, 'Couldn’t add — please try again.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(errorText(error, 'Couldn’t add — please try again.'), 'Dismiss', {
+        duration: 4000,
+      });
       this.submitting.set(false);
     }
   }

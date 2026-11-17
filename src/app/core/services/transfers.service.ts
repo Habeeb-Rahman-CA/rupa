@@ -7,6 +7,7 @@ import { SupabaseService } from './supabase.service';
 import { TransactionsService } from './transactions.service';
 import { OfflineQueueService } from './offline-queue.service';
 import { roundCurrency } from '../../shared/utils/currency-utils';
+import { todayIso } from '../../shared/utils/budget-utils';
 
 export interface AccountTransferInput {
   source_account_id: string;
@@ -85,7 +86,9 @@ export class TransfersService {
       try {
         const { data, error } = await this.supabase.client
           .from('transfers')
-          .select('*')
+          .select(
+            'id, owner_id, source_account_id, destination_account_id, amount, occurred_on, notes, debit_transaction_id, credit_transaction_id, created_at',
+          )
           .order('occurred_on', { ascending: false })
           .order('created_at', { ascending: false });
 
@@ -293,12 +296,4 @@ export class TransfersService {
       created_at: String(row['created_at']),
     };
   }
-}
-
-function todayIso(): string {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }

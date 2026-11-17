@@ -8,6 +8,7 @@ import {
   isEqualCurrency,
   roundCurrency,
 } from '../../shared/utils/currency-utils';
+import { todayIso } from '../../shared/utils/budget-utils';
 
 export interface CreateInterestEntryInput {
   bank_account_id: string;
@@ -94,7 +95,9 @@ export class InterestService {
       try {
         const entryResult = await this.supabase.client
           .from('interest_entries')
-          .select('*')
+          .select(
+            'id, owner_id, bank_account_id, occurred_on, amount, stage, notes, created_at, updated_at',
+          )
           .order('occurred_on', { ascending: false })
           .order('created_at', { ascending: false });
 
@@ -106,7 +109,7 @@ export class InterestService {
 
         const disposalResult = await this.supabase.client
           .from('interest_disposals')
-          .select('*')
+          .select('id, owner_id, entry_id, occurred_on, amount, notes, created_at, updated_at')
           .order('occurred_on', { ascending: false })
           .order('created_at', { ascending: false });
 
@@ -212,9 +215,7 @@ export class InterestService {
     if (!(amount > 0)) throw new Error('Amount must be greater than zero.');
     const pending = this.pendingBalance();
     if (isGreaterCurrency(amount, pending)) {
-      throw new Error(
-        `Disposal cannot exceed the available balance of ₹${pending.toFixed(2)}.`,
-      );
+      throw new Error(`Disposal cannot exceed the available balance of ₹${pending.toFixed(2)}.`);
     }
 
     const occurredOn = input.occurred_on ?? todayIso();
@@ -269,15 +270,12 @@ export class InterestService {
    * first, so the whole amount is always covered (callers validate against
    * `pendingBalance` first).
    */
-  private allocateOldestFirst(
-    amount: number,
-  ): { entryId: string; amount: number }[] {
+  private allocateOldestFirst(amount: number): { entryId: string; amount: number }[] {
     const open = this._entries()
       .filter((entry) => this.remainingForEntry(entry) > 0)
       .sort(
         (a, b) =>
-          a.occurred_on.localeCompare(b.occurred_on) ||
-          a.created_at.localeCompare(b.created_at),
+          a.occurred_on.localeCompare(b.occurred_on) || a.created_at.localeCompare(b.created_at),
       );
 
     const allocations: { entryId: string; amount: number }[] = [];
@@ -292,11 +290,7 @@ export class InterestService {
     return allocations;
   }
 
-  private assertNoDuplicate(
-    bankAccountId: string,
-    occurredOn: string,
-    amount: number,
-  ): void {
+  private assertNoDuplicate(bankAccountId: string, occurredOn: string, amount: number): void {
     const duplicate = this._entries().some(
       (entry) =>
         entry.occurred_on === occurredOn &&
@@ -335,9 +329,7 @@ export class InterestService {
       .eq('id', entryId)
       .eq('owner_id', this.requireUserId());
     if (error) {
-      this._entries.update((list) =>
-        list.map((item) => (item.id === entryId ? previous : item)),
-      );
+      this._entries.update((list) => list.map((item) => (item.id === entryId ? previous : item)));
       console.error('Failed to sync interest entry stage', error);
     }
   }
@@ -376,11 +368,4 @@ function sumAmounts(values: number[]): number {
 
 function isDuplicateViolation(error: { code?: string }): boolean {
   return error.code === '23505';
-}
-
-function todayIso(): string {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-    date.getDate(),
-  ).padStart(2, '0')}`;
 }

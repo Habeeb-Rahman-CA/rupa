@@ -5,6 +5,7 @@ import { SupabaseService } from './supabase.service';
 import { TransactionsService } from './transactions.service';
 import { OfflineQueueService } from './offline-queue.service';
 import { isGreaterCurrency } from '../../shared/utils/currency-utils';
+import { todayIso } from '../../shared/utils/budget-utils';
 
 export type DebtTransactionImpact = 'default' | 'income' | 'expense' | 'none';
 
@@ -122,7 +123,9 @@ export class DebtsService {
       try {
         const { data, error } = await this.supabase.client
           .from('debts')
-          .select('*')
+          .select(
+            'id, owner_id, person_id, direction, principal, outstanding, reason, opened_on, closed_on, created_at',
+          )
           .order('opened_on', { ascending: false });
 
         if (error) {
@@ -412,14 +415,6 @@ export class DebtsService {
     if (!id) throw new Error('Not signed in.');
     return id;
   }
-}
-
-function todayIso(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 }
 
 function round2(n: number): number {

@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import {
   MAT_DIALOG_DATA,
   MatDialog,
@@ -10,9 +10,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { APP_ICONS } from '../lucide-icons';
 
 const REGISTERED_ICONS = new Set<string>(
-  Object.keys(APP_ICONS).map((k) =>
-    k.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase(),
-  ),
+  Object.keys(APP_ICONS).map((k) => k.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()),
 );
 
 export interface ConfirmDialogData {
@@ -32,14 +30,12 @@ export interface ConfirmDialogData {
 @Component({
   selector: 'app-confirm-dialog',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MatDialogModule, MatButtonModule, LucideAngularModule],
   template: `
     <div class="wrap">
       @if (resolvedIcon()) {
-        <div
-          class="icon"
-          [class.destructive]="data.destructive"
-        >
+        <div class="icon" [class.destructive]="data.destructive">
           <lucide-icon [name]="resolvedIcon()!" />
         </div>
       }
@@ -137,10 +133,7 @@ export class ConfirmDialogComponent {
 /**
  * Helper — call this instead of window.confirm().
  */
-export function openConfirm(
-  dialog: MatDialog,
-  data: ConfirmDialogData,
-): Promise<boolean> {
+export function openConfirm(dialog: MatDialog, data: ConfirmDialogData): Promise<boolean> {
   return new Promise((resolve) => {
     const ref = dialog.open<ConfirmDialogComponent, ConfirmDialogData, boolean>(
       ConfirmDialogComponent,

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatBottomSheetRef, MAT_BOTTOM_SHEET_DATA } from '@angular/material/bottom-sheet';
 import { MatButtonModule } from '@angular/material/button';
 import { LucideAngularModule } from 'lucide-angular';
@@ -19,6 +19,7 @@ export interface TransferSheetData {
 @Component({
   selector: 'app-transfer-sheet',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SheetDragCloseDirective,
     MatButtonModule,
@@ -119,34 +120,114 @@ export interface TransferSheetData {
           (click)="save()"
           [disabled]="!canSave() || submitting()"
         >
-          {{ submitting() ? 'Saving…' : (isEdit ? 'Save changes' : 'Transfer money') }}
+          {{ submitting() ? 'Saving…' : isEdit ? 'Save changes' : 'Transfer money' }}
         </button>
       </div>
     </div>
   `,
   styles: [
     `
-      .sheet { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px 20px; }
-      .sheet-header { display: flex; align-items: center; gap: 12px; margin-bottom: 2px; }
-      .header-icon { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border-radius: 13px; background: var(--app-accent-soft); color: var(--app-accent); }
-      .header-icon lucide-icon { width: 21px; height: 21px; }
-      h2 { margin: 0; color: var(--app-ink); font-size: 18px; font-weight: 700; }
-      .sheet-header p { margin: 3px 0 0; color: var(--app-ink-muted); font-size: 12px; line-height: 1.35; }
-      .notice, .save-error { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; font-size: 12px; line-height: 1.35; }
-      .notice { background: var(--app-accent-soft); color: var(--app-ink-muted); }
-      .save-error { background: var(--app-negative-soft); color: var(--app-negative); }
-      .notice lucide-icon, .save-error lucide-icon { width: 16px; height: 16px; flex: 0 0 auto; }
-      .direction-marker { display: flex; justify-content: center; height: 0; position: relative; z-index: 1; color: var(--app-accent); }
-      .direction-marker lucide-icon { width: 16px; height: 16px; padding: 3px; box-sizing: content-box; border-radius: 999px; background: var(--app-surface); border: 1px solid var(--app-hairline); }
-      .field-error { margin-top: -8px; color: var(--app-negative); font-size: 12px; }
-      .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
-      .actions button { border-radius: 999px; }
+      .sheet {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 18px 20px 20px;
+      }
+      .sheet-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 2px;
+      }
+      .header-icon {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        flex: 0 0 auto;
+        border-radius: 13px;
+        background: var(--app-accent-soft);
+        color: var(--app-accent);
+      }
+      .header-icon lucide-icon {
+        width: 21px;
+        height: 21px;
+      }
+      h2 {
+        margin: 0;
+        color: var(--app-ink);
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .sheet-header p {
+        margin: 3px 0 0;
+        color: var(--app-ink-muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .notice,
+      .save-error {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .notice {
+        background: var(--app-accent-soft);
+        color: var(--app-ink-muted);
+      }
+      .save-error {
+        background: var(--app-negative-soft);
+        color: var(--app-negative);
+      }
+      .notice lucide-icon,
+      .save-error lucide-icon {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+      }
+      .direction-marker {
+        display: flex;
+        justify-content: center;
+        height: 0;
+        position: relative;
+        z-index: 1;
+        color: var(--app-accent);
+      }
+      .direction-marker lucide-icon {
+        width: 16px;
+        height: 16px;
+        padding: 3px;
+        box-sizing: content-box;
+        border-radius: 999px;
+        background: var(--app-surface);
+        border: 1px solid var(--app-hairline);
+      }
+      .field-error {
+        margin-top: -8px;
+        color: var(--app-negative);
+        font-size: 12px;
+      }
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 2px;
+      }
+      .actions button {
+        border-radius: 999px;
+      }
     `,
   ],
 })
 export class TransferSheetComponent {
   private readonly ref = inject(MatBottomSheetRef<TransferSheetComponent>);
-  private readonly data = inject<TransferSheetData | null>(MAT_BOTTOM_SHEET_DATA, { optional: true });
+  private readonly data = inject<TransferSheetData | null>(MAT_BOTTOM_SHEET_DATA, {
+    optional: true,
+  });
   private readonly bankAccountsService = inject(BankAccountsService);
   private readonly transfersService = inject(TransfersService);
 
@@ -156,9 +237,13 @@ export class TransferSheetComponent {
   readonly touched = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly sourceAccountId = signal<string | null>(this.data?.transfer?.source_account_id ?? null);
-  readonly destinationAccountId = signal<string | null>(this.data?.transfer?.destination_account_id ?? null);
+  readonly destinationAccountId = signal<string | null>(
+    this.data?.transfer?.destination_account_id ?? null,
+  );
   readonly amount = signal<number | null>(this.data?.transfer?.amount ?? null);
-  readonly occurredDate = signal<Date | null>(parseIsoDate(this.data?.transfer?.occurred_on) ?? new Date());
+  readonly occurredDate = signal<Date | null>(
+    parseIsoDate(this.data?.transfer?.occurred_on) ?? new Date(),
+  );
   readonly notes = signal(this.data?.transfer?.notes ?? '');
 
   readonly accountOptions = computed<SelectOption<string>[]>(() =>

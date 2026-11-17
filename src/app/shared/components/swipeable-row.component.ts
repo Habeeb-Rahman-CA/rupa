@@ -1,4 +1,5 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   DestroyRef,
   EventEmitter,
@@ -12,6 +13,7 @@ import { LucideAngularModule } from 'lucide-angular';
 @Component({
   selector: 'app-swipeable-row',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule],
   template: `
     <div class="swipe-container">
@@ -77,7 +79,9 @@ import { LucideAngularModule } from 'lucide-angular';
         opacity: 0;
         visibility: hidden;
         pointer-events: none;
-        transition: opacity 0.15s ease, visibility 0.15s ease;
+        transition:
+          opacity 0.15s ease,
+          visibility 0.15s ease;
       }
       .swipe-back.visible {
         visibility: visible;
@@ -232,4 +236,3 @@ export class SwipeableRowComponent {
     this.translateX.set(0);
   }
 }
-

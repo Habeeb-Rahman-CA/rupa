@@ -1,4 +1,11 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DatePipe, UpperCasePipe, formatDate } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
@@ -7,10 +14,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
-import {
-  LineChartComponent,
-  ChartPoint,
-} from '../../shared/components/line-chart.component';
+import { LineChartComponent, ChartPoint } from '../../shared/components/line-chart.component';
 import {
   ReportDetailDialogComponent,
   ReportDetailData,
@@ -21,11 +25,20 @@ import { TransactionsService } from '../../core/services/transactions.service';
 import { CategoriesService } from '../../core/services/categories.service';
 import { DebtsService } from '../../core/services/debts.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
-import { SubscriptionsService, monthlyEquivalent, yearlyEquivalent } from '../../core/services/subscriptions.service';
+import {
+  SubscriptionsService,
+  monthlyEquivalent,
+  yearlyEquivalent,
+} from '../../core/services/subscriptions.service';
 import { WalletsService } from '../../core/services/wallets.service';
 import { MoneyHeldService, MoneyHeldBalance } from '../../core/services/money-held.service';
 import { PeopleService } from '../../core/services/people.service';
-import { Category, Transaction, isSavingsCategory, BankAccount } from '../../core/models/domain.models';
+import {
+  Category,
+  Transaction,
+  isSavingsCategory,
+  BankAccount,
+} from '../../core/models/domain.models';
 import { getCategoryColor, getCategoryIcon } from '../../shared/utils/category-utils';
 
 interface CategoryRow {
@@ -49,6 +62,7 @@ interface BankReportRow extends BankAccount {
 @Component({
   selector: 'app-reports-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink,
     DatePipe,
@@ -59,19 +73,11 @@ interface BankReportRow extends BankAccount {
     LineChartComponent,
   ],
   template: `
-    <app-page-header
-      title="Reports"
-      subtitle="A clear look at where your money moves"
-    />
+    <app-page-header title="Reports" subtitle="A clear look at where your money moves" />
 
     <!-- Month navigator -->
     <div class="month-nav">
-      <button
-        type="button"
-        class="nav-btn"
-        (click)="shiftMonth(-1)"
-        aria-label="Previous month"
-      >
+      <button type="button" class="nav-btn" (click)="shiftMonth(-1)" aria-label="Previous month">
         <lucide-icon name="chevron-left" />
       </button>
       <div class="nav-label">{{ monthDate() | date: 'MMMM y' }}</div>
@@ -166,24 +172,20 @@ interface BankReportRow extends BankAccount {
             ></div>
           </div>
           <div class="split-legend">
-            <button
-              type="button"
-              class="legend-item"
-              (click)="openPaymentModeDetail('bank')"
-            >
+            <button type="button" class="legend-item" (click)="openPaymentModeDetail('bank')">
               <span class="dot bank-dot"></span>
               <span class="legend-label">Bank Accounts</span>
-              <span class="legend-val">{{ bankVsCashMonthly().bankSpent | signedMoney: 'out' }}</span>
+              <span class="legend-val">{{
+                bankVsCashMonthly().bankSpent | signedMoney: 'out'
+              }}</span>
               <span class="legend-pct">({{ bankVsCashMonthly().bankPct }}%)</span>
             </button>
-            <button
-              type="button"
-              class="legend-item"
-              (click)="openPaymentModeDetail('cash')"
-            >
+            <button type="button" class="legend-item" (click)="openPaymentModeDetail('cash')">
               <span class="dot cash-dot"></span>
               <span class="legend-label">Cash</span>
-              <span class="legend-val">{{ bankVsCashMonthly().cashSpent | signedMoney: 'out' }}</span>
+              <span class="legend-val">{{
+                bankVsCashMonthly().cashSpent | signedMoney: 'out'
+              }}</span>
               <span class="legend-pct">({{ bankVsCashMonthly().cashPct }}%)</span>
             </button>
           </div>
@@ -206,11 +208,7 @@ interface BankReportRow extends BankAccount {
 
           <ul class="bank-accounts-list">
             @for (acc of bankAccountRows(); track acc.id; let last = $last) {
-              <li
-                class="bank-acc-row"
-                [class.last]="last"
-                (click)="openBankAccountDetail(acc)"
-              >
+              <li class="bank-acc-row" [class.last]="last" (click)="openBankAccountDetail(acc)">
                 <div class="bank-acc-info">
                   <div class="bank-icon-badge" [attr.data-theme]="acc.theme">
                     <lucide-icon name="credit-card" />
@@ -346,9 +344,7 @@ interface BankReportRow extends BankAccount {
         </ul>
       </section>
     } @else {
-      <div class="app-card placeholder">
-        No expenses this month.
-      </div>
+      <div class="app-card placeholder">No expenses this month.</div>
     }
 
     <!-- Biggest single days -->
@@ -406,7 +402,8 @@ interface BankReportRow extends BankAccount {
               <span class="micro-label">Monthly recurring</span>
               <span class="ob-value">{{ subscriptionMonthly() | signedMoney }}</span>
               <span class="ob-hint">
-                {{ activeSubscriptions().length }} active · {{ subscriptionYearly() | signedMoney }}/yr
+                {{ activeSubscriptions().length }} active ·
+                {{ subscriptionYearly() | signedMoney }}/yr
               </span>
             </button>
           }
@@ -417,7 +414,9 @@ interface BankReportRow extends BankAccount {
                 {{ renewalsThisMonth().amount | signedMoney: 'out' }}
               </span>
               <span class="ob-hint">
-                {{ renewalsThisMonth().count }} payment{{ renewalsThisMonth().count === 1 ? '' : 's' }}
+                {{ renewalsThisMonth().count }} payment{{
+                  renewalsThisMonth().count === 1 ? '' : 's'
+                }}
                 · {{ monthDate() | date: 'MMM y' }}
               </span>
             </button>
@@ -496,10 +495,15 @@ interface BankReportRow extends BankAccount {
         display: grid;
         place-items: center;
         cursor: pointer;
-        transition: background .15s ease;
+        transition: background 0.15s ease;
 
-        &:hover:not(:disabled) { background: var(--app-canvas); }
-        &:disabled { color: var(--app-ink-subtle); cursor: default; }
+        &:hover:not(:disabled) {
+          background: var(--app-canvas);
+        }
+        &:disabled {
+          color: var(--app-ink-subtle);
+          cursor: default;
+        }
       }
       .nav-label {
         font-weight: 600;
@@ -535,10 +539,16 @@ interface BankReportRow extends BankAccount {
         flex-direction: column;
         justify-content: center;
         min-width: 0;
-        transition: background .15s ease, transform .1s ease;
+        transition:
+          background 0.15s ease,
+          transform 0.1s ease;
 
-        &:hover { background: var(--app-hairline); }
-        &:active { transform: scale(0.98); }
+        &:hover {
+          background: var(--app-hairline);
+        }
+        &:active {
+          transform: scale(0.98);
+        }
       }
       .stat-value {
         margin-top: 6px;
@@ -607,7 +617,7 @@ interface BankReportRow extends BankAccount {
         text-decoration: none;
         padding: 4px 8px;
         border-radius: 6px;
-        transition: background .15s ease;
+        transition: background 0.15s ease;
 
         &:hover {
           background: var(--app-canvas);
@@ -633,7 +643,7 @@ interface BankReportRow extends BankAccount {
       }
       .split-bar-segment {
         height: 100%;
-        transition: width .3s ease;
+        transition: width 0.3s ease;
         cursor: pointer;
       }
       .bank-seg {
@@ -661,20 +671,34 @@ interface BankReportRow extends BankAccount {
         padding: 4px;
         margin: -4px;
         border-radius: 8px;
-        transition: background .15s ease;
+        transition: background 0.15s ease;
 
-        &:hover { background: var(--app-canvas); }
+        &:hover {
+          background: var(--app-canvas);
+        }
       }
       .dot {
         width: 8px;
         height: 8px;
         border-radius: 50%;
       }
-      .bank-dot { background: var(--app-ink-dark, #0f172a); }
-      .cash-dot { background: #94a3b8; }
-      .legend-label { color: var(--app-ink-muted); }
-      .legend-val { font-weight: 700; color: var(--app-ink); }
-      .legend-pct { font-size: 11px; color: var(--app-ink-subtle); }
+      .bank-dot {
+        background: var(--app-ink-dark, #0f172a);
+      }
+      .cash-dot {
+        background: #94a3b8;
+      }
+      .legend-label {
+        color: var(--app-ink-muted);
+      }
+      .legend-val {
+        font-weight: 700;
+        color: var(--app-ink);
+      }
+      .legend-pct {
+        font-size: 11px;
+        color: var(--app-ink-subtle);
+      }
 
       .bank-list-card {
         padding: 0;
@@ -691,9 +715,11 @@ interface BankReportRow extends BankAccount {
         padding: 12px 16px;
         border-bottom: 1px solid var(--app-hairline);
         cursor: pointer;
-        transition: background .15s ease;
+        transition: background 0.15s ease;
 
-        &:hover { background: var(--app-canvas); }
+        &:hover {
+          background: var(--app-canvas);
+        }
 
         @media (min-width: 480px) {
           flex-direction: row;
@@ -701,7 +727,9 @@ interface BankReportRow extends BankAccount {
           justify-content: space-between;
         }
       }
-      .bank-acc-row.last { border-bottom: 0; }
+      .bank-acc-row.last {
+        border-bottom: 0;
+      }
 
       .bank-acc-info {
         display: flex;
@@ -717,12 +745,24 @@ interface BankReportRow extends BankAccount {
         color: #fff;
         background: linear-gradient(135deg, #1e293b, #0f172a);
 
-        &[data-theme='emerald'] { background: linear-gradient(135deg, #059669, #047857); }
-        &[data-theme='purple'] { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
-        &[data-theme='rose'] { background: linear-gradient(135deg, #e11d48, #be123c); }
-        &[data-theme='amber'] { background: linear-gradient(135deg, #d97706, #b45309); }
-        &[data-theme='cyan'] { background: linear-gradient(135deg, #0891b2, #0e7490); }
-        &[data-theme='dark'] { background: linear-gradient(135deg, #27272a, #09090b); }
+        &[data-theme='emerald'] {
+          background: linear-gradient(135deg, #059669, #047857);
+        }
+        &[data-theme='purple'] {
+          background: linear-gradient(135deg, #7c3aed, #6d28d9);
+        }
+        &[data-theme='rose'] {
+          background: linear-gradient(135deg, #e11d48, #be123c);
+        }
+        &[data-theme='amber'] {
+          background: linear-gradient(135deg, #d97706, #b45309);
+        }
+        &[data-theme='cyan'] {
+          background: linear-gradient(135deg, #0891b2, #0e7490);
+        }
+        &[data-theme='dark'] {
+          background: linear-gradient(135deg, #27272a, #09090b);
+        }
 
         lucide-icon {
           width: 18px;
@@ -824,10 +864,16 @@ interface BankReportRow extends BankAccount {
         font-weight: 600;
         font-size: 13px;
         text-decoration: none;
-        transition: transform .1s ease, opacity .15s ease;
+        transition:
+          transform 0.1s ease,
+          opacity 0.15s ease;
 
-        &:hover { opacity: 0.9; }
-        &:active { transform: scale(0.97); }
+        &:hover {
+          opacity: 0.9;
+        }
+        &:active {
+          transform: scale(0.97);
+        }
 
         lucide-icon {
           width: 14px;
@@ -865,7 +911,8 @@ interface BankReportRow extends BankAccount {
       }
 
       /* ---------- Category breakdown --------------------------------- */
-      .cat-card { }
+      .cat-card {
+      }
       .cat-list {
         list-style: none;
         margin: 0;
@@ -879,11 +926,15 @@ interface BankReportRow extends BankAccount {
         padding: 14px 16px;
         border-bottom: 1px solid var(--app-hairline);
         cursor: pointer;
-        transition: background .15s ease;
+        transition: background 0.15s ease;
 
-        &:hover { background: var(--app-canvas); }
+        &:hover {
+          background: var(--app-canvas);
+        }
       }
-      .cat-row.last { border-bottom: 0; }
+      .cat-row.last {
+        border-bottom: 0;
+      }
       .cat-icon {
         width: 40px;
         height: 40px;
@@ -896,7 +947,9 @@ interface BankReportRow extends BankAccount {
         width: 22px;
         height: 22px;
       }
-      .cat-body { min-width: 0; }
+      .cat-body {
+        min-width: 0;
+      }
       .cat-head-row {
         display: flex;
         justify-content: space-between;
@@ -925,7 +978,7 @@ interface BankReportRow extends BankAccount {
         height: 100%;
         border-radius: 999px;
         min-width: 4px;
-        transition: width .3s ease;
+        transition: width 0.3s ease;
       }
       .cat-pct {
         margin-top: 4px;
@@ -946,11 +999,15 @@ interface BankReportRow extends BankAccount {
         padding: 12px 16px;
         border-bottom: 1px solid var(--app-hairline);
         cursor: pointer;
-        transition: background .15s ease;
+        transition: background 0.15s ease;
 
-        &:hover { background: var(--app-canvas); }
+        &:hover {
+          background: var(--app-canvas);
+        }
       }
-      .day-row.last { border-bottom: 0; }
+      .day-row.last {
+        border-bottom: 0;
+      }
       .day-label {
         font-size: 14px;
         color: var(--app-ink);
@@ -966,7 +1023,7 @@ interface BankReportRow extends BankAccount {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         gap: 12px;
-        margin-bottom: 18px
+        margin-bottom: 18px;
       }
       .ob-card {
         background: var(--app-surface);
@@ -981,11 +1038,15 @@ interface BankReportRow extends BankAccount {
         padding: 14px 16px;
         text-decoration: none;
         min-width: 0;
-        transition: transform .1s ease;
+        transition: transform 0.1s ease;
 
-        &:active { transform: scale(0.98); }
+        &:active {
+          transform: scale(0.98);
+        }
       }
-      .ob-card > span { display: block; }
+      .ob-card > span {
+        display: block;
+      }
       .ob-value {
         margin-top: 6px;
         font-size: clamp(16px, 4.5vw, 20px);
@@ -1006,12 +1067,21 @@ interface BankReportRow extends BankAccount {
         margin-bottom: 18px;
         padding: 16px 20px;
       }
-      .held-card-head, .held-title-wrap, .held-summary {
+      .held-card-head,
+      .held-title-wrap,
+      .held-summary {
         display: flex;
         align-items: center;
       }
-      .held-card-head, .held-summary { justify-content: space-between; gap: 12px; }
-      .held-title-wrap { gap: 10px; min-width: 0; }
+      .held-card-head,
+      .held-summary {
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .held-title-wrap {
+        gap: 10px;
+        min-width: 0;
+      }
       .held-badge {
         display: grid;
         place-items: center;
@@ -1021,30 +1091,97 @@ interface BankReportRow extends BankAccount {
         background: var(--app-accent-soft);
         color: var(--app-accent);
       }
-      .held-badge lucide-icon { width: 19px; height: 19px; }
+      .held-badge lucide-icon {
+        width: 19px;
+        height: 19px;
+      }
       .section-kicker {
         color: var(--app-ink-muted);
         font-size: 10.5px;
         font-weight: 600;
-        letter-spacing: .08em;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
       }
-      .held-card h2 { margin: 1px 0 0; color: var(--app-ink); font-size: 15px; font-weight: 600; }
-      .held-summary { margin-top: 16px; padding: 12px 0; border-top: 1px solid var(--app-hairline); border-bottom: 1px solid var(--app-hairline); cursor: pointer; transition: opacity .15s ease; }
-      .held-summary:hover { opacity: .75; }
-      .held-total { margin-top: 2px; color: var(--app-ink); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
-      .held-people-count { display: flex; flex-direction: column; align-items: flex-end; color: var(--app-ink-muted); font-size: 11px; }
-      .held-people-count strong { color: var(--app-ink); font-size: 18px; }
-      .held-people-list { list-style: none; margin: 0; padding: 0; }
-      .held-person-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--app-hairline); cursor: pointer; transition: opacity .15s ease; }
-      .held-person-row:hover { opacity: .75; }
-      .held-person-row:last-child { border-bottom: 0; padding-bottom: 0; }
-      .held-person-name { min-width: 0; overflow: hidden; color: var(--app-ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-      .held-person-balance { color: var(--app-positive); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-      .held-person-balance.settled { color: var(--app-ink-muted); }
+      .held-card h2 {
+        margin: 1px 0 0;
+        color: var(--app-ink);
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .held-summary {
+        margin-top: 16px;
+        padding: 12px 0;
+        border-top: 1px solid var(--app-hairline);
+        border-bottom: 1px solid var(--app-hairline);
+        cursor: pointer;
+        transition: opacity 0.15s ease;
+      }
+      .held-summary:hover {
+        opacity: 0.75;
+      }
+      .held-total {
+        margin-top: 2px;
+        color: var(--app-ink);
+        font-size: 22px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .held-people-count {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        color: var(--app-ink-muted);
+        font-size: 11px;
+      }
+      .held-people-count strong {
+        color: var(--app-ink);
+        font-size: 18px;
+      }
+      .held-people-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .held-person-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--app-hairline);
+        cursor: pointer;
+        transition: opacity 0.15s ease;
+      }
+      .held-person-row:hover {
+        opacity: 0.75;
+      }
+      .held-person-row:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+      .held-person-name {
+        min-width: 0;
+        overflow: hidden;
+        color: var(--app-ink);
+        font-size: 13px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .held-person-balance {
+        color: var(--app-positive);
+        font-size: 13px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .held-person-balance.settled {
+        color: var(--app-ink-muted);
+      }
 
       /* Clip row hover backgrounds to the card's rounded corners */
-      .app-card-tight { overflow: hidden; }
+      .app-card-tight {
+        overflow: hidden;
+      }
 
       .placeholder {
         color: var(--app-ink-muted);
@@ -1081,7 +1218,12 @@ export class ReportsPage {
         const [y, m] = latestIso.split('-').map(Number);
         const latestMonth = new Date(y, m - 1, 1);
         const nowMonth = startOfMonth(new Date());
-        if (latestMonth < nowMonth && this.monthly().spent === 0 && this.monthly().received === 0 && this.monthly().saved === 0) {
+        if (
+          latestMonth < nowMonth &&
+          this.monthly().spent === 0 &&
+          this.monthly().received === 0 &&
+          this.monthly().saved === 0
+        ) {
           this.monthDate.set(latestMonth);
         }
       }
@@ -1153,7 +1295,7 @@ export class ReportsPage {
       if (t.bank_account_id) {
         accountSpendMap.set(
           t.bank_account_id,
-          (accountSpendMap.get(t.bank_account_id) ?? 0) + Number(t.amount)
+          (accountSpendMap.get(t.bank_account_id) ?? 0) + Number(t.amount),
         );
       }
     }
@@ -1174,9 +1316,7 @@ export class ReportsPage {
   readonly trend = computed<ChartPoint[]>(() => {
     const anchor = this.monthDate();
     const buckets: ChartPoint[] = [];
-    const catsMap = new Map(
-      this.categoriesService.categories().map((c) => [c.id, c.kind]),
-    );
+    const catsMap = new Map(this.categoriesService.categories().map((c) => [c.id, c.kind]));
 
     for (let i = 11; i >= 0; i--) {
       const d = new Date(anchor.getFullYear(), anchor.getMonth() - i, 1);
@@ -1269,9 +1409,10 @@ export class ReportsPage {
       if (t.direction !== 'out' || !t.occurred_on || !t.occurred_on.startsWith(prefix)) continue;
       const cat = t.category_id ? catMap.get(t.category_id) : undefined;
       if (isSavingsCategory(cat)) continue;
-       const key = t.source === 'wallet_spend'
-         ? '__wallet_spending__'
-         : (t.category_id ?? '__uncategorized__');
+      const key =
+        t.source === 'wallet_spend'
+          ? '__wallet_spending__'
+          : (t.category_id ?? '__uncategorized__');
       const amt = Number(t.amount);
       totals.set(key, (totals.get(key) ?? 0) + amt);
       sum += amt;
@@ -1281,7 +1422,8 @@ export class ReportsPage {
     return [...totals.entries()]
       .map(([id, amount]) => {
         const cat = catMap.get(id);
-         const name = id === '__wallet_spending__' ? 'Wallet spending' : (cat?.name ?? 'Uncategorized');
+        const name =
+          id === '__wallet_spending__' ? 'Wallet spending' : (cat?.name ?? 'Uncategorized');
         return {
           id,
           name,
@@ -1329,14 +1471,16 @@ export class ReportsPage {
 
   readonly subscriptionMonthly = computed(() =>
     this.activeSubscriptions().reduce(
-      (total, subscription) => total + monthlyEquivalent(subscription.amount, subscription.billing_cycle),
+      (total, subscription) =>
+        total + monthlyEquivalent(subscription.amount, subscription.billing_cycle),
       0,
     ),
   );
 
   readonly subscriptionYearly = computed(() =>
     this.activeSubscriptions().reduce(
-      (total, subscription) => total + yearlyEquivalent(subscription.amount, subscription.billing_cycle),
+      (total, subscription) =>
+        total + yearlyEquivalent(subscription.amount, subscription.billing_cycle),
       0,
     ),
   );
@@ -1360,7 +1504,9 @@ export class ReportsPage {
 
   readonly walletHint = computed(() => {
     const wallets = this.walletsService.wallets();
-    const low = wallets.filter((w) => w.minimum_balance > 0 && w.balance <= w.minimum_balance).length;
+    const low = wallets.filter(
+      (w) => w.minimum_balance > 0 && w.balance <= w.minimum_balance,
+    ).length;
     const base = `${wallets.length} wallet${wallets.length === 1 ? '' : 's'}`;
     return low > 0 ? `${base} · ${low} low balance` : base;
   });
@@ -1372,9 +1518,7 @@ export class ReportsPage {
       this.wallets().length > 0,
   );
 
-  readonly hasHoldings = computed(
-    () => this.hasGridCards() || this.moneyHeldPeople() > 0,
-  );
+  readonly hasHoldings = computed(() => this.hasGridCards() || this.moneyHeldPeople() > 0);
 
   shiftMonth(delta: number): void {
     const cur = this.monthDate();
@@ -1408,8 +1552,18 @@ export class ReportsPage {
 
     const totals = this.monthly();
     const conf = {
-      spent: { title: 'Spent', total: totals.spent, totalTone: 'out' as const, totalLabel: 'Total spent' },
-      received: { title: 'Received', total: totals.received, totalTone: 'in' as const, totalLabel: 'Total received' },
+      spent: {
+        title: 'Spent',
+        total: totals.spent,
+        totalTone: 'out' as const,
+        totalLabel: 'Total spent',
+      },
+      received: {
+        title: 'Received',
+        total: totals.received,
+        totalTone: 'in' as const,
+        totalLabel: 'Total received',
+      },
       saved: { title: 'Saved', total: totals.saved, totalTone: null, totalLabel: 'Net saved' },
       net: { title: 'Net Cash', total: totals.net, totalTone: null, totalLabel: 'Net this month' },
     }[kind];
@@ -1614,9 +1768,7 @@ export class ReportsPage {
       id: w.id,
       title: w.name,
       meta:
-        w.minimum_balance > 0 && Number(w.balance) <= w.minimum_balance
-          ? 'Low balance'
-          : undefined,
+        w.minimum_balance > 0 && Number(w.balance) <= w.minimum_balance ? 'Low balance' : undefined,
       amount: Number(w.balance),
       tone: null,
     }));
@@ -1719,12 +1871,14 @@ export class ReportsPage {
   /** All non-transfer transactions of the selected month (mirrors monthly()). */
   private monthTx(): Transaction[] {
     const prefix = this.monthPrefix();
-    return this.txService.transactions().filter(
-      (t) =>
-        t.source !== 'transfer' &&
-        t.source !== 'wallet_recharge' &&
-        t.occurred_on.startsWith(prefix),
-    );
+    return this.txService
+      .transactions()
+      .filter(
+        (t) =>
+          t.source !== 'transfer' &&
+          t.source !== 'wallet_recharge' &&
+          t.occurred_on.startsWith(prefix),
+      );
   }
 
   /** Outgoing, non-savings month expenses (mirrors categoryRows/topDays). */
@@ -1739,13 +1893,15 @@ export class ReportsPage {
 
   /** Grouping key used by categoryRows(). */
   private categoryKey(t: Transaction): string {
-    return t.source === 'wallet_spend' ? '__wallet_spending__' : t.category_id ?? '__uncategorized__';
+    return t.source === 'wallet_spend'
+      ? '__wallet_spending__'
+      : (t.category_id ?? '__uncategorized__');
   }
 
   private txRow(t: Transaction, catMap: Map<string, Category>): ReportDetailRow {
     const cat = t.category_id ? catMap.get(t.category_id) : undefined;
     const fallback =
-      t.source === 'wallet_spend' ? 'Wallet spending' : cat?.name ?? 'Uncategorized';
+      t.source === 'wallet_spend' ? 'Wallet spending' : (cat?.name ?? 'Uncategorized');
     return {
       id: t.id,
       title: t.notes?.trim() || fallback,

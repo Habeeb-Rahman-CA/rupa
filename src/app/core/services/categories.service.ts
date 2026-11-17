@@ -90,7 +90,7 @@ export class CategoriesService {
       try {
         const { data, error } = await this.supabase.client
           .from('categories')
-          .select('*')
+          .select('id, owner_id, name, kind, created_at')
           .order('kind', { ascending: true })
           .order('name', { ascending: true });
 

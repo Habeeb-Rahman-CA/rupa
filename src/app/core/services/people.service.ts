@@ -71,7 +71,7 @@ export class PeopleService {
       try {
         const { data, error } = await this.supabase.client
           .from('people')
-          .select('*')
+          .select('id, owner_id, name, phone, notes, created_at')
           .order('name', { ascending: true });
 
         if (error) {

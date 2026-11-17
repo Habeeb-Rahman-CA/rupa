@@ -52,7 +52,9 @@ export class BankAccountsService {
 
         const { data, error } = await this.supabase.client
           .from('bank_accounts')
-          .select('*')
+          .select(
+            'id, owner_id, bank_name, account_name, card_type, payment_network, card_number_masked, expiry_date, cardholder_name, account_number_masked, ifsc_code, balance, credit_limit, theme, is_primary, created_at',
+          )
           .eq('owner_id', ownerId)
           .order('created_at', { ascending: false });
 
@@ -86,7 +88,9 @@ export class BankAccountsService {
 
           const refreshed = await this.supabase.client
             .from('bank_accounts')
-            .select('*')
+            .select(
+              'id, owner_id, bank_name, account_name, card_type, payment_network, card_number_masked, expiry_date, cardholder_name, account_number_masked, ifsc_code, balance, credit_limit, theme, is_primary, created_at',
+            )
             .eq('owner_id', ownerId)
             .order('created_at', { ascending: false });
           if (refreshed.error) {
@@ -336,10 +340,7 @@ export class BankAccountsService {
         const parsed = JSON.parse(local) as BankAccount[];
         if (Array.isArray(parsed)) {
           return parsed.filter(
-            (c) =>
-              !!c?.id &&
-              !c.id.startsWith('demo_card_') &&
-              !c.id.startsWith('sample_card_'),
+            (c) => !!c?.id && !c.id.startsWith('demo_card_') && !c.id.startsWith('sample_card_'),
           );
         }
       }
@@ -361,7 +362,10 @@ export class BankAccountsService {
 
   private hasLegacyStorage(userId: string): boolean {
     try {
-      return typeof localStorage !== 'undefined' && localStorage.getItem(legacyStorageKey(userId)) !== null;
+      return (
+        typeof localStorage !== 'undefined' &&
+        localStorage.getItem(legacyStorageKey(userId)) !== null
+      );
     } catch {
       return false;
     }
@@ -381,7 +385,8 @@ function generateUniqueId(prefix = 'card'): string {
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
   }
   const ts = Date.now().toString(36);
-  const perf = typeof performance !== 'undefined' ? performance.now().toString(36).replace('.', '') : '';
+  const perf =
+    typeof performance !== 'undefined' ? performance.now().toString(36).replace('.', '') : '';
   const rand1 = Math.random().toString(36).substring(2, 10);
   const rand2 = Math.random().toString(36).substring(2, 10);
   return `${prefix}_${ts}_${perf}_${rand1}${rand2}`;

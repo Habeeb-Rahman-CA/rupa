@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -23,6 +23,7 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
 @Component({
   selector: 'app-interest-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe,
     MatButtonModule,
@@ -35,10 +36,7 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
     SignedMoneyPipe,
   ],
   template: `
-    <app-page-header
-      title="Interest"
-      subtitle="Bank interest kept separate from income"
-    >
+    <app-page-header title="Interest" subtitle="Bank interest kept separate from income">
       <button
         class="guide-btn"
         type="button"
@@ -87,10 +85,9 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
         </div>
         <div class="balance-side">
           <span class="micro-label">To dispose</span>
-          <strong
-            class="balance-pending"
-            [class.is-zero]="pendingBalance() <= 0"
-          >{{ pendingBalance() | signedMoney }}</strong>
+          <strong class="balance-pending" [class.is-zero]="pendingBalance() <= 0">{{
+            pendingBalance() | signedMoney
+          }}</strong>
         </div>
       </section>
 
@@ -109,7 +106,9 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
       <!-- INTEREST ENTRIES -->
       <section class="list-head" aria-label="Interest received">
         <h2>Interest received</h2>
-        <span class="count">{{ entries().length }} entr{{ entries().length === 1 ? 'y' : 'ies' }}</span>
+        <span class="count"
+          >{{ entries().length }} entr{{ entries().length === 1 ? 'y' : 'ies' }}</span
+        >
       </section>
 
       <ul class="entry-list">
@@ -121,7 +120,9 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
                 <h3>{{ bankLabel(entry.bank_account_id) }}</h3>
                 <span class="entry-meta">
                   {{ entry.occurred_on | date: 'MMM d, y' }}
-                  @if (entry.notes) { · {{ entry.notes }} }
+                  @if (entry.notes) {
+                    · {{ entry.notes }}
+                  }
                 </span>
                 @if (disposedFor(entry) > 0) {
                   <span class="status-chip" [class.done]="remainingFor(entry) <= 0">
@@ -160,7 +161,10 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
         font-size: 13px;
         font-weight: 600;
       }
-      .add-btn lucide-icon { width: 17px; height: 17px; }
+      .add-btn lucide-icon {
+        width: 17px;
+        height: 17px;
+      }
       .guide-btn {
         display: inline-grid;
         place-items: center;
@@ -173,11 +177,27 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
         color: var(--app-ink-muted);
         cursor: pointer;
       }
-      .guide-btn:hover { color: var(--app-accent); border-color: var(--app-accent); }
-      .guide-btn lucide-icon { width: 17px; height: 17px; }
-      .empty-actions { display: flex; justify-content: center; margin-top: 16px; }
-      .empty-actions button { border-radius: 999px; }
-      .empty-actions lucide-icon { width: 17px; height: 17px; margin-right: 5px; }
+      .guide-btn:hover {
+        color: var(--app-accent);
+        border-color: var(--app-accent);
+      }
+      .guide-btn lucide-icon {
+        width: 17px;
+        height: 17px;
+      }
+      .empty-actions {
+        display: flex;
+        justify-content: center;
+        margin-top: 16px;
+      }
+      .empty-actions button {
+        border-radius: 999px;
+      }
+      .empty-actions lucide-icon {
+        width: 17px;
+        height: 17px;
+        margin-right: 5px;
+      }
 
       /* Totals */
       .balance-card {
@@ -188,7 +208,12 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
         margin-bottom: 12px;
         padding: 16px;
       }
-      .balance-main { display: flex; align-items: center; gap: 12px; min-width: 0; }
+      .balance-main {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
       .balance-icon {
         display: grid;
         place-items: center;
@@ -199,8 +224,16 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
         background: var(--app-accent-soft);
         color: var(--app-accent);
       }
-      .balance-icon lucide-icon { width: 19px; height: 19px; }
-      .balance-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .balance-icon lucide-icon {
+        width: 19px;
+        height: 19px;
+      }
+      .balance-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+      }
       .balance-total {
         color: var(--app-ink);
         font-size: 24px;
@@ -208,7 +241,13 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
         font-variant-numeric: tabular-nums;
         line-height: 1.1;
       }
-      .balance-side { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex: 0 0 auto; }
+      .balance-side {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 3px;
+        flex: 0 0 auto;
+      }
       .balance-pending {
         color: var(--app-ink);
         font-size: 17px;
@@ -216,7 +255,10 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
         font-variant-numeric: tabular-nums;
         line-height: 1.1;
       }
-      .balance-pending.is-zero { color: var(--app-ink-muted); font-weight: 600; }
+      .balance-pending.is-zero {
+        color: var(--app-ink-muted);
+        font-weight: 600;
+      }
 
       .dispose-btn {
         width: 100%;
@@ -226,8 +268,14 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
         font-size: 14px;
         font-weight: 600;
       }
-      .dispose-btn lucide-icon { width: 17px; height: 17px; margin-right: 7px; }
-      .dispose-btn:disabled { opacity: .5; }
+      .dispose-btn lucide-icon {
+        width: 17px;
+        height: 17px;
+        margin-right: 7px;
+      }
+      .dispose-btn:disabled {
+        opacity: 0.5;
+      }
 
       /* Entries */
       .list-head {
@@ -243,7 +291,10 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
         font-size: 15px;
         font-weight: 700;
       }
-      .list-head .count { color: var(--app-ink-muted); font-size: 12px; }
+      .list-head .count {
+        color: var(--app-ink-muted);
+        font-size: 12px;
+      }
       .entry-list {
         list-style: none;
         margin: 0 0 16px 0;
@@ -272,8 +323,17 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
         background: var(--app-accent-soft);
         color: var(--app-accent);
       }
-      .entry-icon lucide-icon { width: 19px; height: 19px; }
-      .entry-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 auto; }
+      .entry-icon lucide-icon {
+        width: 19px;
+        height: 19px;
+      }
+      .entry-main {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+        flex: 1 1 auto;
+      }
       .entry-main h3 {
         margin: 0;
         overflow: hidden;
@@ -303,12 +363,18 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
         color: var(--app-ink-muted);
         font-size: 10.5px;
         font-weight: 700;
-        letter-spacing: .03em;
+        letter-spacing: 0.03em;
         white-space: nowrap;
         font-variant-numeric: tabular-nums;
       }
-      .status-chip.done { background: var(--app-positive-soft, rgba(16, 163, 127, .12)); color: var(--app-positive); }
-      .status-chip lucide-icon { width: 11px; height: 11px; }
+      .status-chip.done {
+        background: var(--app-positive-soft, rgba(16, 163, 127, 0.12));
+        color: var(--app-positive);
+      }
+      .status-chip lucide-icon {
+        width: 11px;
+        height: 11px;
+      }
       .entry-amount {
         color: var(--app-positive);
         font-size: 17px;
@@ -318,14 +384,28 @@ import { RibaGuideDialogComponent } from './riba-guide-dialog.component';
       }
 
       @media (max-width: 640px) {
-        .add-btn span { display: none; }
-        .add-btn { width: 40px; justify-content: center; padding: 0; }
+        .add-btn span {
+          display: none;
+        }
+        .add-btn {
+          width: 40px;
+          justify-content: center;
+          padding: 0;
+        }
       }
       @media (max-width: 480px) {
-        .balance-card { padding: 14px; }
-        .balance-total { font-size: 21px; }
-        .balance-pending { font-size: 15px; }
-        .entry-amount { font-size: 16px; }
+        .balance-card {
+          padding: 14px;
+        }
+        .balance-total {
+          font-size: 21px;
+        }
+        .balance-pending {
+          font-size: 15px;
+        }
+        .entry-amount {
+          font-size: 16px;
+        }
       }
     `,
   ],

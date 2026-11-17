@@ -1,4 +1,11 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -23,6 +30,7 @@ export interface PayDebtDialogData {
 @Component({
   selector: 'app-pay-debt-dialog',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     MatDialogModule,
     MatButtonModule,
@@ -95,7 +103,9 @@ export interface PayDebtDialogData {
             <div class="no-bank-notice">
               <lucide-icon name="alert-circle" />
               <span>No bank accounts added yet.</span>
-              <button type="button" class="link-btn" (click)="openBankAccounts()">Add Account</button>
+              <button type="button" class="link-btn" (click)="openBankAccounts()">
+                Add Account
+              </button>
             </div>
           }
         }
@@ -111,7 +121,15 @@ export interface PayDebtDialogData {
 
       <!-- Actions Footer -->
       <mat-dialog-actions align="end" class="dialog-actions">
-        <button mat-button type="button" (click)="close()" [disabled]="submitting()" class="cancel-btn">Cancel</button>
+        <button
+          mat-button
+          type="button"
+          (click)="close()"
+          [disabled]="submitting()"
+          class="cancel-btn"
+        >
+          Cancel
+        </button>
         <button
           mat-flat-button
           color="primary"
@@ -215,7 +233,9 @@ export interface PayDebtDialogData {
         font-weight: 600;
         cursor: pointer;
       }
-      .link-btn:hover { text-decoration: underline; }
+      .link-btn:hover {
+        text-decoration: underline;
+      }
       .dialog-actions {
         padding-top: 12px;
       }
@@ -248,7 +268,9 @@ export class PayDebtDialogComponent {
   readonly bankAccountOptions = computed<SelectOption[]>(() => {
     return this.bankAccountsService.bankAccounts().map((acc) => ({
       value: acc.id,
-      label: acc.is_primary ? `${acc.bank_name} (${acc.account_name}) ★` : `${acc.bank_name} (${acc.account_name})`,
+      label: acc.is_primary
+        ? `${acc.bank_name} (${acc.account_name}) ★`
+        : `${acc.bank_name} (${acc.account_name})`,
       icon: 'landmark',
     }));
   });
@@ -285,7 +307,11 @@ export class PayDebtDialogComponent {
   readonly canSave = computed(() => {
     const a = this.amount();
     if (!a || a <= 0) return false;
-    if (this.paymentMode() === 'bank' && this.bankAccountOptions().length > 0 && !this.selectedBankAccountId()) {
+    if (
+      this.paymentMode() === 'bank' &&
+      this.bankAccountOptions().length > 0 &&
+      !this.selectedBankAccountId()
+    ) {
       return false;
     }
     return isLessOrEqualCurrency(a, Number(this.data.debt.outstanding));
@@ -312,7 +338,9 @@ export class PayDebtDialogComponent {
       this.snack.open('Payment recorded.', undefined, { duration: 2000 });
       this.ref.close({ saved: true });
     } catch (e: unknown) {
-      this.snack.open(errorText(e, 'Couldn’t save — please try again.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(errorText(e, 'Couldn’t save — please try again.'), 'Dismiss', {
+        duration: 4000,
+      });
       this.submitting.set(false);
     }
   }

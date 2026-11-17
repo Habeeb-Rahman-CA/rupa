@@ -5,12 +5,19 @@ import { AuthService } from './auth.service';
 import { CategoriesService } from './categories.service';
 import { SupabaseService } from './supabase.service';
 import { TransactionsService } from './transactions.service';
-import { CardTheme, PaymentMode, Wallet, WalletTransaction, WalletTransactionKind } from '../models/domain.models';
+import {
+  CardTheme,
+  PaymentMode,
+  Wallet,
+  WalletTransaction,
+  WalletTransactionKind,
+} from '../models/domain.models';
 import { roundCurrency } from '../../shared/utils/currency-utils';
 import {
   WALLET_SPENDING_CATEGORY_NAME,
   isWalletSpendingCategory,
 } from '../../shared/utils/category-utils';
+import { todayIso } from '../../shared/utils/budget-utils';
 
 export interface CreateWalletInput {
   name: string;
@@ -82,10 +89,17 @@ export class WalletsService {
     this.loadPromise = (async () => {
       try {
         const [walletResult, transactionResult] = await Promise.all([
-          this.supabase.client.from('wallets').select('*').order('created_at', { ascending: false }),
+          this.supabase.client
+            .from('wallets')
+            .select(
+              'id, owner_id, name, theme, initial_balance, balance, minimum_balance, created_at',
+            )
+            .order('created_at', { ascending: false }),
           this.supabase.client
             .from('wallet_transactions')
-            .select('*')
+            .select(
+              'id, owner_id, wallet_id, kind, amount, occurred_on, category_id, funding_mode, bank_account_id, notes, debit_transaction_id, credit_transaction_id, created_at',
+            )
             .order('occurred_on', { ascending: false })
             .order('created_at', { ascending: false }),
         ]);
@@ -195,10 +209,10 @@ export class WalletsService {
       p_amount: roundCurrency(input.amount),
       p_occurred_on: input.occurred_on ?? todayIso(),
       p_category_id: input.kind === 'spend' ? await this.walletSpendingCategoryId() : null,
-      p_funding_mode: input.kind === 'recharge' ? input.funding_mode ?? null : null,
+      p_funding_mode: input.kind === 'recharge' ? (input.funding_mode ?? null) : null,
       p_bank_account_id:
         input.kind === 'recharge' && input.funding_mode === 'bank'
-          ? input.bank_account_id ?? null
+          ? (input.bank_account_id ?? null)
           : null,
       p_notes: input.notes?.trim() || null,
     });
@@ -223,10 +237,10 @@ export class WalletsService {
       p_amount: roundCurrency(input.amount),
       p_occurred_on: input.occurred_on ?? todayIso(),
       p_category_id: input.kind === 'spend' ? await this.walletSpendingCategoryId() : null,
-      p_funding_mode: input.kind === 'recharge' ? input.funding_mode ?? null : null,
+      p_funding_mode: input.kind === 'recharge' ? (input.funding_mode ?? null) : null,
       p_bank_account_id:
         input.kind === 'recharge' && input.funding_mode === 'bank'
-          ? input.bank_account_id ?? null
+          ? (input.bank_account_id ?? null)
           : null,
       p_notes: input.notes?.trim() || null,
     });
@@ -269,10 +283,7 @@ export class WalletsService {
     if (existing) return existing;
 
     try {
-      const created = await this.categoriesService.create(
-        WALLET_SPENDING_CATEGORY_NAME,
-        'expense',
-      );
+      const created = await this.categoriesService.create(WALLET_SPENDING_CATEGORY_NAME, 'expense');
       return created?.id ?? findId();
     } catch (err) {
       console.error('Could not ensure the Wallet spending category', err);
@@ -319,14 +330,21 @@ export class WalletsService {
         current?.kind === 'recharge' && current.bank_account_id === input.bank_account_id
           ? Number(current.amount)
           : 0;
-      if (!account || Number(account.balance ?? 0) + restoredAmount + 0.000001 < Number(input.amount)) {
+      if (
+        !account ||
+        Number(account.balance ?? 0) + restoredAmount + 0.000001 < Number(input.amount)
+      ) {
         throw new Error('Insufficient balance in the selected bank account.');
       }
     }
   }
 
   private async refreshDependents(): Promise<void> {
-    await Promise.all([this.load(), this.bankAccountsService.load(), this.transactionsService.refresh()]);
+    await Promise.all([
+      this.load(),
+      this.bankAccountsService.load(),
+      this.transactionsService.refresh(),
+    ]);
   }
 
   private ensureAvailable(): void {
@@ -399,21 +417,15 @@ export class WalletsService {
 }
 
 function isWalletTheme(value: unknown): value is CardTheme {
-  return value === 'blue'
-    || value === 'purple'
-    || value === 'dark'
-    || value === 'emerald'
-    || value === 'sunset'
-    || value === 'gold'
-    || value === 'rose';
-}
-
-function todayIso(): string {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return (
+    value === 'blue' ||
+    value === 'purple' ||
+    value === 'dark' ||
+    value === 'emerald' ||
+    value === 'sunset' ||
+    value === 'gold' ||
+    value === 'rose'
+  );
 }
 
 function generateUuid(): string {

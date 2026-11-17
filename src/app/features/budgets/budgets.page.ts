@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -29,6 +29,7 @@ function monthRange(year: number, month: number): { start: string; end: string }
 @Component({
   selector: 'app-budgets-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe,
     MatButtonModule,
@@ -76,7 +77,9 @@ function monthRange(year: number, month: number): { start: string; end: string }
               <span class="micro-label">Current budgets</span>
               <h2>Overall usage</h2>
             </div>
-            <span class="figure-pct" [attr.data-tone]="overview().tone">{{ overview().percent }}%</span>
+            <span class="figure-pct" [attr.data-tone]="overview().tone"
+              >{{ overview().percent }}%</span
+            >
           </div>
 
           <div class="overview-figures">
@@ -130,7 +133,9 @@ function monthRange(year: number, month: number): { start: string; end: string }
                   <span class="item-meta">
                     {{ row.budget.start_date | date: 'MMM d' }} –
                     {{ row.budget.end_date | date: 'MMM d, y' }}
-                    @if (row.budget.recurring) { · repeats }
+                    @if (row.budget.recurring) {
+                      · repeats
+                    }
                   </span>
                 </div>
                 <div class="item-actions">
@@ -212,7 +217,9 @@ function monthRange(year: number, month: number): { start: string; end: string }
                   <span class="item-meta">
                     {{ row.budget.start_date | date: 'MMM d' }} –
                     {{ row.budget.end_date | date: 'MMM d, y' }}
-                    @if (row.budget.recurring) { · repeats }
+                    @if (row.budget.recurring) {
+                      · repeats
+                    }
                   </span>
                 </div>
                 <div class="item-actions">
@@ -339,7 +346,9 @@ function monthRange(year: number, month: number): { start: string; end: string }
   `,
   styles: [
     `
-      .budget-card + .budget-card { margin-top: 16px; }
+      .budget-card + .budget-card {
+        margin-top: 16px;
+      }
 
       .over-banner {
         display: flex;
@@ -353,7 +362,11 @@ function monthRange(year: number, month: number): { start: string; end: string }
         font-size: 13px;
         font-weight: 600;
       }
-      .over-banner lucide-icon { width: 17px; height: 17px; flex: 0 0 auto; }
+      .over-banner lucide-icon {
+        width: 17px;
+        height: 17px;
+        flex: 0 0 auto;
+      }
 
       .section-heading {
         display: flex;
@@ -410,16 +423,25 @@ function monthRange(year: number, month: number): { start: string; end: string }
         background: var(--app-accent);
         transition: width 0.35s ease;
       }
-      .progress-fill[data-tone='warning'] { background: #f59e0b; }
-      .progress-fill[data-tone='over'] { background: var(--app-negative); }
+      .progress-fill[data-tone='warning'] {
+        background: #f59e0b;
+      }
+      .progress-fill[data-tone='over'] {
+        background: var(--app-negative);
+      }
 
       /* -------------------------------------------------------- budget item */
       .budget-item {
         padding: 14px 0;
         border-top: 1px solid var(--app-hairline);
       }
-      .section-heading + .budget-item { border-top: 0; padding-top: 0; }
-      .budget-item:last-child { padding-bottom: 0; }
+      .section-heading + .budget-item {
+        border-top: 0;
+        padding-top: 0;
+      }
+      .budget-item:last-child {
+        padding-bottom: 0;
+      }
 
       .item-head {
         display: flex;
@@ -434,8 +456,14 @@ function monthRange(year: number, month: number): { start: string; end: string }
         flex: 0 0 auto;
         border-radius: 12px;
       }
-      .item-icon lucide-icon { width: 18px; height: 18px; }
-      .item-title { min-width: 0; flex: 1 1 auto; }
+      .item-icon lucide-icon {
+        width: 18px;
+        height: 18px;
+      }
+      .item-title {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
       .item-name {
         display: block;
         color: var(--app-ink);
@@ -451,7 +479,11 @@ function monthRange(year: number, month: number): { start: string; end: string }
         color: var(--app-ink-muted);
         font-size: 11.5px;
       }
-      .item-actions { display: flex; gap: 2px; flex: 0 0 auto; }
+      .item-actions {
+        display: flex;
+        gap: 2px;
+        flex: 0 0 auto;
+      }
 
       .row-btn {
         width: 32px;
@@ -459,8 +491,13 @@ function monthRange(year: number, month: number): { start: string; end: string }
         padding: 0;
         color: var(--app-ink-subtle);
       }
-      .row-btn lucide-icon { width: 15px; height: 15px; }
-      .row-btn.danger:hover { color: var(--app-negative); }
+      .row-btn lucide-icon {
+        width: 15px;
+        height: 15px;
+      }
+      .row-btn.danger:hover {
+        color: var(--app-negative);
+      }
 
       .item-figures {
         display: flex;
@@ -489,10 +526,18 @@ function monthRange(year: number, month: number): { start: string; end: string }
         font-weight: 700;
         font-variant-numeric: tabular-nums;
       }
-      .figure-pct[data-tone='warning'] { background: rgba(245, 158, 11, 0.15); color: #b45309; }
-      .figure-pct[data-tone='over'] { background: var(--app-negative-soft); color: var(--app-negative); }
+      .figure-pct[data-tone='warning'] {
+        background: rgba(245, 158, 11, 0.15);
+        color: #b45309;
+      }
+      .figure-pct[data-tone='over'] {
+        background: var(--app-negative-soft);
+        color: var(--app-negative);
+      }
 
-      .budget-item .progress-track { margin-top: 10px; }
+      .budget-item .progress-track {
+        margin-top: 10px;
+      }
 
       .item-foot {
         display: flex;
@@ -511,8 +556,14 @@ function monthRange(year: number, month: number): { start: string; end: string }
         color: var(--app-negative);
         font-weight: 600;
       }
-      .overspend-text lucide-icon { width: 14px; height: 14px; }
-      .warn-text { color: #b45309; font-weight: 600; }
+      .overspend-text lucide-icon {
+        width: 14px;
+        height: 14px;
+      }
+      .warn-text {
+        color: #b45309;
+        font-weight: 600;
+      }
 
       /* ----------------------------------------------------- monthly compare */
       .cmp-row {
@@ -541,7 +592,9 @@ function monthRange(year: number, month: number): { start: string; end: string }
         background: var(--app-accent);
         transition: width 0.35s ease;
       }
-      .cmp-row:last-of-type .cmp-fill { background: var(--app-ink-subtle); }
+      .cmp-row:last-of-type .cmp-fill {
+        background: var(--app-ink-subtle);
+      }
       .cmp-value {
         width: 78px;
         flex: 0 0 auto;
@@ -557,8 +610,12 @@ function monthRange(year: number, month: number): { start: string; end: string }
         font-size: 12.5px;
         font-weight: 600;
       }
-      .cmp-delta.up { color: var(--app-negative); }
-      .cmp-delta.down { color: var(--app-positive); }
+      .cmp-delta.up {
+        color: var(--app-negative);
+      }
+      .cmp-delta.down {
+        color: var(--app-positive);
+      }
 
       /* ------------------------------------------------------------- history */
       .history-row {
@@ -568,9 +625,17 @@ function monthRange(year: number, month: number): { start: string; end: string }
         padding: 11px 0;
         border-top: 1px solid var(--app-hairline);
       }
-      .section-heading + .history-row { border-top: 0; padding-top: 0; }
-      .history-row:last-child { padding-bottom: 0; }
-      .history-copy { min-width: 0; flex: 1 1 auto; }
+      .section-heading + .history-row {
+        border-top: 0;
+        padding-top: 0;
+      }
+      .history-row:last-child {
+        padding-bottom: 0;
+      }
+      .history-copy {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
       .history-name {
         display: block;
         color: var(--app-ink);
@@ -596,7 +661,9 @@ function monthRange(year: number, month: number): { start: string; end: string }
         gap: 3px;
         flex: 0 0 auto;
       }
-      .history-end .figure-pct { margin-left: 0; }
+      .history-end .figure-pct {
+        margin-left: 0;
+      }
 
       /* ------------------------------------------------------------ actions */
       .empty-action {
@@ -616,9 +683,13 @@ function monthRange(year: number, month: number): { start: string; end: string }
 
       /* ------------------------------------------------------- narrow screens */
       @media (max-width: 480px) {
-        .item-head { align-items: flex-start; }
+        .item-head {
+          align-items: flex-start;
+        }
         /* Long amounts wrap instead of pushing the % pill off the card. */
-        .item-figures { flex-wrap: wrap; }
+        .item-figures {
+          flex-wrap: wrap;
+        }
       }
     `,
   ],
@@ -649,8 +720,7 @@ export class BudgetsPage {
     const spent = this.budgetsService.spentIn(current.start, current.end);
     const prevSpent = this.budgetsService.spentIn(previous.start, previous.end);
     const max = Math.max(spent, prevSpent, 1);
-    const delta =
-      prevSpent > 0 ? Math.round(((spent - prevSpent) / prevSpent) * 100) : null;
+    const delta = prevSpent > 0 ? Math.round(((spent - prevSpent) / prevSpent) * 100) : null;
 
     return {
       months: [
@@ -690,8 +760,7 @@ export class BudgetsPage {
   async confirmDelete(budget: Budget): Promise<void> {
     const confirmed = await openConfirm(this.dialog, {
       title: `Delete ${budget.name}?`,
-      message:
-        'Its spending and history will be removed. Transactions are not affected.',
+      message: 'Its spending and history will be removed. Transactions are not affected.',
       confirmLabel: 'Delete',
       destructive: true,
       icon: 'trash-2',

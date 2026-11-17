@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { MAT_BOTTOM_SHEET_DATA, MatBottomSheetRef } from '@angular/material/bottom-sheet';
 import { MatButtonModule } from '@angular/material/button';
@@ -12,10 +12,7 @@ import {
   WalletTransactionKind,
 } from '../../core/models/domain.models';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
-import {
-  WalletTransactionInput,
-  WalletsService,
-} from '../../core/services/wallets.service';
+import { WalletTransactionInput, WalletsService } from '../../core/services/wallets.service';
 import { DateFieldComponent } from '../../shared/components/date-field.component';
 import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
@@ -31,6 +28,7 @@ export interface WalletTransactionSheetData {
 @Component({
   selector: 'app-wallet-transaction-sheet',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SheetDragCloseDirective,
     MatButtonModule,
@@ -60,8 +58,12 @@ export interface WalletTransactionSheetData {
           [disabled]="isEdit"
           hideSingleSelectionIndicator
         >
-          <mat-button-toggle value="recharge"><lucide-icon name="arrow-down" /> Recharge</mat-button-toggle>
-          <mat-button-toggle value="spend"><lucide-icon name="arrow-up" /> Spending</mat-button-toggle>
+          <mat-button-toggle value="recharge"
+            ><lucide-icon name="arrow-down" /> Recharge</mat-button-toggle
+          >
+          <mat-button-toggle value="spend"
+            ><lucide-icon name="arrow-up" /> Spending</mat-button-toggle
+          >
         </mat-button-toggle-group>
       </div>
 
@@ -85,7 +87,11 @@ export interface WalletTransactionSheetData {
       @if (kind() === 'recharge') {
         <div class="type-field">
           <label class="field-label">Recharge from</label>
-          <mat-button-toggle-group [value]="fundingMode()" (change)="setFundingMode($event.value)" hideSingleSelectionIndicator>
+          <mat-button-toggle-group
+            [value]="fundingMode()"
+            (change)="setFundingMode($event.value)"
+            hideSingleSelectionIndicator
+          >
             <mat-button-toggle value="cash">Cash</mat-button-toggle>
             <mat-button-toggle value="bank">Bank account</mat-button-toggle>
           </mat-button-toggle-group>
@@ -128,40 +134,155 @@ export interface WalletTransactionSheetData {
       />
 
       @if (errorMessage()) {
-        <div class="save-error" role="alert"><lucide-icon name="alert-circle" /> {{ errorMessage() }}</div>
+        <div class="save-error" role="alert">
+          <lucide-icon name="alert-circle" /> {{ errorMessage() }}
+        </div>
       }
 
       <div class="actions">
         <button mat-button type="button" (click)="close()" [disabled]="submitting()">Cancel</button>
-        <button mat-flat-button color="primary" type="button" (click)="save()" [disabled]="!canSave() || submitting()">
-          {{ submitting() ? 'Saving…' : (isEdit ? 'Save changes' : (kind() === 'recharge' ? 'Recharge wallet' : 'Record spending')) }}
+        <button
+          mat-flat-button
+          color="primary"
+          type="button"
+          (click)="save()"
+          [disabled]="!canSave() || submitting()"
+        >
+          {{
+            submitting()
+              ? 'Saving…'
+              : isEdit
+                ? 'Save changes'
+                : kind() === 'recharge'
+                  ? 'Recharge wallet'
+                  : 'Record spending'
+          }}
         </button>
       </div>
     </div>
   `,
   styles: [
     `
-      .sheet { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px 20px; }
-      .sheet-header { display: flex; align-items: center; gap: 12px; margin-bottom: 2px; }
-      .header-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 13px; background: var(--app-accent-soft); color: var(--app-accent); }
-      .header-icon lucide-icon { width: 21px; height: 21px; }
-      h2 { margin: 0; color: var(--app-ink); font-size: 18px; font-weight: 700; }
-      .sheet-header p { margin: 3px 0 0; color: var(--app-ink-muted); font-size: 12px; }
-      .type-field { display: flex; flex-direction: column; gap: 6px; }
-      .field-label { color: var(--app-ink); font-size: 13px; font-weight: 500; }
-      .type-field mat-button-toggle-group { display: flex; width: 100%; }
-      .type-field mat-button-toggle { flex: 1; min-width: 0; }
-      .type-field mat-button-toggle lucide-icon { width: 15px; height: 15px; margin-right: 4px; }
-      .wallet-category { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid var(--app-hairline); border-radius: 13px; background: var(--app-input-bg); }
-      .wallet-category-icon { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto; border-radius: 10px; background: var(--app-surface); color: var(--app-accent); box-shadow: var(--app-shadow-sm); }
-      .wallet-category-icon lucide-icon { width: 16px; height: 16px; }
-      .wallet-category .field-label { display: block; margin-bottom: 2px; color: var(--app-ink-muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
-      .wallet-category strong { display: block; color: var(--app-ink); font-size: 13px; }
-      .wallet-category small { display: block; margin-top: 2px; color: var(--app-ink-muted); font-size: 11px; }
-      .save-error { background: var(--app-negative-soft); color: var(--app-negative); }
-      .save-error lucide-icon { width: 16px; height: 16px; flex: 0 0 auto; }
-      .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
-      .actions button { border-radius: 999px; }
+      .sheet {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 18px 20px 20px;
+      }
+      .sheet-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 2px;
+      }
+      .header-icon {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 13px;
+        background: var(--app-accent-soft);
+        color: var(--app-accent);
+      }
+      .header-icon lucide-icon {
+        width: 21px;
+        height: 21px;
+      }
+      h2 {
+        margin: 0;
+        color: var(--app-ink);
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .sheet-header p {
+        margin: 3px 0 0;
+        color: var(--app-ink-muted);
+        font-size: 12px;
+      }
+      .type-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .field-label {
+        color: var(--app-ink);
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .type-field mat-button-toggle-group {
+        display: flex;
+        width: 100%;
+      }
+      .type-field mat-button-toggle {
+        flex: 1;
+        min-width: 0;
+      }
+      .type-field mat-button-toggle lucide-icon {
+        width: 15px;
+        height: 15px;
+        margin-right: 4px;
+      }
+      .wallet-category {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 12px;
+        border: 1px solid var(--app-hairline);
+        border-radius: 13px;
+        background: var(--app-input-bg);
+      }
+      .wallet-category-icon {
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        flex: 0 0 auto;
+        border-radius: 10px;
+        background: var(--app-surface);
+        color: var(--app-accent);
+        box-shadow: var(--app-shadow-sm);
+      }
+      .wallet-category-icon lucide-icon {
+        width: 16px;
+        height: 16px;
+      }
+      .wallet-category .field-label {
+        display: block;
+        margin-bottom: 2px;
+        color: var(--app-ink-muted);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .wallet-category strong {
+        display: block;
+        color: var(--app-ink);
+        font-size: 13px;
+      }
+      .wallet-category small {
+        display: block;
+        margin-top: 2px;
+        color: var(--app-ink-muted);
+        font-size: 11px;
+      }
+      .save-error {
+        background: var(--app-negative-soft);
+        color: var(--app-negative);
+      }
+      .save-error lucide-icon {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+      }
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 2px;
+      }
+      .actions button {
+        border-radius: 999px;
+      }
     `,
   ],
 })
@@ -176,10 +297,13 @@ export class WalletTransactionSheetComponent {
   readonly kind = signal<WalletTransactionKind>(this.data.transaction?.kind ?? this.data.kind);
   readonly amount = signal<number | null>(this.data.transaction?.amount ?? null);
   readonly fundingMode = signal<PaymentMode>(
-    this.data.transaction?.funding_mode ?? (this.bankAccountsService.primaryAccount() ? 'bank' : 'cash'),
+    this.data.transaction?.funding_mode ??
+      (this.bankAccountsService.primaryAccount() ? 'bank' : 'cash'),
   );
   readonly bankAccountId = signal<string | null>(this.data.transaction?.bank_account_id ?? null);
-  readonly occurredDate = signal<Date | null>(parseIsoDate(this.data.transaction?.occurred_on) ?? new Date());
+  readonly occurredDate = signal<Date | null>(
+    parseIsoDate(this.data.transaction?.occurred_on) ?? new Date(),
+  );
   readonly notes = signal(this.data.transaction?.notes ?? '');
   readonly touched = signal(false);
   readonly submitting = signal(false);
@@ -193,13 +317,19 @@ export class WalletTransactionSheetComponent {
     })),
   );
 
-  readonly availableBalance = computed(() =>
-    this.wallet.balance + (this.data.transaction?.kind === 'spend' ? this.data.transaction.amount : 0),
+  readonly availableBalance = computed(
+    () =>
+      this.wallet.balance +
+      (this.data.transaction?.kind === 'spend' ? this.data.transaction.amount : 0),
   );
 
   readonly amountValid = computed(() => {
     const value = this.amount();
-    return !!value && value > 0 && (this.kind() === 'recharge' || value <= this.availableBalance() + 0.000001);
+    return (
+      !!value &&
+      value > 0 &&
+      (this.kind() === 'recharge' || value <= this.availableBalance() + 0.000001)
+    );
   });
 
   readonly canSave = computed(() => {

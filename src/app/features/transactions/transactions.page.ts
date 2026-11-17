@@ -1,12 +1,14 @@
 import {
+  AfterViewInit,
+  ChangeDetectionStrategy,
   Component,
+  DestroyRef,
+  ElementRef,
+  OnDestroy,
+  ViewChild,
   computed,
   inject,
   signal,
-  AfterViewInit,
-  OnDestroy,
-  ElementRef,
-  ViewChild,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 
@@ -62,6 +64,7 @@ export interface DayGroup {
 @Component({
   selector: 'app-transactions-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe,
     MatButtonModule,

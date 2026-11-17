@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -16,6 +16,7 @@ import { isEqualCurrency, roundCurrency } from '../../shared/utils/currency-util
 @Component({
   selector: 'app-interest-dialog',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     MatDialogModule,
     MatButtonModule,
@@ -48,7 +49,8 @@ import { isEqualCurrency, roundCurrency } from '../../shared/utils/currency-util
             [invalid]="touched() && !amountValid()"
             (valueChange)="amount.set(toNumber($event))"
             [autofocus]="true"
-          ><span prefix>₹</span></app-text-field>
+            ><span prefix>₹</span></app-text-field
+          >
 
           <app-date-field
             label="Date"
@@ -72,7 +74,9 @@ import { isEqualCurrency, roundCurrency } from '../../shared/utils/currency-util
               <div class="no-bank-notice">
                 <lucide-icon name="alert-circle" />
                 <span>No bank accounts added yet.</span>
-                <button type="button" class="link-btn" (click)="openBankAccounts()">Add account</button>
+                <button type="button" class="link-btn" (click)="openBankAccounts()">
+                  Add account
+                </button>
               </div>
             }
           </div>
@@ -91,9 +95,8 @@ import { isEqualCurrency, roundCurrency } from '../../shared/utils/currency-util
           <div class="full hint">
             <lucide-icon name="shield-check" />
             <span>
-              Record only interest your bank has actually credited — estimated or expected
-              interest is never counted. This is tracked separately and is never treated
-              as personal income.
+              Record only interest your bank has actually credited — estimated or expected interest
+              is never counted. This is tracked separately and is never treated as personal income.
             </span>
           </div>
 
@@ -122,14 +125,45 @@ import { isEqualCurrency, roundCurrency } from '../../shared/utils/currency-util
   `,
   styles: [
     `
-      h2 { margin: 0 !important; padding: 0 !important; font-size: 18px !important; font-weight: 700 !important; line-height: 1.2 !important; }
-      .dialog-container { max-width: 520px; background: var(--app-surface); color: var(--app-ink); }
-      .dialog-header { display: flex; gap: 12px; align-items: flex-start; padding: 4px 16px 14px; border-bottom: 1px solid var(--app-hairline); }
-      .dialog-subtitle { margin: 3px 0 0; color: var(--app-ink-muted); font-size: 12px; line-height: 1.35; }
-      .dialog-content { max-height: 75vh; padding: 16px !important; }
-      .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
-      .full { grid-column: 1 / -1; }
-      .hint, .error-notice {
+      h2 {
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        line-height: 1.2 !important;
+      }
+      .dialog-container {
+        max-width: 520px;
+        background: var(--app-surface);
+        color: var(--app-ink);
+      }
+      .dialog-header {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 4px 16px 14px;
+        border-bottom: 1px solid var(--app-hairline);
+      }
+      .dialog-subtitle {
+        margin: 3px 0 0;
+        color: var(--app-ink-muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .dialog-content {
+        max-height: 75vh;
+        padding: 16px !important;
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 12px;
+      }
+      .full {
+        grid-column: 1 / -1;
+      }
+      .hint,
+      .error-notice {
         display: flex;
         align-items: flex-start;
         gap: 8px;
@@ -140,9 +174,20 @@ import { isEqualCurrency, roundCurrency } from '../../shared/utils/currency-util
         font-size: 12px;
         line-height: 1.35;
       }
-      .hint lucide-icon, .error-notice lucide-icon { width: 16px; height: 16px; flex: 0 0 auto; color: var(--app-accent); }
-      .error-notice { background: var(--app-negative-soft, rgba(239, 68, 68, .1)); color: var(--app-negative); }
-      .error-notice lucide-icon { color: var(--app-negative); }
+      .hint lucide-icon,
+      .error-notice lucide-icon {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+        color: var(--app-accent);
+      }
+      .error-notice {
+        background: var(--app-negative-soft, rgba(239, 68, 68, 0.1));
+        color: var(--app-negative);
+      }
+      .error-notice lucide-icon {
+        color: var(--app-negative);
+      }
       .no-bank-notice {
         display: flex;
         align-items: center;
@@ -154,7 +199,11 @@ import { isEqualCurrency, roundCurrency } from '../../shared/utils/currency-util
         color: var(--app-ink-muted);
         font-size: 12px;
       }
-      .no-bank-notice lucide-icon { width: 16px; height: 16px; flex: 0 0 auto; }
+      .no-bank-notice lucide-icon {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+      }
       .link-btn {
         margin-left: auto;
         border: 0;
@@ -165,9 +214,18 @@ import { isEqualCurrency, roundCurrency } from '../../shared/utils/currency-util
         font-size: 12px;
         font-weight: 700;
       }
-      .dialog-actions { padding: 0 16px 14px !important; gap: 8px; }
-      .dialog-actions button { border-radius: 999px; }
-      @media (max-width: 540px) { .form-grid { grid-template-columns: 1fr; } }
+      .dialog-actions {
+        padding: 0 16px 14px !important;
+        gap: 8px;
+      }
+      .dialog-actions button {
+        border-radius: 999px;
+      }
+      @media (max-width: 540px) {
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+      }
     `,
   ],
 })
@@ -200,12 +258,14 @@ export class InterestDialogComponent {
     const on = toIsoDate(this.occurredOn());
     const bankId = this.bankAccountId();
     if (!amount || !on || !bankId) return false;
-    return this.interestService.entries().some(
-      (entry) =>
-        entry.occurred_on === on &&
-        entry.bank_account_id === bankId &&
-        isEqualCurrency(Number(entry.amount), roundCurrency(amount)),
-    );
+    return this.interestService
+      .entries()
+      .some(
+        (entry) =>
+          entry.occurred_on === on &&
+          entry.bank_account_id === bankId &&
+          isEqualCurrency(Number(entry.amount), roundCurrency(amount)),
+      );
   });
 
   amountValid(): boolean {
@@ -214,12 +274,7 @@ export class InterestDialogComponent {
   }
 
   canSave(): boolean {
-    return (
-      this.amountValid() &&
-      !!this.occurredOn() &&
-      !!this.bankAccountId() &&
-      !this.duplicate()
-    );
+    return this.amountValid() && !!this.occurredOn() && !!this.bankAccountId() && !this.duplicate();
   }
 
   toNumber(value: string | number | null): number | null {

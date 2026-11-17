@@ -1,4 +1,5 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   computed,
   ElementRef,
@@ -26,6 +27,7 @@ export interface SelectOption<T = string> {
 @Component({
   selector: 'app-select-field',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MatMenuModule, LucideAngularModule],
   template: `
     @if (label()) {
@@ -98,7 +100,9 @@ export interface SelectOption<T = string> {
         border: 1px solid transparent;
         border-radius: 14px;
         cursor: pointer;
-        transition: background .15s ease, border-color .15s ease;
+        transition:
+          background 0.15s ease,
+          border-color 0.15s ease;
         font: inherit;
         color: var(--app-ink);
         text-align: left;

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -22,6 +22,7 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
 @Component({
   selector: 'app-categories-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     MatButtonModule,
     MatButtonToggleModule,
@@ -33,16 +34,8 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
     SwipeableRowComponent,
   ],
   template: `
-    <app-page-header
-      title="Categories"
-      subtitle="Organize your expenses, income, and savings"
-    >
-      <button
-        class="add-btn"
-        type="button"
-        (click)="openAddDialog()"
-        aria-label="Add category"
-      >
+    <app-page-header title="Categories" subtitle="Organize your expenses, income, and savings">
+      <button class="add-btn" type="button" (click)="openAddDialog()" aria-label="Add category">
         <lucide-icon name="plus" />
       </button>
     </app-page-header>
@@ -87,7 +80,9 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
             </div>
             <div class="group-title">
               <div class="group-label">Savings</div>
-              <div class="group-count">{{ savings().length }} {{ savings().length === 1 ? 'category' : 'categories' }}</div>
+              <div class="group-count">
+                {{ savings().length }} {{ savings().length === 1 ? 'category' : 'categories' }}
+              </div>
             </div>
           </div>
           @if (savings().length > 0) {
@@ -123,7 +118,9 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
             </div>
             <div class="group-title">
               <div class="group-label">Expense</div>
-              <div class="group-count">{{ expenses().length }} {{ expenses().length === 1 ? 'category' : 'categories' }}</div>
+              <div class="group-count">
+                {{ expenses().length }} {{ expenses().length === 1 ? 'category' : 'categories' }}
+              </div>
             </div>
           </div>
           @if (expenses().length > 0) {
@@ -159,7 +156,9 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
             </div>
             <div class="group-title">
               <div class="group-label">Income</div>
-              <div class="group-count">{{ incomes().length }} {{ incomes().length === 1 ? 'category' : 'categories' }}</div>
+              <div class="group-count">
+                {{ incomes().length }} {{ incomes().length === 1 ? 'category' : 'categories' }}
+              </div>
             </div>
           </div>
           @if (incomes().length > 0) {
@@ -232,20 +231,28 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
           line-height: 34px !important;
         }
       }
-      .add-card { margin-bottom: 20px; padding: 16px; }
+      .add-card {
+        margin-bottom: 20px;
+        padding: 16px;
+      }
       .add-form {
         display: flex;
         gap: 12px;
         align-items: flex-end;
         flex-wrap: wrap;
       }
-      .name { flex: 1; min-width: 200px; }
+      .name {
+        flex: 1;
+        min-width: 200px;
+      }
       .right {
         display: flex;
         gap: 8px;
         align-items: center;
       }
-      .group { margin-bottom: 24px; }
+      .group {
+        margin-bottom: 24px;
+      }
       .group-head {
         display: flex;
         align-items: center;
@@ -260,7 +267,10 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
         place-items: center;
         flex: 0 0 auto;
 
-        lucide-icon { width: 16px; height: 16px; }
+        lucide-icon {
+          width: 16px;
+          height: 16px;
+        }
       }
       .kind-icon.negative {
         background: var(--app-negative-soft);
@@ -274,7 +284,10 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
         background: var(--app-savings-soft);
         color: var(--app-savings);
       }
-      .group-title { display: flex; flex-direction: column; }
+      .group-title {
+        display: flex;
+        flex-direction: column;
+      }
       .group-label {
         font-size: 15px;
         font-weight: 700;
@@ -297,11 +310,20 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
         gap: 3px;
         font-weight: 600;
 
-        lucide-icon { width: 12px; height: 12px; }
+        lucide-icon {
+          width: 12px;
+          height: 12px;
+        }
       }
-      .kind-tag.negative { color: var(--app-negative); }
-      .kind-tag.positive { color: var(--app-positive); }
-      .kind-tag.savings { color: var(--app-savings); }
+      .kind-tag.negative {
+        color: var(--app-negative);
+      }
+      .kind-tag.positive {
+        color: var(--app-positive);
+      }
+      .kind-tag.savings {
+        color: var(--app-savings);
+      }
       .list {
         list-style: none;
         margin: 0;
@@ -332,7 +354,11 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
         width: 22px;
         height: 22px;
       }
-      .title { font-size: 14px; font-weight: 600; color: var(--app-ink); }
+      .title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--app-ink);
+      }
       .placeholder {
         color: var(--app-ink-muted);
         font-size: 14px;
@@ -355,9 +381,7 @@ export class CategoriesPage {
 
   readonly categories = this.service.categories;
   readonly isLoading = this.service.isLoading;
-  readonly savings = computed(() =>
-    this.categories().filter((c) => isSavingsCategory(c)),
-  );
+  readonly savings = computed(() => this.categories().filter((c) => isSavingsCategory(c)));
   readonly expenses = computed(() =>
     this.categories().filter((c) => c.kind === 'expense' && !isSavingsCategory(c)),
   );
@@ -390,7 +414,9 @@ export class CategoriesPage {
     try {
       await this.service.delete(id);
     } catch (e: unknown) {
-      this.snack.open(errText(e, 'Couldn’t delete — please try again.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(errText(e, 'Couldn’t delete — please try again.'), 'Dismiss', {
+        duration: 4000,
+      });
     }
   }
 
@@ -401,7 +427,9 @@ export class CategoriesPage {
       await this.service.seedDefaults();
       this.snack.open('Common categories added — you’re set.', undefined, { duration: 2500 });
     } catch (e: unknown) {
-      this.snack.open(errText(e, 'Couldn’t seed — please try again.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(errText(e, 'Couldn’t seed — please try again.'), 'Dismiss', {
+        duration: 4000,
+      });
     } finally {
       this.submitting.set(false);
     }

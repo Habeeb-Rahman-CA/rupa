@@ -1,4 +1,4 @@
-import { Component, Inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -45,13 +45,8 @@ export interface ReportDetailData {
 @Component({
   selector: 'app-report-detail-dialog',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatDialogModule,
-    MatButtonModule,
-    LucideAngularModule,
-    SignedMoneyPipe,
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [CommonModule, MatDialogModule, MatButtonModule, LucideAngularModule, SignedMoneyPipe],
   template: `
     <div class="dialog-container">
       <div class="dialog-header">
@@ -126,7 +121,13 @@ export interface ReportDetailData {
   `,
   styles: [
     `
-      h2 { margin: 0 !important; padding: 0 !important; font-size: 18px !important; font-weight: 700 !important; line-height: 1.2 !important; }
+      h2 {
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        line-height: 1.2 !important;
+      }
       .dialog-container {
         padding: 0 24px 24px 24px;
         max-width: 480px;
@@ -157,7 +158,9 @@ export interface ReportDetailData {
         align-items: center;
         justify-content: center;
       }
-      .icon-badge.solid { color: #fff; }
+      .icon-badge.solid {
+        color: #fff;
+      }
       .icon-badge lucide-icon {
         width: 20px;
         height: 20px;
@@ -206,8 +209,12 @@ export interface ReportDetailData {
         font-weight: 700;
         font-variant-numeric: tabular-nums;
       }
-      .summary-value.pos { color: var(--app-positive); }
-      .summary-value.neg { color: var(--app-negative); }
+      .summary-value.pos {
+        color: var(--app-positive);
+      }
+      .summary-value.neg {
+        color: var(--app-negative);
+      }
 
       .detail-list {
         list-style: none;
@@ -233,9 +240,17 @@ export interface ReportDetailData {
         display: grid;
         place-items: center;
       }
-      .row-icon.solid { color: #fff; }
-      .row-icon.tint { background: var(--app-accent-soft); color: var(--app-accent); }
-      .row-icon lucide-icon { width: 16px; height: 16px; }
+      .row-icon.solid {
+        color: #fff;
+      }
+      .row-icon.tint {
+        background: var(--app-accent-soft);
+        color: var(--app-accent);
+      }
+      .row-icon lucide-icon {
+        width: 16px;
+        height: 16px;
+      }
 
       .row-body {
         display: flex;
@@ -265,8 +280,12 @@ export interface ReportDetailData {
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
       }
-      .row-amount.pos { color: var(--app-positive); }
-      .row-amount.neg { color: var(--app-negative); }
+      .row-amount.pos {
+        color: var(--app-positive);
+      }
+      .row-amount.neg {
+        color: var(--app-negative);
+      }
 
       .empty {
         color: var(--app-ink-muted);

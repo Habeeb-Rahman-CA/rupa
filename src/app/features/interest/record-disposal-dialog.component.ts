@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -14,6 +14,7 @@ import { isGreaterCurrency, roundCurrency } from '../../shared/utils/currency-ut
 @Component({
   selector: 'app-record-disposal-dialog',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     MatDialogModule,
     MatButtonModule,
@@ -55,7 +56,8 @@ import { isGreaterCurrency, roundCurrency } from '../../shared/utils/currency-ut
             [hint]="remainingHint()"
             (valueChange)="amount.set(toNumber($event))"
             [autofocus]="true"
-          ><span prefix>₹</span></app-text-field>
+            ><span prefix>₹</span></app-text-field
+          >
 
           <app-date-field
             label="Date"
@@ -78,16 +80,18 @@ import { isGreaterCurrency, roundCurrency } from '../../shared/utils/currency-ut
           <div class="full hint">
             <lucide-icon name="shield-check" />
             <span>
-              A disposal is money given away — it is never counted as a personal expense
-              and will not appear in expenses or reports. The amount is applied to your
-              oldest interest first.
+              A disposal is money given away — it is never counted as a personal expense and will
+              not appear in expenses or reports. The amount is applied to your oldest interest
+              first.
             </span>
           </div>
 
           @if (touched() && overRemaining()) {
             <div class="full error-notice">
               <lucide-icon name="alert-circle" />
-              <span>Amount cannot exceed the available balance of ₹{{ remaining().toFixed(2) }}.</span>
+              <span
+                >Amount cannot exceed the available balance of ₹{{ remaining().toFixed(2) }}.</span
+              >
             </div>
           }
         </div>
@@ -109,13 +113,43 @@ import { isGreaterCurrency, roundCurrency } from '../../shared/utils/currency-ut
   `,
   styles: [
     `
-      h2 { margin: 0 !important; padding: 0 !important; font-size: 18px !important; font-weight: 700 !important; line-height: 1.2 !important; }
-      .dialog-container { max-width: 520px; background: var(--app-surface); color: var(--app-ink); }
-      .dialog-header { display: flex; gap: 12px; align-items: flex-start; padding: 4px 16px 14px; border-bottom: 1px solid var(--app-hairline); }
-      .dialog-subtitle { margin: 3px 0 0; color: var(--app-ink-muted); font-size: 12px; line-height: 1.35; }
-      .dialog-content { max-height: 75vh; padding: 16px !important; }
-      .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
-      .full { grid-column: 1 / -1; }
+      h2 {
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        line-height: 1.2 !important;
+      }
+      .dialog-container {
+        max-width: 520px;
+        background: var(--app-surface);
+        color: var(--app-ink);
+      }
+      .dialog-header {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 4px 16px 14px;
+        border-bottom: 1px solid var(--app-hairline);
+      }
+      .dialog-subtitle {
+        margin: 3px 0 0;
+        color: var(--app-ink-muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .dialog-content {
+        max-height: 75vh;
+        padding: 16px !important;
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 12px;
+      }
+      .full {
+        grid-column: 1 / -1;
+      }
       .balance-chip {
         display: flex;
         align-items: center;
@@ -128,14 +162,19 @@ import { isGreaterCurrency, roundCurrency } from '../../shared/utils/currency-ut
         font-size: 12px;
         font-weight: 600;
       }
-      .balance-chip lucide-icon { width: 16px; height: 16px; color: var(--app-accent); }
+      .balance-chip lucide-icon {
+        width: 16px;
+        height: 16px;
+        color: var(--app-accent);
+      }
       .balance-chip strong {
         margin-left: auto;
         color: var(--app-ink);
         font-size: 15px;
         font-variant-numeric: tabular-nums;
       }
-      .hint, .error-notice {
+      .hint,
+      .error-notice {
         display: flex;
         align-items: flex-start;
         gap: 8px;
@@ -146,12 +185,32 @@ import { isGreaterCurrency, roundCurrency } from '../../shared/utils/currency-ut
         font-size: 12px;
         line-height: 1.35;
       }
-      .hint lucide-icon, .error-notice lucide-icon { width: 16px; height: 16px; flex: 0 0 auto; color: var(--app-accent); }
-      .error-notice { background: var(--app-negative-soft, rgba(239, 68, 68, .1)); color: var(--app-negative); }
-      .error-notice lucide-icon { color: var(--app-negative); }
-      .dialog-actions { padding: 0 16px 14px !important; gap: 8px; }
-      .dialog-actions button { border-radius: 999px; }
-      @media (max-width: 540px) { .form-grid { grid-template-columns: 1fr; } }
+      .hint lucide-icon,
+      .error-notice lucide-icon {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+        color: var(--app-accent);
+      }
+      .error-notice {
+        background: var(--app-negative-soft, rgba(239, 68, 68, 0.1));
+        color: var(--app-negative);
+      }
+      .error-notice lucide-icon {
+        color: var(--app-negative);
+      }
+      .dialog-actions {
+        padding: 0 16px 14px !important;
+        gap: 8px;
+      }
+      .dialog-actions button {
+        border-radius: 999px;
+      }
+      @media (max-width: 540px) {
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+      }
     `,
   ],
 })
@@ -168,9 +227,7 @@ export class RecordDisposalDialogComponent {
   readonly notes = signal('');
 
   /** The overall accumulated interest balance available to give away. */
-  readonly remaining = computed(() =>
-    roundCurrency(this.interestService.pendingBalance()),
-  );
+  readonly remaining = computed(() => roundCurrency(this.interestService.pendingBalance()));
 
   readonly overRemaining = computed(() => {
     const amount = this.amount();

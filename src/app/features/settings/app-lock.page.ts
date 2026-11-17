@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -16,12 +16,8 @@ import { MpinDialogComponent, MpinDialogMode } from './mpin-dialog.component';
 @Component({
   selector: 'app-app-lock-page',
   standalone: true,
-  imports: [
-    MatButtonModule,
-    MatButtonToggleModule,
-    LucideAngularModule,
-    PageHeaderComponent,
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MatButtonModule, MatButtonToggleModule, LucideAngularModule, PageHeaderComponent],
   template: `
     <app-page-header title="App lock" subtitle="Protect rūpa with a 4 or 6-digit MPIN" />
 
@@ -96,7 +92,9 @@ import { MpinDialogComponent, MpinDialogMode } from './mpin-dialog.component';
   `,
   styles: [
     `
-      .lock-card { padding: 16px; }
+      .lock-card {
+        padding: 16px;
+      }
 
       .section-heading {
         display: flex;
@@ -110,11 +108,17 @@ import { MpinDialogComponent, MpinDialogMode } from './mpin-dialog.component';
         height: 38px;
         flex: 0 0 auto;
         border-radius: 12px;
-        background: rgba(99, 102, 241, .12);
+        background: rgba(99, 102, 241, 0.12);
         color: #3f4bb8;
       }
-      .heading-icon lucide-icon { width: 19px; height: 19px; }
-      .heading-text { min-width: 0; flex: 1 1 auto; }
+      .heading-icon lucide-icon {
+        width: 19px;
+        height: 19px;
+      }
+      .heading-text {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
       .section-heading h2 {
         margin: 0;
         color: var(--app-ink);
@@ -136,11 +140,11 @@ import { MpinDialogComponent, MpinDialogMode } from './mpin-dialog.component';
         color: var(--app-ink-muted);
         font-size: 10px;
         font-weight: 700;
-        letter-spacing: .05em;
+        letter-spacing: 0.05em;
         text-transform: uppercase;
       }
       .status-chip[data-status='active'] {
-        background: var(--app-positive-soft, rgba(16, 163, 127, .12));
+        background: var(--app-positive-soft, rgba(16, 163, 127, 0.12));
         color: var(--app-positive);
       }
 
@@ -151,15 +155,26 @@ import { MpinDialogComponent, MpinDialogMode } from './mpin-dialog.component';
         line-height: 1.5;
       }
 
-      .primary-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+      .primary-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
       .pill-btn {
         min-height: 38px;
         border-radius: 999px !important;
         font-size: 13px;
         font-weight: 600;
       }
-      .pill-btn lucide-icon { width: 16px; height: 16px; margin-right: 6px; }
-      .danger-btn { color: var(--app-negative, #dc2626) !important; }
+      .pill-btn lucide-icon {
+        width: 16px;
+        height: 16px;
+        margin-right: 6px;
+      }
+      .danger-btn {
+        color: var(--app-negative, #dc2626) !important;
+      }
 
       .auto-lock {
         display: flex;
@@ -192,7 +207,12 @@ import { MpinDialogComponent, MpinDialogMode } from './mpin-dialog.component';
         font-size: 12px;
         line-height: 1.45;
       }
-      .notes lucide-icon { width: 15px; height: 15px; flex: 0 0 auto; margin-top: 1px; }
+      .notes lucide-icon {
+        width: 15px;
+        height: 15px;
+        flex: 0 0 auto;
+        margin-top: 1px;
+      }
     `,
   ],
 })
@@ -214,9 +234,7 @@ export class AppLockPage {
       void this.router.navigate(['/dashboard'], { replaceUrl: true });
     };
     window.addEventListener('popstate', redirectBack);
-    this.destroyRef.onDestroy(() =>
-      window.removeEventListener('popstate', redirectBack),
-    );
+    this.destroyRef.onDestroy(() => window.removeEventListener('popstate', redirectBack));
   }
 
   openMpin(mode: MpinDialogMode): void {

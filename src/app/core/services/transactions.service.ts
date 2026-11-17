@@ -6,6 +6,7 @@ import { CategoriesService } from './categories.service';
 import { DebtsService } from './debts.service';
 import { BankAccountsService } from './bank-accounts.service';
 import { OfflineQueueService, OfflineAction, OfflineActionType } from './offline-queue.service';
+import { todayIso } from '../../shared/utils/budget-utils';
 
 export interface CreateTransactionInput {
   amount: number;
@@ -297,16 +298,22 @@ export class TransactionsService {
     if (!ownerId) throw new Error('Not signed in.');
 
     let targetBankAccountId = input.bank_account_id ?? null;
-    let mode = input.payment_mode ?? 'cash';
+    let mode = input.payment_mode ?? 'bank';
 
+    // Default to bank mode with the primary account when no mode is specified.
+    // Fall back to cash if no bank accounts exist.
     if (mode === 'bank' && !targetBankAccountId) {
       try {
         const bankAccountsService = this.injector.get(BankAccountsService);
         const primary = bankAccountsService.primaryAccount();
         if (primary) {
           targetBankAccountId = primary.id;
+        } else {
+          mode = 'cash';
         }
-      } catch {}
+      } catch {
+        mode = 'cash';
+      }
     }
 
     const occurredOn = input.occurred_on ?? todayIso();
@@ -566,11 +573,3 @@ export class TransactionsService {
 }
 
 // -------- helpers -----------------------------------------------------------
-
-function todayIso(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}

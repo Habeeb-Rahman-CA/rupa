@@ -1,4 +1,5 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   ViewChild,
   computed,
@@ -13,18 +14,12 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
-import {
-  DebtTransactionImpact,
-  DebtsService,
-} from '../../core/services/debts.service';
+import { DebtTransactionImpact, DebtsService } from '../../core/services/debts.service';
 import { PeopleService } from '../../core/services/people.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
 import { DebtDirection, PaymentMode } from '../../core/models/domain.models';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
-import {
-  SelectFieldComponent,
-  SelectOption,
-} from '../../shared/components/select-field.component';
+import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
 import { SheetDragCloseDirective } from '../../shared/directives/sheet-drag-close.directive';
 import { errorText } from '../../shared/utils/error-utils';
 
@@ -33,6 +28,7 @@ const NEW_PERSON = '__new__';
 @Component({
   selector: 'app-add-debt-sheet',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SheetDragCloseDirective,
     MatButtonModule,
@@ -117,7 +113,9 @@ const NEW_PERSON = '__new__';
             <div class="no-bank-notice">
               <lucide-icon name="alert-circle" />
               <span>No bank accounts added yet.</span>
-              <button type="button" class="link-btn" (click)="openBankAccounts()">Add Account</button>
+              <button type="button" class="link-btn" (click)="openBankAccounts()">
+                Add Account
+              </button>
             </div>
           }
         }
@@ -141,8 +139,11 @@ const NEW_PERSON = '__new__';
 
       <div class="hint">
         @if (impact() === 'none') {
-          This debt will only be tracked under your owed balances and will <strong>not</strong> change your monthly Income, Expense, or Total Balance.
-        } @else if (impact() === 'expense' || (impact() === 'default' && direction() === 'they_owe')) {
+          This debt will only be tracked under your owed balances and will
+          <strong>not</strong> change your monthly Income, Expense, or Total Balance.
+        } @else if (
+          impact() === 'expense' || (impact() === 'default' && direction() === 'they_owe')
+        ) {
           Will log an <strong>Expense</strong> transaction for today.
         } @else {
           Will log an <strong>Income</strong> transaction for today.
@@ -176,8 +177,14 @@ const NEW_PERSON = '__new__';
         justify-content: space-between;
         gap: 12px;
       }
-      h2 { margin: 0; font-size: 16px; font-weight: 600; }
-      .full { width: 100%; }
+      h2 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+      }
+      .full {
+        width: 100%;
+      }
       .field-group {
         display: flex;
         flex-direction: column;
@@ -222,7 +229,9 @@ const NEW_PERSON = '__new__';
         font-weight: 600;
         cursor: pointer;
       }
-      .link-btn:hover { text-decoration: underline; }
+      .link-btn:hover {
+        text-decoration: underline;
+      }
       .hint {
         font-size: 12px;
         color: var(--app-ink-muted);
@@ -270,7 +279,9 @@ export class AddDebtSheetComponent {
   readonly bankAccountOptions = computed<SelectOption[]>(() => {
     return this.bankAccountsService.bankAccounts().map((acc) => ({
       value: acc.id,
-      label: acc.is_primary ? `${acc.bank_name} (${acc.account_name}) ★` : `${acc.bank_name} (${acc.account_name})`,
+      label: acc.is_primary
+        ? `${acc.bank_name} (${acc.account_name}) ★`
+        : `${acc.bank_name} (${acc.account_name})`,
       icon: 'landmark',
     }));
   });
@@ -308,7 +319,12 @@ export class AddDebtSheetComponent {
     if (!amt || amt <= 0) return false;
     const pid = this.personId();
     if (pid === NEW_PERSON) return this.newPersonName().trim().length > 0;
-    if (this.impact() !== 'none' && this.paymentMode() === 'bank' && this.bankAccountOptions().length > 0 && !this.selectedBankAccountId()) {
+    if (
+      this.impact() !== 'none' &&
+      this.paymentMode() === 'bank' &&
+      this.bankAccountOptions().length > 0 &&
+      !this.selectedBankAccountId()
+    ) {
       return false;
     }
     return !!pid;
@@ -375,7 +391,9 @@ export class AddDebtSheetComponent {
       this.snack.open('Debt saved to your ledger.', undefined, { duration: 2000 });
       this.ref.dismiss({ saved: true });
     } catch (e: unknown) {
-      this.snack.open(errorText(e, 'Couldn’t save — please try again.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(errorText(e, 'Couldn’t save — please try again.'), 'Dismiss', {
+        duration: 4000,
+      });
       this.submitting.set(false);
     }
   }

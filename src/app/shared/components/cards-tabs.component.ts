@@ -1,10 +1,11 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
 @Component({
   selector: 'app-cards-tabs',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, RouterLinkActive, LucideAngularModule],
   template: `
     <nav class="cards-tabs" aria-label="Cards section">
@@ -73,9 +74,14 @@ import { LucideAngularModule } from 'lucide-angular';
         border-radius: calc(var(--app-radius-lg) - 4px);
         color: var(--app-ink-muted);
         text-decoration: none;
-        transition: background .18s ease, box-shadow .18s ease, color .18s ease;
+        transition:
+          background 0.18s ease,
+          box-shadow 0.18s ease,
+          color 0.18s ease;
       }
-      .cards-tab:hover { color: var(--app-ink); }
+      .cards-tab:hover {
+        color: var(--app-ink);
+      }
       .cards-tab.active {
         background: var(--app-surface);
         box-shadow: var(--app-shadow-sm);
@@ -90,15 +96,45 @@ import { LucideAngularModule } from 'lucide-angular';
         border-radius: 10px;
         color: var(--app-ink-muted);
       }
-      .cards-tab.active .tab-icon { color: var(--app-accent); }
-      .tab-icon lucide-icon { width: 17px; height: 17px; }
-      .tab-copy { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
-      .tab-copy strong { overflow: hidden; color: inherit; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-      .tab-copy span { overflow: hidden; color: var(--app-ink-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+      .cards-tab.active .tab-icon {
+        color: var(--app-accent);
+      }
+      .tab-icon lucide-icon {
+        width: 17px;
+        height: 17px;
+      }
+      .tab-copy {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        gap: 1px;
+      }
+      .tab-copy strong {
+        overflow: hidden;
+        color: inherit;
+        font-size: 12px;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .tab-copy span {
+        overflow: hidden;
+        color: var(--app-ink-muted);
+        font-size: 10px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       @media (max-width: 480px) {
-        .cards-tabs { margin-bottom: 16px; }
-        .cards-tab { justify-content: center; padding: 4px 8px; }
-        .tab-copy span { display: none; }
+        .cards-tabs {
+          margin-bottom: 16px;
+        }
+        .cards-tab {
+          justify-content: center;
+          padding: 4px 8px;
+        }
+        .tab-copy span {
+          display: none;
+        }
       }
     `,
   ],

@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -33,6 +33,7 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
 @Component({
   selector: 'app-settings-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     MatButtonModule,
     MatSlideToggleModule,
@@ -147,18 +148,26 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
       <ul class="notes">
         <li>
           <lucide-icon name="smartphone" />
-          <span>Turn notifications on separately on each device — your phone and laptop each subscribe on their own.</span>
+          <span
+            >Turn notifications on separately on each device — your phone and laptop each subscribe
+            on their own.</span
+          >
         </li>
         <li>
           <lucide-icon name="apple" />
-          <span>On iPhone/iPad, add rūpa to your Home Screen first (Share → Add to Home Screen), then enable notifications.</span>
+          <span
+            >On iPhone/iPad, add rūpa to your Home Screen first (Share → Add to Home Screen), then
+            enable notifications.</span
+          >
         </li>
       </ul>
     </section>
   `,
   styles: [
     `
-      .settings-card { padding: 16px; }
+      .settings-card {
+        padding: 16px;
+      }
 
       .section-heading {
         display: flex;
@@ -175,8 +184,14 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
         background: var(--app-accent-soft);
         color: var(--app-accent);
       }
-      .heading-icon lucide-icon { width: 19px; height: 19px; }
-      .heading-text { min-width: 0; flex: 1 1 auto; }
+      .heading-icon lucide-icon {
+        width: 19px;
+        height: 19px;
+      }
+      .heading-text {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
       .section-heading h2 {
         margin: 0;
         color: var(--app-ink);
@@ -198,12 +213,21 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
         color: var(--app-ink-muted);
         font-size: 10px;
         font-weight: 700;
-        letter-spacing: .05em;
+        letter-spacing: 0.05em;
         text-transform: uppercase;
       }
-      .status-chip[data-status='active'] { background: var(--app-positive-soft, rgba(16, 163, 127, .12)); color: var(--app-positive); }
-      .status-chip[data-status='denied'] { background: var(--app-negative-soft, rgba(239, 68, 68, .1)); color: var(--app-negative, #dc2626); }
-      .status-chip[data-status='dev'] { background: rgba(99, 102, 241, .12); color: #3f4bb8; }
+      .status-chip[data-status='active'] {
+        background: var(--app-positive-soft, rgba(16, 163, 127, 0.12));
+        color: var(--app-positive);
+      }
+      .status-chip[data-status='denied'] {
+        background: var(--app-negative-soft, rgba(239, 68, 68, 0.1));
+        color: var(--app-negative, #dc2626);
+      }
+      .status-chip[data-status='dev'] {
+        background: rgba(99, 102, 241, 0.12);
+        color: #3f4bb8;
+      }
 
       .status-hint {
         margin: 12px 0 0;
@@ -220,18 +244,35 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
         font-size: 12.5px;
         line-height: 1.45;
       }
-      .feedback.error { background: var(--app-negative-soft, rgba(239, 68, 68, .1)); color: var(--app-negative, #dc2626); }
+      .feedback.error {
+        background: var(--app-negative-soft, rgba(239, 68, 68, 0.1));
+        color: var(--app-negative, #dc2626);
+      }
 
-      .primary-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+      .primary-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
       .pill-btn {
         min-height: 38px;
         border-radius: 999px !important;
         font-size: 13px;
         font-weight: 600;
       }
-      .pill-btn lucide-icon { width: 16px; height: 16px; margin-right: 6px; }
-      .test-btn { color: var(--app-accent) !important; }
-      .btn-spinner { display: inline-block; margin-right: 8px; }
+      .pill-btn lucide-icon {
+        width: 16px;
+        height: 16px;
+        margin-right: 6px;
+      }
+      .test-btn {
+        color: var(--app-accent) !important;
+      }
+      .btn-spinner {
+        display: inline-block;
+        margin-right: 8px;
+      }
 
       .category-list {
         list-style: none;
@@ -246,9 +287,23 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
         padding: 12px 2px;
         border-bottom: 1px solid var(--app-hairline);
       }
-      .category-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
-      .category-name { color: var(--app-ink); font-size: 13.5px; font-weight: 600; }
-      .category-desc { color: var(--app-ink-muted); font-size: 12px; line-height: 1.35; }
+      .category-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+      .category-name {
+        color: var(--app-ink);
+        font-size: 13.5px;
+        font-weight: 600;
+      }
+      .category-desc {
+        color: var(--app-ink-muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
 
       .notes {
         list-style: none;
@@ -266,7 +321,12 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
         font-size: 12px;
         line-height: 1.45;
       }
-      .notes lucide-icon { width: 15px; height: 15px; flex: 0 0 auto; margin-top: 1px; }
+      .notes lucide-icon {
+        width: 15px;
+        height: 15px;
+        flex: 0 0 auto;
+        margin-top: 1px;
+      }
     `,
   ],
 })

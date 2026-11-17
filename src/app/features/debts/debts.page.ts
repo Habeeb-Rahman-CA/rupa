@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { DatePipe } from '@angular/common';
 
 import { MatButtonModule } from '@angular/material/button';
@@ -26,6 +26,7 @@ import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
 @Component({
   selector: 'app-debts-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe,
     MatButtonModule,
@@ -38,12 +39,7 @@ import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
   ],
   template: `
     <app-page-header title="Owed" subtitle="What people owe you and what you owe them">
-      <button
-        class="add-btn"
-        type="button"
-        (click)="openAdd()"
-        aria-label="Add debt"
-      >
+      <button class="add-btn" type="button" (click)="openAdd()" aria-label="Add debt">
         <lucide-icon name="plus" />
       </button>
     </app-page-header>
@@ -78,7 +74,9 @@ import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
                     <div class="person-copy">
                       <div class="title">{{ nameFor(d) }}</div>
                       <div class="sub">
-                        @if (d.reason) { {{ d.reason }} · }
+                        @if (d.reason) {
+                          {{ d.reason }} ·
+                        }
                         Opened {{ d.opened_on | date: 'MMM d' }}
                       </div>
                     </div>
@@ -89,7 +87,11 @@ import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
                   </div>
                 </div>
                 <div class="debt-actions">
-                  <button mat-stroked-button class="debt-action-btn they-owe-btn" (click)="openPay(d)">
+                  <button
+                    mat-stroked-button
+                    class="debt-action-btn they-owe-btn"
+                    (click)="openPay(d)"
+                  >
                     <lucide-icon name="wallet" /> Record payment
                   </button>
                   <button
@@ -127,7 +129,9 @@ import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
                     <div class="person-copy">
                       <div class="title">{{ nameFor(d) }}</div>
                       <div class="sub">
-                        @if (d.reason) { {{ d.reason }} · }
+                        @if (d.reason) {
+                          {{ d.reason }} ·
+                        }
                         Opened {{ d.opened_on | date: 'MMM d' }}
                       </div>
                     </div>
@@ -138,7 +142,11 @@ import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
                   </div>
                 </div>
                 <div class="debt-actions">
-                  <button mat-stroked-button class="debt-action-btn you-owe-btn" (click)="openPay(d)">
+                  <button
+                    mat-stroked-button
+                    class="debt-action-btn you-owe-btn"
+                    (click)="openPay(d)"
+                  >
                     <lucide-icon name="wallet" /> Record repayment
                   </button>
                   <button
@@ -160,7 +168,9 @@ import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
   `,
   styles: [
     `
-      .group { margin-bottom: 20px; }
+      .group {
+        margin-bottom: 20px;
+      }
       .group-head {
         display: flex;
         justify-content: space-between;
@@ -187,10 +197,24 @@ import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
         flex-direction: column;
         gap: 8px;
       }
-      .debt-card { padding: 16px; }
-      .debt-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-      .person-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
-      .person-copy { min-width: 0; }
+      .debt-card {
+        padding: 16px;
+      }
+      .debt-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .person-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+      .person-copy {
+        min-width: 0;
+      }
       .avatar {
         width: 40px;
         height: 40px;
@@ -201,18 +225,44 @@ import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
         font-weight: 700;
         font-size: 15px;
       }
-      .title { font-size: 14px; font-weight: 600; color: var(--app-ink); }
-      .sub { overflow: hidden; color: var(--app-ink-muted); font-size: 12px; margin-top: 2px; text-overflow: ellipsis; white-space: nowrap; }
-      .debt-balance { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; }
+      .title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--app-ink);
+      }
+      .sub {
+        overflow: hidden;
+        color: var(--app-ink-muted);
+        font-size: 12px;
+        margin-top: 2px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .debt-balance {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        min-width: 0;
+      }
       .debt-balance strong {
         margin-top: 2px;
         font-size: 17px;
         font-weight: 700;
         font-variant-numeric: tabular-nums;
       }
-      .debt-balance.money-positive strong { color: var(--app-positive); }
-      .debt-balance.money-negative strong { color: var(--app-negative); }
-      .debt-actions { display: grid; grid-template-columns: minmax(0, 1fr) 40px; gap: 8px; align-items: center; margin-top: 14px; }
+      .debt-balance.money-positive strong {
+        color: var(--app-positive);
+      }
+      .debt-balance.money-negative strong {
+        color: var(--app-negative);
+      }
+      .debt-actions {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 40px;
+        gap: 8px;
+        align-items: center;
+        margin-top: 14px;
+      }
       .debt-action-btn {
         min-height: 40px;
         border-radius: 999px !important;
@@ -229,9 +279,17 @@ import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
         background: var(--app-negative-soft) !important;
         color: var(--app-negative) !important;
       }
-      .debt-action-btn.they-owe-btn:hover { background: rgba(22, 163, 74, .2) !important; }
-      .debt-action-btn.you-owe-btn:hover { background: rgba(239, 68, 68, .18) !important; }
-      .debt-action-btn lucide-icon { width: 16px; height: 16px; margin-right: 4px; }
+      .debt-action-btn.they-owe-btn:hover {
+        background: rgba(22, 163, 74, 0.2) !important;
+      }
+      .debt-action-btn.you-owe-btn:hover {
+        background: rgba(239, 68, 68, 0.18) !important;
+      }
+      .debt-action-btn lucide-icon {
+        width: 16px;
+        height: 16px;
+        margin-right: 4px;
+      }
       .debt-delete-btn {
         width: 40px;
         height: 40px;
@@ -239,11 +297,20 @@ import { OwedTabsComponent } from '../../shared/components/owed-tabs.component';
         background: var(--app-negative-soft) !important;
         color: var(--app-negative) !important;
       }
-      .debt-delete-btn:hover { background: rgba(239, 68, 68, .18) !important; }
-      .debt-delete-btn lucide-icon { width: 18px; height: 18px; }
+      .debt-delete-btn:hover {
+        background: rgba(239, 68, 68, 0.18) !important;
+      }
+      .debt-delete-btn lucide-icon {
+        width: 18px;
+        height: 18px;
+      }
       @media (max-width: 480px) {
-        .debt-head { align-items: flex-start; }
-        .debt-balance { padding-top: 2px; }
+        .debt-head {
+          align-items: flex-start;
+        }
+        .debt-balance {
+          padding-top: 2px;
+        }
       }
     `,
   ],
@@ -261,18 +328,11 @@ export class DebtsPage {
   readonly theyOweTotal = this.debtsService.theyOweYouTotal;
   readonly youOweTotal = this.debtsService.youOweTotal;
 
-  readonly theyOwe = computed(() =>
-    this.openDebts().filter((d) => d.direction === 'they_owe'),
-  );
-  readonly youOwe = computed(() =>
-    this.openDebts().filter((d) => d.direction === 'i_owe'),
-  );
+  readonly theyOwe = computed(() => this.openDebts().filter((d) => d.direction === 'they_owe'));
+  readonly youOwe = computed(() => this.openDebts().filter((d) => d.direction === 'i_owe'));
 
   nameFor(debt: Debt): string {
-    return (
-      this.peopleService.people().find((p) => p.id === debt.person_id)?.name ??
-      'Unknown'
-    );
+    return this.peopleService.people().find((p) => p.id === debt.person_id)?.name ?? 'Unknown';
   }
 
   readonly initial = getInitial;

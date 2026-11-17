@@ -1,8 +1,9 @@
-import { Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 @Component({
   selector: 'app-loading-state',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="loading app-card" role="status" aria-live="polite">
       <span class="spinner" aria-hidden="true"></span>
@@ -26,10 +27,12 @@ import { Component, input } from '@angular/core';
         border: 2px solid var(--app-hairline);
         border-top-color: var(--app-accent);
         border-radius: 999px;
-        animation: spin .7s linear infinite;
+        animation: spin 0.7s linear infinite;
       }
       @keyframes spin {
-        to { transform: rotate(360deg); }
+        to {
+          transform: rotate(360deg);
+        }
       }
     `,
   ],

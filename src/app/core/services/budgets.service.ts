@@ -82,7 +82,9 @@ export class BudgetsService {
       try {
         const { data, error } = await this.supabase.client
           .from('budgets')
-          .select('*')
+          .select(
+            'id, owner_id, name, category_id, amount, period, start_date, end_date, recurring, thresholds, created_at, updated_at',
+          )
           .order('start_date', { ascending: false })
           .order('created_at', { ascending: false });
 
@@ -122,9 +124,7 @@ export class BudgetsService {
       .eq('id', id);
     if (error) throw error;
 
-    this._budgets.update((list) =>
-      list.map((b) => (b.id === id ? { ...b, ...patch } : b)),
-    );
+    this._budgets.update((list) => list.map((b) => (b.id === id ? { ...b, ...patch } : b)));
   }
 
   /** Optimistic removal; the row is restored at its old index on failure. */
@@ -136,10 +136,7 @@ export class BudgetsService {
 
     this._budgets.update((list) => list.filter((b) => b.id !== id));
 
-    const { error } = await this.supabase.client
-      .from('budgets')
-      .delete()
-      .eq('id', id);
+    const { error } = await this.supabase.client.from('budgets').delete().eq('id', id);
     if (error) {
       this._budgets.update((list) => {
         if (list.some((b) => b.id === id)) return list;
@@ -162,9 +159,7 @@ export class BudgetsService {
    */
   private async rolloverRecurring(): Promise<void> {
     const today = todayIso();
-    const expired = this._budgets().filter(
-      (b) => b.recurring && b.end_date < today,
-    );
+    const expired = this._budgets().filter((b) => b.recurring && b.end_date < today);
 
     for (const budget of expired) {
       let range = nextPeriodRange(budget);
@@ -218,21 +213,14 @@ export class BudgetsService {
         remaining: roundCurrency(amount - spent),
         percent,
         tone: budgetTone(percent),
-        phase: budgetPhase(
-          { start: budget.start_date, end: budget.end_date },
-          today,
-        ),
+        phase: budgetPhase({ start: budget.start_date, end: budget.end_date }, today),
       };
     });
   });
 
-  readonly activeRows = computed(() =>
-    this.rows().filter((r) => r.phase === 'current'),
-  );
+  readonly activeRows = computed(() => this.rows().filter((r) => r.phase === 'current'));
 
-  readonly upcomingRows = computed(() =>
-    this.rows().filter((r) => r.phase === 'upcoming'),
-  );
+  readonly upcomingRows = computed(() => this.rows().filter((r) => r.phase === 'upcoming'));
 
   /** Finished periods, most recent first — the performance history. */
   readonly historyRows = computed(() =>

@@ -1,4 +1,11 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { MAT_BOTTOM_SHEET_DATA, MatBottomSheetRef } from '@angular/material/bottom-sheet';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -6,10 +13,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 
-import {
-  MoneyHeldDirection,
-  PaymentMode,
-} from '../../core/models/domain.models';
+import { MoneyHeldDirection, PaymentMode } from '../../core/models/domain.models';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
 import { MoneyHeldService } from '../../core/services/money-held.service';
 import { DateFieldComponent } from '../../shared/components/date-field.component';
@@ -28,6 +32,7 @@ export interface RecordMoneyHeldSheetData {
 @Component({
   selector: 'app-record-money-held-sheet',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SheetDragCloseDirective,
     MatButtonModule,
@@ -51,7 +56,9 @@ export interface RecordMoneyHeldSheetData {
           class="direction-toggle"
         >
           <mat-button-toggle value="received">Received</mat-button-toggle>
-          <mat-button-toggle value="returned" [disabled]="outstanding() <= 0">Returned</mat-button-toggle>
+          <mat-button-toggle value="returned" [disabled]="outstanding() <= 0"
+            >Returned</mat-button-toggle
+          >
         </mat-button-toggle-group>
       </header>
 
@@ -127,13 +134,19 @@ export interface RecordMoneyHeldSheetData {
         @if (direction() === 'received') {
           This will increase money held for {{ data.personName }}. It will not be counted as income.
         } @else {
-          This will reduce money held for {{ data.personName }}. It will not be counted as an expense.
+          This will reduce money held for {{ data.personName }}. It will not be counted as an
+          expense.
         }
       </div>
 
       <div class="actions">
         <button mat-button (click)="close()" [disabled]="submitting()">Cancel</button>
-        <button mat-flat-button color="primary" (click)="save()" [disabled]="!canSave() || submitting()">
+        <button
+          mat-flat-button
+          color="primary"
+          (click)="save()"
+          [disabled]="!canSave() || submitting()"
+        >
           {{ submitting() ? 'Saving…' : 'Save record' }}
         </button>
       </div>
@@ -153,9 +166,21 @@ export interface RecordMoneyHeldSheetData {
         justify-content: space-between;
         gap: 12px;
       }
-      h2 { margin: 0; font-size: 17px; font-weight: 700; }
-      .sheet-header p { margin: 4px 0 0; color: var(--app-ink-muted); font-size: 12px; }
-      .direction-toggle { flex: 0 0 auto; transform: scale(.9); transform-origin: right top; }
+      h2 {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 700;
+      }
+      .sheet-header p {
+        margin: 4px 0 0;
+        color: var(--app-ink-muted);
+        font-size: 12px;
+      }
+      .direction-toggle {
+        flex: 0 0 auto;
+        transform: scale(0.9);
+        transform-origin: right top;
+      }
       .balance-hint {
         padding: 10px 12px;
         border-radius: var(--app-radius-md);
@@ -163,11 +188,26 @@ export interface RecordMoneyHeldSheetData {
         color: var(--app-ink-muted);
         font-size: 13px;
       }
-      .balance-hint strong { color: var(--app-ink); }
-      .field-group { display: flex; flex-direction: column; gap: 6px; }
-      .ft-label { color: var(--app-ink); font-size: 13px; font-weight: 500; }
-      .payment-mode-toggle { display: flex; width: 100%; }
-      .payment-mode-toggle mat-button-toggle { flex: 1; }
+      .balance-hint strong {
+        color: var(--app-ink);
+      }
+      .field-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .ft-label {
+        color: var(--app-ink);
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .payment-mode-toggle {
+        display: flex;
+        width: 100%;
+      }
+      .payment-mode-toggle mat-button-toggle {
+        flex: 1;
+      }
       .no-bank-notice {
         display: flex;
         align-items: center;
@@ -178,7 +218,11 @@ export interface RecordMoneyHeldSheetData {
         color: var(--app-ink-muted);
         font-size: 13px;
       }
-      .no-bank-notice lucide-icon { width: 16px; height: 16px; flex: 0 0 auto; }
+      .no-bank-notice lucide-icon {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+      }
       .link-btn {
         margin-left: auto;
         padding: 0;
@@ -189,8 +233,17 @@ export interface RecordMoneyHeldSheetData {
         font-size: 12px;
         font-weight: 600;
       }
-      .hint { color: var(--app-ink-muted); font-size: 12px; line-height: 1.35; }
-      .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+      .hint {
+        color: var(--app-ink-muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 4px;
+      }
     `,
   ],
 })
@@ -227,7 +280,11 @@ export class RecordMoneyHeldSheetComponent {
     if (this.direction() === 'returned' && !isLessOrEqualCurrency(value, this.outstanding())) {
       return false;
     }
-    return !(this.paymentMode() === 'bank' && this.bankAccountOptions().length > 0 && !this.selectedBankAccountId());
+    return !(
+      this.paymentMode() === 'bank' &&
+      this.bankAccountOptions().length > 0 &&
+      !this.selectedBankAccountId()
+    );
   });
 
   constructor() {
@@ -272,12 +329,16 @@ export class RecordMoneyHeldSheetComponent {
       this.snack.open('Money-held record saved.', undefined, { duration: 2000 });
       this.ref.dismiss({ saved: true });
     } catch (error: unknown) {
-      this.snack.open(errorText(error, 'Couldn’t save — please try again.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(errorText(error, 'Couldn’t save — please try again.'), 'Dismiss', {
+        duration: 4000,
+      });
       this.submitting.set(false);
     }
   }
 
-  close(): void { this.ref.dismiss(); }
+  close(): void {
+    this.ref.dismiss();
+  }
 
   openBankAccounts(): void {
     this.ref.dismiss();

@@ -1,9 +1,5 @@
-import { Component, inject } from '@angular/core';
-import {
-  MatDialog,
-  MatDialogModule,
-  MatDialogRef,
-} from '@angular/material/dialog';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { LucideAngularModule } from 'lucide-angular';
 
@@ -16,6 +12,7 @@ import { CONTACT_INFO } from '../../core/contact-info';
 @Component({
   selector: 'app-contact-dialog',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MatDialogModule, MatButtonModule, LucideAngularModule],
   template: `
     <div class="dialog-container">
@@ -108,10 +105,16 @@ import { CONTACT_INFO } from '../../core/contact-info';
         background: var(--app-input-bg);
         text-decoration: none;
         color: var(--app-ink);
-        transition: background .12s ease, transform .1s ease;
+        transition:
+          background 0.12s ease,
+          transform 0.1s ease;
       }
-      .opt:hover { background: var(--app-canvas); }
-      .opt:active { transform: scale(0.99); }
+      .opt:hover {
+        background: var(--app-canvas);
+      }
+      .opt:active {
+        transform: scale(0.99);
+      }
 
       .opt-icon {
         width: 40px;
@@ -123,9 +126,14 @@ import { CONTACT_INFO } from '../../core/contact-info';
         place-items: center;
         flex: 0 0 auto;
       }
-      .opt-icon lucide-icon { width: 20px; height: 20px; }
+      .opt-icon lucide-icon {
+        width: 20px;
+        height: 20px;
+      }
 
-      .opt-body { min-width: 0; }
+      .opt-body {
+        min-width: 0;
+      }
       .opt-label {
         font-size: 11px;
         font-weight: 600;

@@ -1,4 +1,5 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   ElementRef,
   ViewChild,
@@ -26,16 +27,13 @@ let nextFieldId = 0;
 @Component({
   selector: 'app-text-field',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, LucideAngularModule],
   template: `
     @if (label()) {
       <label class="ft-label" [for]="inputId()">{{ label() }}</label>
     }
-    <div
-      class="ft-field"
-      [class.invalid]="invalid()"
-      [class.focused]="focused()"
-    >
+    <div class="ft-field" [class.invalid]="invalid()" [class.focused]="focused()">
       @if (leadIcon()) {
         <lucide-icon class="ft-lead" [name]="leadIcon()!" />
       }
@@ -89,7 +87,9 @@ let nextFieldId = 0;
         border-radius: 14px;
         padding: 0 12px;
         height: 52px;
-        transition: border-color .15s ease, background .15s ease;
+        transition:
+          border-color 0.15s ease,
+          background 0.15s ease;
       }
 
       .ft-field.focused {
@@ -133,12 +133,12 @@ let nextFieldId = 0;
       }
 
       // Kill the ugly spinner on number inputs
-      input[type="number"]::-webkit-outer-spin-button,
-      input[type="number"]::-webkit-inner-spin-button {
+      input[type='number']::-webkit-outer-spin-button,
+      input[type='number']::-webkit-inner-spin-button {
         -webkit-appearance: none;
         margin: 0;
       }
-      input[type="number"] {
+      input[type='number'] {
         -moz-appearance: textfield;
       }
 

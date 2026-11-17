@@ -1,4 +1,4 @@
-import { Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 
 export interface ChartPoint {
   label: string;
@@ -18,6 +18,7 @@ export interface ChartPoint {
 @Component({
   selector: 'app-line-chart',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (points().length >= 2) {
       <div class="chart">
@@ -30,15 +31,12 @@ export interface ChartPoint {
         >
           <defs>
             <linearGradient [attr.id]="gradId" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" [attr.stop-color]="strokeColor()" stop-opacity="0.18"/>
-              <stop offset="100%" [attr.stop-color]="strokeColor()" stop-opacity="0"/>
+              <stop offset="0%" [attr.stop-color]="strokeColor()" stop-opacity="0.18" />
+              <stop offset="100%" [attr.stop-color]="strokeColor()" stop-opacity="0" />
             </linearGradient>
           </defs>
 
-          <path
-            [attr.d]="areaPath()"
-            [attr.fill]="'url(#' + gradId + ')'"
-          />
+          <path [attr.d]="areaPath()" [attr.fill]="'url(#' + gradId + ')'" />
           <path
             [attr.d]="linePath()"
             fill="none"
@@ -135,7 +133,9 @@ export interface ChartPoint {
         top: -4px;
         pointer-events: none;
         z-index: 10;
-        transition: left 0.15s ease, transform 0.15s ease;
+        transition:
+          left 0.15s ease,
+          transform 0.15s ease;
       }
       .tt-val {
         background: var(--app-ink-dark);

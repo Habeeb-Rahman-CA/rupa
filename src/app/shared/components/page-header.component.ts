@@ -1,8 +1,9 @@
-import { Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 @Component({
   selector: 'app-page-header',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="page-header">
       <div class="titles">
@@ -25,7 +26,9 @@ import { Component, input } from '@angular/core';
         gap: 12px;
         margin: 8px 0 20px;
       }
-      .titles { min-width: 0; }
+      .titles {
+        min-width: 0;
+      }
       h1 {
         margin: 0;
         font-size: 26px;

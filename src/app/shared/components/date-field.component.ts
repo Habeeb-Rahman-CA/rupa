@@ -1,10 +1,7 @@
-import { Component, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
-import {
-  MatDatepickerModule,
-  MatDatepickerInputEvent,
-} from '@angular/material/datepicker';
+import { MatDatepickerModule, MatDatepickerInputEvent } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -23,6 +20,7 @@ import { LucideAngularModule } from 'lucide-angular';
 @Component({
   selector: 'app-date-field',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
     DatePipe,
@@ -51,11 +49,7 @@ import { LucideAngularModule } from 'lucide-angular';
       (focus)="isFocused.set(true)"
       (blur)="isFocused.set(false)"
     >
-      <div
-        class="df-trigger"
-        [class.focused]="isFocused() || isOpen()"
-        [class.invalid]="invalid()"
-      >
+      <div class="df-trigger" [class.focused]="isFocused() || isOpen()" [class.invalid]="invalid()">
         <lucide-icon class="df-lead" name="calendar" />
         <span class="df-value" [class.placeholder]="!value()">
           {{ value() ? (value() | date: displayFormat()) : placeholder() }}
@@ -80,11 +74,7 @@ import { LucideAngularModule } from 'lucide-angular';
         (dateChange)="onDateChange($event)"
         readonly
       />
-      <mat-datepicker
-        #picker
-        (opened)="isOpen.set(true)"
-        (closed)="isOpen.set(false)"
-      />
+      <mat-datepicker #picker (opened)="isOpen.set(true)" (closed)="isOpen.set(false)" />
     </mat-form-field>
   `,
   styles: [
@@ -126,7 +116,9 @@ import { LucideAngularModule } from 'lucide-angular';
         background: var(--app-input-bg);
         border: 1px solid transparent;
         border-radius: 14px;
-        transition: background .15s ease, border-color .15s ease;
+        transition:
+          background 0.15s ease,
+          border-color 0.15s ease;
       }
       .df-trigger.focused {
         background: #fff;

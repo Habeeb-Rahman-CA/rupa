@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -23,6 +23,7 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
 @Component({
   selector: 'app-bank-accounts-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     RouterLink,
@@ -37,22 +38,14 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
   ],
   template: `
     <!-- Top Page Header matching system standards -->
-    <app-page-header
-      title="Cards"
-      subtitle="Manage your cards and accounts"
-    >
+    <app-page-header title="Cards" subtitle="Manage your cards and accounts">
       @if (cards().length > 1) {
         <a class="transfer-link" routerLink="/transfers">
           <lucide-icon name="arrow-left-right" />
           <span>Transfer</span>
         </a>
       }
-      <button
-        class="add-btn"
-        type="button"
-        (click)="openAddDialog()"
-        aria-label="Add card"
-      >
+      <button class="add-btn" type="button" (click)="openAddDialog()" aria-label="Add card">
         <lucide-icon name="plus" />
       </button>
     </app-page-header>
@@ -69,7 +62,12 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
         message="Add your first card to organize your bank accounts, debit, and credit cards."
       />
       <div class="empty-actions-wrap">
-        <button mat-flat-button color="primary" (click)="openAddDialog()" class="primary-action-btn">
+        <button
+          mat-flat-button
+          color="primary"
+          (click)="openAddDialog()"
+          class="primary-action-btn"
+        >
           <lucide-icon name="plus" />
           Add Your First Card
         </button>
@@ -81,7 +79,9 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
           <span class="micro-label">Cards balance</span>
           <strong>{{ totalBalance() | signedMoney }}</strong>
         </div>
-        <span class="overview-count">{{ cards().length }} card{{ cards().length === 1 ? '' : 's' }}</span>
+        <span class="overview-count"
+          >{{ cards().length }} card{{ cards().length === 1 ? '' : 's' }}</span
+        >
       </section>
 
       <div class="cards-grid">
@@ -136,9 +136,7 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
               </div>
 
               <!-- Card Number -->
-              <div class="card-number">
-                •••• •••• •••• {{ card.card_number_masked }}
-              </div>
+              <div class="card-number">•••• •••• •••• {{ card.card_number_masked }}</div>
 
               <!-- Card Bottom Meta -->
               <div class="card-footer">
@@ -163,9 +161,7 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
               <div class="card-nickname">
                 <span>{{ card.account_name }}</span>
                 @if (card.balance !== undefined) {
-                  <span class="card-balance-tag">
-                    ₹{{ card.balance | number:'1.0-0' }}
-                  </span>
+                  <span class="card-balance-tag"> ₹{{ card.balance | number: '1.0-0' }} </span>
                 }
               </div>
 
@@ -221,10 +217,19 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
         font-weight: 700;
         text-decoration: none;
       }
-      .transfer-link lucide-icon { width: 17px; height: 17px; }
+      .transfer-link lucide-icon {
+        width: 17px;
+        height: 17px;
+      }
       @media (max-width: 480px) {
-        .transfer-link span { display: none; }
-        .transfer-link { width: 40px; justify-content: center; padding: 0; }
+        .transfer-link span {
+          display: none;
+        }
+        .transfer-link {
+          width: 40px;
+          justify-content: center;
+          padding: 0;
+        }
       }
       .empty-actions-wrap {
         display: flex;
@@ -240,11 +245,39 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
         gap: 6px;
       }
 
-      .overview { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding: 14px 16px; }
-      .overview-icon { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border-radius: 14px; background: var(--app-accent-soft); color: var(--app-accent); }
-      .overview-icon lucide-icon { width: 19px; height: 19px; }
-      .overview strong { display: block; margin-top: 2px; color: var(--app-ink); font-size: 20px; font-variant-numeric: tabular-nums; }
-      .overview-count { margin-left: auto; color: var(--app-ink-muted); font-size: 12px; }
+      .overview {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+        padding: 14px 16px;
+      }
+      .overview-icon {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        flex: 0 0 auto;
+        border-radius: 14px;
+        background: var(--app-accent-soft);
+        color: var(--app-accent);
+      }
+      .overview-icon lucide-icon {
+        width: 19px;
+        height: 19px;
+      }
+      .overview strong {
+        display: block;
+        margin-top: 2px;
+        color: var(--app-ink);
+        font-size: 20px;
+        font-variant-numeric: tabular-nums;
+      }
+      .overview-count {
+        margin-left: auto;
+        color: var(--app-ink-muted);
+        font-size: 12px;
+      }
 
       /* Cards Grid */
       .cards-grid {
@@ -281,7 +314,9 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
         justify-content: space-between;
         min-height: 210px;
         cursor: pointer;
-        transition: transform 0.25s ease, box-shadow 0.25s ease;
+        transition:
+          transform 0.25s ease,
+          box-shadow 0.25s ease;
         overflow: hidden;
 
         &:hover {
@@ -415,8 +450,14 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
         border-radius: 50%;
         display: inline-block;
       }
-      .mc-circle.red { background: #eb001b; }
-      .mc-circle.yellow { background: #f79e1b; margin-left: -11px; opacity: 0.9; }
+      .mc-circle.red {
+        background: #eb001b;
+      }
+      .mc-circle.yellow {
+        background: #f79e1b;
+        margin-left: -11px;
+        opacity: 0.9;
+      }
 
       .rupay-text {
         font-size: 16px;
@@ -498,7 +539,11 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
         min-width: 0;
         flex: 1 1 auto;
       }
-      .card-nickname > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .card-nickname > span:first-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .card-balance-tag {
         font-size: 12px;
         font-weight: 700;
@@ -547,20 +592,23 @@ export class BankAccountsPage {
       data: { isFirstCard, currentBalance },
     });
 
-    ref.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(async (result) => {
-      if (result) {
-        try {
-          await this.bankAccountsService.create(result);
-          this.snack.open(
-            isFirstCard ? 'Primary card created & balance linked!' : 'Card added successfully!',
-            undefined,
-            { duration: 3000 }
-          );
-        } catch {
-          this.snack.open('Failed to add card', 'Dismiss', { duration: 3000 });
+    ref
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(async (result) => {
+        if (result) {
+          try {
+            await this.bankAccountsService.create(result);
+            this.snack.open(
+              isFirstCard ? 'Primary card created & balance linked!' : 'Card added successfully!',
+              undefined,
+              { duration: 3000 },
+            );
+          } catch {
+            this.snack.open('Failed to add card', 'Dismiss', { duration: 3000 });
+          }
         }
-      }
-    });
+      });
   }
 
   openEditDialog(card: BankAccount): void {
@@ -569,16 +617,19 @@ export class BankAccountsPage {
       data: { account: card },
     });
 
-    ref.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe(async (result) => {
-      if (result) {
-        try {
-          await this.bankAccountsService.update(card.id, result);
-          this.snack.open('Card updated successfully!', undefined, { duration: 2500 });
-        } catch {
-          this.snack.open('Failed to update card', 'Dismiss', { duration: 3000 });
+    ref
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(async (result) => {
+        if (result) {
+          try {
+            await this.bankAccountsService.update(card.id, result);
+            this.snack.open('Card updated successfully!', undefined, { duration: 2500 });
+          } catch {
+            this.snack.open('Failed to update card', 'Dismiss', { duration: 3000 });
+          }
         }
-      }
-    });
+      });
   }
 
   async setPrimary(card: BankAccount): Promise<void> {
@@ -616,10 +667,13 @@ export class BankAccountsPage {
       width: '100%',
     });
 
-    dialogRef.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((res) => {
-      if (res?.edit) {
-        this.openEditDialog(card);
-      }
-    });
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((res) => {
+        if (res?.edit) {
+          this.openEditDialog(card);
+        }
+      });
   }
 }

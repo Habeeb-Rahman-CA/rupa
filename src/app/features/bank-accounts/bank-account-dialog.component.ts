@@ -1,4 +1,4 @@
-import { Component, Inject, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Inject, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -17,6 +17,7 @@ export interface BankAccountDialogData {
 @Component({
   selector: 'app-bank-account-dialog',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     FormsModule,
@@ -32,7 +33,13 @@ export interface BankAccountDialogData {
       <div class="dialog-header">
         <div class="header-text-group">
           <h2 mat-dialog-title class="dialog-title">
-            {{ isEdit ? 'Edit Bank Card' : (isFirstCard ? 'Add Your First Bank Card' : 'Add Bank Account') }}
+            {{
+              isEdit
+                ? 'Edit Bank Card'
+                : isFirstCard
+                  ? 'Add Your First Bank Card'
+                  : 'Add Bank Account'
+            }}
           </h2>
           <p class="dialog-subtitle">Configure card details and physical appearance</p>
         </div>
@@ -48,8 +55,9 @@ export interface BankAccountDialogData {
             <div class="notice-body">
               <div class="notice-title">Primary Card Automatic Setup</div>
               <div class="notice-desc">
-                This will be designated as your <strong>Primary Account</strong>. Your current net account balance
-                (₹{{ currentBalance | number:'1.0-0' }}) and transactions will be linked to this card.
+                This will be designated as your <strong>Primary Account</strong>. Your current net
+                account balance (₹{{ currentBalance | number: '1.0-0' }}) and transactions will be
+                linked to this card.
               </div>
             </div>
           </div>
@@ -94,9 +102,7 @@ export interface BankAccountDialogData {
             </div>
 
             <!-- Card Number -->
-            <div class="card-number">
-              •••• •••• •••• {{ last4Digits() || '4329' }}
-            </div>
+            <div class="card-number">•••• •••• •••• {{ last4Digits() || '4329' }}</div>
 
             <!-- Card Footer Details -->
             <div class="card-footer">
@@ -200,7 +206,11 @@ export interface BankAccountDialogData {
           </div>
 
           <!-- Card Balance & Credit Limit -->
-          <div class="form-group" [class.half]="cardType() === 'credit'" [class.full]="cardType() !== 'credit'">
+          <div
+            class="form-group"
+            [class.half]="cardType() === 'credit'"
+            [class.full]="cardType() !== 'credit'"
+          >
             <app-text-field
               label="Card Balance (₹)"
               type="number"
@@ -293,7 +303,7 @@ export interface BankAccountDialogData {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        padding: 0 16px 12px 16px;;
+        padding: 0 16px 12px 16px;
         border-bottom: 1px solid var(--app-hairline);
       }
       .dialog-title {
@@ -490,8 +500,14 @@ export interface BankAccountDialogData {
         border-radius: 50%;
         display: inline-block;
       }
-      .mc-logo .circle.red { background: #eb001b; }
-      .mc-logo .circle.orange { background: #f79e1b; margin-left: -9px; opacity: 0.9; }
+      .mc-logo .circle.red {
+        background: #eb001b;
+      }
+      .mc-logo .circle.orange {
+        background: #f79e1b;
+        margin-left: -9px;
+        opacity: 0.9;
+      }
       .rupay-logo {
         font-size: 14px;
         font-weight: 800;
@@ -594,7 +610,9 @@ export interface BankAccountDialogData {
         display: grid;
         place-items: center;
         color: #fff;
-        transition: transform 0.15s ease, border-color 0.15s ease;
+        transition:
+          transform 0.15s ease,
+          border-color 0.15s ease;
 
         &:hover {
           transform: scale(1.08);
@@ -604,13 +622,27 @@ export interface BankAccountDialogData {
           transform: scale(1.12);
         }
       }
-      .theme-swatch[data-theme='blue'] { background: #2563eb; }
-      .theme-swatch[data-theme='purple'] { background: #7c3aed; }
-      .theme-swatch[data-theme='dark'] { background: #1e293b; }
-      .theme-swatch[data-theme='emerald'] { background: #059669; }
-      .theme-swatch[data-theme='sunset'] { background: #ea580c; }
-      .theme-swatch[data-theme='gold'] { background: #b45309; }
-      .theme-swatch[data-theme='rose'] { background: #be123c; }
+      .theme-swatch[data-theme='blue'] {
+        background: #2563eb;
+      }
+      .theme-swatch[data-theme='purple'] {
+        background: #7c3aed;
+      }
+      .theme-swatch[data-theme='dark'] {
+        background: #1e293b;
+      }
+      .theme-swatch[data-theme='emerald'] {
+        background: #059669;
+      }
+      .theme-swatch[data-theme='sunset'] {
+        background: #ea580c;
+      }
+      .theme-swatch[data-theme='gold'] {
+        background: #b45309;
+      }
+      .theme-swatch[data-theme='rose'] {
+        background: #be123c;
+      }
 
       .check-icon {
         width: 16px;

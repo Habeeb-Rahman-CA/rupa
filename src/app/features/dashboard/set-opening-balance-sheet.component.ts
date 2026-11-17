@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatBottomSheetRef } from '@angular/material/bottom-sheet';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -13,6 +13,7 @@ import { errorText } from '../../shared/utils/error-utils';
 @Component({
   selector: 'app-set-opening-balance-sheet',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SheetDragCloseDirective,
     MatButtonModule,
@@ -26,7 +27,9 @@ import { errorText } from '../../shared/utils/error-utils';
       <header class="sheet-header">
         <div>
           <h2>Set starting balance</h2>
-          <p class="subtitle">Set your starting money without distorting your monthly income and expense totals.</p>
+          <p class="subtitle">
+            Set your starting money without distorting your monthly income and expense totals.
+          </p>
         </div>
       </header>
 
@@ -56,7 +59,9 @@ import { errorText } from '../../shared/utils/error-utils';
       </mat-button-toggle-group>
 
       <div class="hint">
-        This initial balance is recorded as an opening entry dated in the past so it only affects your <strong>Total Balance</strong> and will <strong>not</strong> count towards your monthly Income or Expense statistics.
+        This initial balance is recorded as an opening entry dated in the past so it only affects
+        your <strong>Total Balance</strong> and will <strong>not</strong> count towards your monthly
+        Income or Expense statistics.
       </div>
 
       <div class="actions">
@@ -147,7 +152,9 @@ export class SetOpeningBalanceSheetComponent {
       this.snack.open('Starting balance updated.', undefined, { duration: 2000 });
       this.ref.dismiss({ saved: true });
     } catch (e: unknown) {
-      this.snack.open(errorText(e, 'Could not set starting balance.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(errorText(e, 'Could not set starting balance.'), 'Dismiss', {
+        duration: 4000,
+      });
       this.submitting.set(false);
     }
   }

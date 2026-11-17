@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -21,17 +21,17 @@ import { PageHeaderComponent } from '../../shared/components/page-header.compone
 import { CardsTabsComponent } from '../../shared/components/cards-tabs.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state.component';
 import { LoadingStateComponent } from '../../shared/components/loading-state.component';
+import { todayIso } from '../../shared/utils/budget-utils';
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
 import { openConfirm } from '../../shared/components/confirm-dialog.component';
 import { errorText } from '../../shared/utils/error-utils';
 import { SubscriptionDialogComponent } from './subscription-dialog.component';
-import {
-  RecordSubscriptionPaymentDialogComponent,
-} from './record-subscription-payment-dialog.component';
+import { RecordSubscriptionPaymentDialogComponent } from './record-subscription-payment-dialog.component';
 
 @Component({
   selector: 'app-subscriptions-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe,
     MatButtonModule,
@@ -44,10 +44,7 @@ import {
     SignedMoneyPipe,
   ],
   template: `
-    <app-page-header
-      title="Subscriptions"
-      subtitle="Plan renewals, payments, and recurring costs"
-    >
+    <app-page-header title="Subscriptions" subtitle="Plan renewals, payments, and recurring costs">
       <button class="add-btn" type="button" (click)="openAdd()" aria-label="Add subscription">
         <lucide-icon name="plus" />
       </button>
@@ -85,124 +82,140 @@ import {
                   <strong>{{ reminder.subscription.name }}</strong>
                   <span>{{ reminder.subscription.next_renewal_date | date: 'MMM d, y' }}</span>
                 </div>
-                <span class="reminder-pill">{{ reminder.daysUntilRenewal }} day{{ reminder.daysUntilRenewal === 1 ? '' : 's' }}</span>
+                <span class="reminder-pill"
+                  >{{ reminder.daysUntilRenewal }} day{{
+                    reminder.daysUntilRenewal === 1 ? '' : 's'
+                  }}</span
+                >
               </div>
             }
           </div>
-          <p class="section-note">Reminders never create expenses automatically. Record a payment only when it actually happens.</p>
+          <p class="section-note">
+            Reminders never create expenses automatically. Record a payment only when it actually
+            happens.
+          </p>
         </section>
       }
 
       <section class="subscriptions-grid">
-          @for (subscription of sortedSubscriptions(); track subscription.id) {
-            <article
-              class="sub-card-wrapper"
-              [class.is-history]="isHistory(subscription)"
-            >
-              <!-- Digital Subscription Pass Card Face -->
-              <div class="sub-pass-face" [attr.data-theme]="getTheme(subscription)">
-                <div class="pass-ambient-glow"></div>
+        @for (subscription of sortedSubscriptions(); track subscription.id) {
+          <article class="sub-card-wrapper" [class.is-history]="isHistory(subscription)">
+            <!-- Digital Subscription Pass Card Face -->
+            <div class="sub-pass-face" [attr.data-theme]="getTheme(subscription)">
+              <div class="pass-ambient-glow"></div>
 
-                <!-- Pass Top Header: Compact Emblem + Titles + Status Dot -->
-                <div class="pass-top">
-                  <div class="pass-identity">
-                    <div class="pass-emblem">
-                      <lucide-icon [name]="getIconName(subscription)" />
-                    </div>
-                    <div class="pass-titles">
-                      <span class="pass-eyebrow">{{ getEyebrow(subscription) }}</span>
-                      <h2 class="pass-name" [title]="subscription.name">{{ subscription.name }}</h2>
-                    </div>
+              <!-- Pass Top Header: Compact Emblem + Titles + Status Dot -->
+              <div class="pass-top">
+                <div class="pass-identity">
+                  <div class="pass-emblem">
+                    <lucide-icon [name]="getIconName(subscription)" />
                   </div>
-
-                  <span class="pass-status-pill" [attr.data-status]="statusFor(subscription)">
-                    <i class="status-dot"></i>
-                    {{ statusLabel(statusFor(subscription)) }}
-                  </span>
-                </div>
-
-                <!-- Pricing & Next Renewal Info -->
-                <div class="pass-middle">
-                  <div class="pass-amount-wrap">
-                    <strong class="pass-amount">{{ subscription.amount | signedMoney }}</strong>
-                    <span class="pass-cadence">{{ cycleLabel(subscription.billing_cycle, true) }}</span>
-                  </div>
-
-                  <div class="pass-renewal-chip" [class.urgent]="isDueSoon(subscription)">
-                    <span class="chip-date">{{ subscription.next_renewal_date | date: 'MMM d' }}</span>
-                    <span class="chip-sep">·</span>
-                    <span class="chip-days">{{ daysLabel(subscription.next_renewal_date, 'Renewal') }}</span>
+                  <div class="pass-titles">
+                    <span class="pass-eyebrow">{{ getEyebrow(subscription) }}</span>
+                    <h2 class="pass-name" [title]="subscription.name">{{ subscription.name }}</h2>
                   </div>
                 </div>
 
-                <!-- Slim Progress Bar -->
-                <div
-                  class="cycle-progress-track"
-                  [matTooltip]="getCycleProgress(subscription) + '% through billing cycle'"
-                >
-                  <div class="cycle-progress-fill" [style.width.%]="getCycleProgress(subscription)"></div>
+                <span class="pass-status-pill" [attr.data-status]="statusFor(subscription)">
+                  <i class="status-dot"></i>
+                  {{ statusLabel(statusFor(subscription)) }}
+                </span>
+              </div>
+
+              <!-- Pricing & Next Renewal Info -->
+              <div class="pass-middle">
+                <div class="pass-amount-wrap">
+                  <strong class="pass-amount">{{ subscription.amount | signedMoney }}</strong>
+                  <span class="pass-cadence">{{
+                    cycleLabel(subscription.billing_cycle, true)
+                  }}</span>
                 </div>
 
-                <!-- Compact Meta Row -->
-                <div class="pass-meta-compact">
-                  <span class="meta-item" [title]="accountName(subscription.payment_account_id)">
-                    <lucide-icon name="credit-card" />
-                    {{ accountName(subscription.payment_account_id) }}
-                  </span>
-                </div>
-
-                @if (subscription.notes) {
-                  <p class="pass-notes" [title]="subscription.notes">
-                    <lucide-icon name="sticky-note" />
-                    <span>{{ subscription.notes }}</span>
-                  </p>
-                }
-
-                <!-- Card Actions: Renew (no icon) + Edit + Delete -->
-                <div class="pass-actions">
-                  @if (statusFor(subscription) === 'active' || statusFor(subscription) === 'paused') {
-                    <button
-                      mat-stroked-button
-                      type="button"
-                      class="pass-pay-btn"
-                      (click)="renew(subscription)"
-                    >
-                      Renew
-                    </button>
-                  }
-
-                  <div class="pass-action-icons">
-                    <button
-                      mat-icon-button
-                      type="button"
-                      (click)="openEdit(subscription)"
-                      matTooltip="Edit subscription"
-                      aria-label="Edit subscription"
-                    >
-                      <lucide-icon name="pencil" />
-                    </button>
-
-                    <button
-                      mat-icon-button
-                      type="button"
-                      class="danger-button"
-                      (click)="confirmDelete(subscription)"
-                      matTooltip="Delete subscription"
-                      aria-label="Delete subscription"
-                    >
-                      <lucide-icon name="trash-2" />
-                    </button>
-                  </div>
+                <div class="pass-renewal-chip" [class.urgent]="isDueSoon(subscription)">
+                  <span class="chip-date">{{
+                    subscription.next_renewal_date | date: 'MMM d'
+                  }}</span>
+                  <span class="chip-sep">·</span>
+                  <span class="chip-days">{{
+                    daysLabel(subscription.next_renewal_date, 'Renewal')
+                  }}</span>
                 </div>
               </div>
-            </article>
-          }
-        </section>
+
+              <!-- Slim Progress Bar -->
+              <div
+                class="cycle-progress-track"
+                [matTooltip]="getCycleProgress(subscription) + '% through billing cycle'"
+              >
+                <div
+                  class="cycle-progress-fill"
+                  [style.width.%]="getCycleProgress(subscription)"
+                ></div>
+              </div>
+
+              <!-- Compact Meta Row -->
+              <div class="pass-meta-compact">
+                <span class="meta-item" [title]="accountName(subscription.payment_account_id)">
+                  <lucide-icon name="credit-card" />
+                  {{ accountName(subscription.payment_account_id) }}
+                </span>
+              </div>
+
+              @if (subscription.notes) {
+                <p class="pass-notes" [title]="subscription.notes">
+                  <lucide-icon name="sticky-note" />
+                  <span>{{ subscription.notes }}</span>
+                </p>
+              }
+
+              <!-- Card Actions: Renew (no icon) + Edit + Delete -->
+              <div class="pass-actions">
+                @if (statusFor(subscription) === 'active' || statusFor(subscription) === 'paused') {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    class="pass-pay-btn"
+                    (click)="renew(subscription)"
+                  >
+                    Renew
+                  </button>
+                }
+
+                <div class="pass-action-icons">
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="openEdit(subscription)"
+                    matTooltip="Edit subscription"
+                    aria-label="Edit subscription"
+                  >
+                    <lucide-icon name="pencil" />
+                  </button>
+
+                  <button
+                    mat-icon-button
+                    type="button"
+                    class="danger-button"
+                    (click)="confirmDelete(subscription)"
+                    matTooltip="Delete subscription"
+                    aria-label="Delete subscription"
+                  >
+                    <lucide-icon name="trash-2" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </article>
+        }
+      </section>
 
       @if (payments().length > 0) {
         <section class="history-section">
           <div class="section-heading page-section-heading">
-            <div><span class="micro-label">Actual payments</span><h2>Payment &amp; renewal history</h2></div>
+            <div>
+              <span class="micro-label">Actual payments</span>
+              <h2>Payment &amp; renewal history</h2>
+            </div>
             <lucide-icon name="receipt" />
           </div>
           <div class="history-list app-card">
@@ -210,9 +223,16 @@ import {
               <div class="history-row">
                 <div class="history-copy">
                   <strong>{{ subscriptionName(payment.subscription_id) }}</strong>
-                  <span>Paid {{ payment.paid_on | date: 'MMM d, y' }} · Renewal due {{ renewalDue(payment.renewal_id) | date: 'MMM d, y' }}</span>
+                  <span
+                    >Paid {{ payment.paid_on | date: 'MMM d, y' }} · Renewal due
+                    {{ renewalDue(payment.renewal_id) | date: 'MMM d, y' }}</span
+                  >
                 </div>
-                <div class="history-amount"><strong>{{ payment.amount | signedMoney }}</strong><span>{{ payment.transaction_id ? 'Linked expense' : 'Unlinked' }}</span></div>
+                <div class="history-amount">
+                  <strong>{{ payment.amount | signedMoney }}</strong><span>{{
+                    payment.transaction_id ? 'Linked expense' : 'Unlinked'
+                  }}</span>
+                </div>
               </div>
             }
           </div>
@@ -222,14 +242,26 @@ import {
       @if (priceChanges().length > 0) {
         <section class="history-section">
           <div class="section-heading page-section-heading">
-            <div><span class="micro-label">Price tracking</span><h2>Price changes</h2></div>
+            <div>
+              <span class="micro-label">Price tracking</span>
+              <h2>Price changes</h2>
+            </div>
             <lucide-icon name="trending-up" />
           </div>
           <div class="history-list app-card">
             @for (change of priceChanges(); track change.id) {
               <div class="history-row">
-                <div class="history-copy"><strong>{{ subscriptionName(change.subscription_id) }}</strong><span>Effective {{ change.effective_on | date: 'MMM d, y' }}</span></div>
-                <div class="history-amount"><strong>{{ change.old_amount | signedMoney }} → {{ change.new_amount | signedMoney }}</strong><span>Price updated</span></div>
+                <div class="history-copy">
+                  <strong>{{ subscriptionName(change.subscription_id) }}</strong><span
+                    >Effective {{ change.effective_on | date: 'MMM d, y' }}</span
+                  >
+                </div>
+                <div class="history-amount">
+                  <strong
+                    >{{ change.old_amount | signedMoney }} →
+                    {{ change.new_amount | signedMoney }}</strong
+                  ><span>Price updated</span>
+                </div>
               </div>
             }
           </div>
@@ -239,22 +271,89 @@ import {
   `,
   styles: [
     `
-      .empty-action { display: flex; justify-content: center; margin-top: 16px; }
-      .empty-action button { border-radius: 999px; font-weight: 700; }
-      .empty-action lucide-icon { width: 17px; height: 17px; margin-right: 4px; }
-      .reminder-card { margin-bottom: 14px; border-left: 3px solid var(--app-negative); padding: 14px 16px; }
-      .section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-      .section-heading h2 { margin: 3px 0 0; font-size: 15px; font-weight: 700; }
-      .section-heading > lucide-icon { width: 19px; height: 19px; color: var(--app-ink-muted); }
-      .reminder-card .section-heading > lucide-icon { color: var(--app-negative); }
-      .reminder-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
-      .reminder-row, .history-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-      .reminder-row > div, .history-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-      .reminder-row strong, .history-copy strong { font-size: 13px; }
-      .reminder-row span, .history-copy span { color: var(--app-ink-muted); font-size: 11px; }
-      .reminder-pill { padding: 4px 9px; border-radius: 999px; color: var(--app-negative); background: var(--app-negative-soft); font-size: 11px !important; font-weight: 700; white-space: nowrap; }
-      .section-note { margin: 12px 0 0; color: var(--app-ink-muted); font-size: 11px; line-height: 1.35; }
-      
+      .empty-action {
+        display: flex;
+        justify-content: center;
+        margin-top: 16px;
+      }
+      .empty-action button {
+        border-radius: 999px;
+        font-weight: 700;
+      }
+      .empty-action lucide-icon {
+        width: 17px;
+        height: 17px;
+        margin-right: 4px;
+      }
+      .reminder-card {
+        margin-bottom: 14px;
+        border-left: 3px solid var(--app-negative);
+        padding: 14px 16px;
+      }
+      .section-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      .section-heading h2 {
+        margin: 3px 0 0;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .section-heading > lucide-icon {
+        width: 19px;
+        height: 19px;
+        color: var(--app-ink-muted);
+      }
+      .reminder-card .section-heading > lucide-icon {
+        color: var(--app-negative);
+      }
+      .reminder-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .reminder-row,
+      .history-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .reminder-row > div,
+      .history-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .reminder-row strong,
+      .history-copy strong {
+        font-size: 13px;
+      }
+      .reminder-row span,
+      .history-copy span {
+        color: var(--app-ink-muted);
+        font-size: 11px;
+      }
+      .reminder-pill {
+        padding: 4px 9px;
+        border-radius: 999px;
+        color: var(--app-negative);
+        background: var(--app-negative-soft);
+        font-size: 11px !important;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .section-note {
+        margin: 12px 0 0;
+        color: var(--app-ink-muted);
+        font-size: 11px;
+        line-height: 1.35;
+      }
+
       /* Subscriptions Grid & Pass Card Styles */
       .subscriptions-grid {
         display: grid;
@@ -266,7 +365,9 @@ import {
         display: flex;
         flex-direction: column;
         border-radius: 22px;
-        transition: transform 0.25s ease, box-shadow 0.25s ease;
+        transition:
+          transform 0.25s ease,
+          box-shadow 0.25s ease;
       }
       .sub-card-wrapper:hover {
         transform: translateY(-4px);
@@ -299,7 +400,11 @@ import {
         width: 120px;
         height: 120px;
         border-radius: 50%;
-        background: radial-gradient(circle, var(--theme-glow, rgba(255, 255, 255, 0.22)) 0%, transparent 70%);
+        background: radial-gradient(
+          circle,
+          var(--theme-glow, rgba(255, 255, 255, 0.22)) 0%,
+          transparent 70%
+        );
         pointer-events: none;
       }
 
@@ -564,65 +669,103 @@ import {
 
       /* 7 Color Themes */
       .sub-pass-face[data-theme='mint'] {
-        background: radial-gradient(circle at 85% 15%, rgba(16, 163, 127, 0.35) 0%, transparent 60%),
-                    linear-gradient(145deg, #0b1c18 0%, #0d1413 55%, #050a09 100%);
+        background:
+          radial-gradient(circle at 85% 15%, rgba(16, 163, 127, 0.35) 0%, transparent 60%),
+          linear-gradient(145deg, #0b1c18 0%, #0d1413 55%, #050a09 100%);
         border-color: rgba(16, 163, 127, 0.35);
         --theme-accent: #10a37f;
         --theme-glow: rgba(16, 163, 127, 0.45);
       }
       .sub-pass-face[data-theme='neon'] {
-        background: radial-gradient(circle at 85% 15%, rgba(29, 185, 84, 0.35) 0%, transparent 60%),
-                    linear-gradient(145deg, #0a1c10 0%, #121212 55%, #050505 100%);
+        background:
+          radial-gradient(circle at 85% 15%, rgba(29, 185, 84, 0.35) 0%, transparent 60%),
+          linear-gradient(145deg, #0a1c10 0%, #121212 55%, #050505 100%);
         border-color: rgba(29, 185, 84, 0.35);
         --theme-accent: #1ed760;
         --theme-glow: rgba(29, 185, 84, 0.45);
       }
       .sub-pass-face[data-theme='rose'] {
-        background: radial-gradient(circle at 85% 15%, rgba(252, 60, 68, 0.4) 0%, transparent 60%),
-                    radial-gradient(circle at 15% 85%, rgba(212, 0, 89, 0.25) 0%, transparent 55%),
-                    linear-gradient(145deg, #380816 0%, #1f050d 55%, #0e0206 100%);
+        background:
+          radial-gradient(circle at 85% 15%, rgba(252, 60, 68, 0.4) 0%, transparent 60%),
+          radial-gradient(circle at 15% 85%, rgba(212, 0, 89, 0.25) 0%, transparent 55%),
+          linear-gradient(145deg, #380816 0%, #1f050d 55%, #0e0206 100%);
         border-color: rgba(252, 60, 68, 0.4);
         --theme-accent: #fc3c44;
         --theme-glow: rgba(252, 60, 68, 0.5);
       }
       .sub-pass-face[data-theme='amber'] {
-        background: radial-gradient(circle at 85% 15%, rgba(255, 87, 34, 0.38) 0%, transparent 60%),
-                    linear-gradient(145deg, #2b1306 0%, #190e06 55%, #0d0702 100%);
+        background:
+          radial-gradient(circle at 85% 15%, rgba(255, 87, 34, 0.38) 0%, transparent 60%),
+          linear-gradient(145deg, #2b1306 0%, #190e06 55%, #0d0702 100%);
         border-color: rgba(255, 107, 53, 0.38);
         --theme-accent: #ff6b35;
         --theme-glow: rgba(255, 107, 53, 0.45);
       }
       .sub-pass-face[data-theme='scarlet'] {
-        background: radial-gradient(circle at 85% 15%, rgba(229, 9, 20, 0.38) 0%, transparent 60%),
-                    linear-gradient(145deg, #2a080c 0%, #141414 55%, #080808 100%);
+        background:
+          radial-gradient(circle at 85% 15%, rgba(229, 9, 20, 0.38) 0%, transparent 60%),
+          linear-gradient(145deg, #2a080c 0%, #141414 55%, #080808 100%);
         border-color: rgba(229, 9, 20, 0.35);
         --theme-accent: #e50914;
         --theme-glow: rgba(229, 9, 20, 0.45);
       }
       .sub-pass-face[data-theme='slate'] {
-        background: radial-gradient(circle at 85% 15%, rgba(148, 163, 184, 0.25) 0%, transparent 60%),
-                    linear-gradient(145deg, #1e293b 0%, #0f172a 60%, #030712 100%);
+        background:
+          radial-gradient(circle at 85% 15%, rgba(148, 163, 184, 0.25) 0%, transparent 60%),
+          linear-gradient(145deg, #1e293b 0%, #0f172a 60%, #030712 100%);
         border-color: rgba(148, 163, 184, 0.28);
         --theme-accent: #94a3b8;
         --theme-glow: rgba(148, 163, 184, 0.35);
       }
       .sub-pass-face[data-theme='violet'] {
-        background: radial-gradient(circle at 85% 15%, rgba(99, 102, 241, 0.36) 0%, transparent 60%),
-                    linear-gradient(145deg, #1e1b4b 0%, #0f172a 55%, #030712 100%);
+        background:
+          radial-gradient(circle at 85% 15%, rgba(99, 102, 241, 0.36) 0%, transparent 60%),
+          linear-gradient(145deg, #1e1b4b 0%, #0f172a 55%, #030712 100%);
         border-color: rgba(99, 102, 241, 0.35);
         --theme-accent: #818cf8;
         --theme-glow: rgba(99, 102, 241, 0.45);
       }
 
-      .history-section { margin-top: 24px; }
-      .page-section-heading { margin-bottom: 10px; padding: 0 4px; }
-      .history-list { display: flex; flex-direction: column; gap: 0; padding: 4px 14px; }
-      .history-row { padding: 11px 0; border-bottom: 1px solid var(--app-hairline); }
-      .history-row:last-child { border-bottom: 0; }
-      .history-amount { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; white-space: nowrap; }
-      .history-amount strong { font-size: 13px; font-variant-numeric: tabular-nums; }
-      .history-amount span { color: var(--app-ink-muted); font-size: 10px; }
-      @media (max-width: 560px) { .subscriptions-grid { grid-template-columns: 1fr; } }
+      .history-section {
+        margin-top: 24px;
+      }
+      .page-section-heading {
+        margin-bottom: 10px;
+        padding: 0 4px;
+      }
+      .history-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        padding: 4px 14px;
+      }
+      .history-row {
+        padding: 11px 0;
+        border-bottom: 1px solid var(--app-hairline);
+      }
+      .history-row:last-child {
+        border-bottom: 0;
+      }
+      .history-amount {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 2px;
+        white-space: nowrap;
+      }
+      .history-amount strong {
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+      }
+      .history-amount span {
+        color: var(--app-ink-muted);
+        font-size: 10px;
+      }
+      @media (max-width: 560px) {
+        .subscriptions-grid {
+          grid-template-columns: 1fr;
+        }
+      }
     `,
   ],
 })
@@ -679,10 +822,14 @@ export class SubscriptionsPage {
     const today = todayIso();
     const renewal = subscription.next_renewal_date;
     const daysLeft = daysBetween(today, renewal);
-    const totalDays = subscription.billing_cycle === 'weekly' ? 7
-      : subscription.billing_cycle === 'monthly' ? 30
-      : subscription.billing_cycle === 'quarterly' ? 91
-      : 365;
+    const totalDays =
+      subscription.billing_cycle === 'weekly'
+        ? 7
+        : subscription.billing_cycle === 'monthly'
+          ? 30
+          : subscription.billing_cycle === 'quarterly'
+            ? 91
+            : 365;
     if (daysLeft <= 0) return 100;
     if (daysLeft >= totalDays) return 5;
     return Math.max(5, Math.min(100, Math.round(((totalDays - daysLeft) / totalDays) * 100)));
@@ -716,12 +863,19 @@ export class SubscriptionsPage {
   }
 
   async togglePaused(subscription: Subscription): Promise<void> {
-    const next: SubscriptionStatus = this.statusFor(subscription) === 'paused' ? 'active' : 'paused';
+    const next: SubscriptionStatus =
+      this.statusFor(subscription) === 'paused' ? 'active' : 'paused';
     try {
       await this.subscriptionsService.update(subscription.id, { status: next });
-      this.snack.open(next === 'paused' ? 'Subscription paused.' : 'Subscription resumed.', undefined, { duration: 2000 });
+      this.snack.open(
+        next === 'paused' ? 'Subscription paused.' : 'Subscription resumed.',
+        undefined,
+        { duration: 2000 },
+      );
     } catch (error: unknown) {
-      this.snack.open(errorText(error, 'Couldn’t update subscription.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(errorText(error, 'Couldn’t update subscription.'), 'Dismiss', {
+        duration: 4000,
+      });
     }
   }
 
@@ -738,14 +892,17 @@ export class SubscriptionsPage {
       await this.subscriptionsService.update(subscription.id, { status: 'cancelled' });
       this.snack.open('Subscription cancelled and kept in history.', undefined, { duration: 2500 });
     } catch (error: unknown) {
-      this.snack.open(errorText(error, 'Couldn’t cancel subscription.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(errorText(error, 'Couldn’t cancel subscription.'), 'Dismiss', {
+        duration: 4000,
+      });
     }
   }
 
   async confirmDelete(subscription: Subscription): Promise<void> {
     const confirmed = await openConfirm(this.dialog, {
       title: `Delete ${subscription.name}?`,
-      message: 'This permanently removes the subscription record and its payment history. Its expense transactions stay in your ledger.',
+      message:
+        'This permanently removes the subscription record and its payment history. Its expense transactions stay in your ledger.',
       confirmLabel: 'Delete',
       destructive: true,
       icon: 'trash-2',
@@ -755,7 +912,9 @@ export class SubscriptionsPage {
       await this.subscriptionsService.delete(subscription.id);
       this.snack.open('Subscription deleted.', undefined, { duration: 2000 });
     } catch (error: unknown) {
-      this.snack.open(errorText(error, 'Couldn’t delete subscription.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(errorText(error, 'Couldn’t delete subscription.'), 'Dismiss', {
+        duration: 4000,
+      });
     }
   }
 
@@ -773,7 +932,14 @@ export class SubscriptionsPage {
   }
 
   cycleLabel(cycle: Subscription['billing_cycle'], short = false): string {
-    if (short) return cycle === 'yearly' ? '/ year' : cycle === 'quarterly' ? '/ quarter' : cycle === 'monthly' ? '/ month' : '/ week';
+    if (short)
+      return cycle === 'yearly'
+        ? '/ year'
+        : cycle === 'quarterly'
+          ? '/ quarter'
+          : cycle === 'monthly'
+            ? '/ month'
+            : '/ week';
     return cycle.charAt(0).toUpperCase() + cycle.slice(1);
   }
 
@@ -784,11 +950,16 @@ export class SubscriptionsPage {
   }
 
   subscriptionName(id: string): string {
-    return this.subscriptions().find((subscription) => subscription.id === id)?.name ?? 'Deleted subscription';
+    return (
+      this.subscriptions().find((subscription) => subscription.id === id)?.name ??
+      'Deleted subscription'
+    );
   }
 
   renewalDue(id: string): string | null {
-    return this.subscriptionsService.renewals().find((renewal) => renewal.id === id)?.due_on ?? null;
+    return (
+      this.subscriptionsService.renewals().find((renewal) => renewal.id === id)?.due_on ?? null
+    );
   }
 
   daysLabel(date: string, noun: string): string {
@@ -797,10 +968,4 @@ export class SubscriptionsPage {
     if (days === 1) return `In 1 day`;
     return days > 0 ? `In ${days} days` : `${noun} passed`;
   }
-
-}
-
-function todayIso(): string {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }

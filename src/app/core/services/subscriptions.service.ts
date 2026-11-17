@@ -14,6 +14,7 @@ import { SupabaseService } from './supabase.service';
 import { TransactionsService } from './transactions.service';
 import { CategoriesService } from './categories.service';
 import { isEqualCurrency, roundCurrency } from '../../shared/utils/currency-utils';
+import { todayIso, toIsoDate } from '../../shared/utils/budget-utils';
 
 export interface CreateSubscriptionInput {
   name: string;
@@ -84,22 +85,56 @@ export function detectSubscriptionTheme(name: string, category?: string): Subscr
   const c = (category || '').toLowerCase().trim();
 
   if (n.includes('claude') || n.includes('anthropic')) return 'amber';
-  if (n.includes('chatgpt') || n.includes('openai') || n.includes('gpt-') || n.includes('chat gpt')) return 'mint';
+  if (n.includes('chatgpt') || n.includes('openai') || n.includes('gpt-') || n.includes('chat gpt'))
+    return 'mint';
   if (n.includes('spotify')) return 'neon';
-  if (n.includes('apple') || n.includes('icloud') || n.includes('apple music') || n.includes('apple one')) return 'rose';
-  if (n.includes('gym') || n.includes('fitness') || n.includes('cult') || n.includes('workout') || n.includes('crossfit') || n.includes('gold\'s') || n.includes('anytime')) return 'amber';
-  if (n.includes('netflix') || n.includes('youtube') || n.includes('yt music') || n.includes('hotstar')) return 'scarlet';
-  if (n.includes('prime') || n.includes('amazon') || n.includes('aws') || n.includes('github') || n.includes('gitlab')) return 'violet';
+  if (
+    n.includes('apple') ||
+    n.includes('icloud') ||
+    n.includes('apple music') ||
+    n.includes('apple one')
+  )
+    return 'rose';
+  if (
+    n.includes('gym') ||
+    n.includes('fitness') ||
+    n.includes('cult') ||
+    n.includes('workout') ||
+    n.includes('crossfit') ||
+    n.includes("gold's") ||
+    n.includes('anytime')
+  )
+    return 'amber';
+  if (
+    n.includes('netflix') ||
+    n.includes('youtube') ||
+    n.includes('yt music') ||
+    n.includes('hotstar')
+  )
+    return 'scarlet';
+  if (
+    n.includes('prime') ||
+    n.includes('amazon') ||
+    n.includes('aws') ||
+    n.includes('github') ||
+    n.includes('gitlab')
+  )
+    return 'violet';
 
   if (c.includes('fitness') || c.includes('health') || c.includes('sport')) return 'amber';
   if (c.includes('music') || c.includes('audio') || c.includes('podcast')) return 'neon';
-  if (c.includes('ai') || c.includes('software') || c.includes('developer') || c.includes('cloud')) return 'violet';
+  if (c.includes('ai') || c.includes('software') || c.includes('developer') || c.includes('cloud'))
+    return 'violet';
   if (c.includes('video') || c.includes('streaming') || c.includes('movie')) return 'scarlet';
 
   return 'slate';
 }
 
-export function resolveSubscriptionTheme(theme: unknown, name: string, category?: string): SubscriptionTheme {
+export function resolveSubscriptionTheme(
+  theme: unknown,
+  name: string,
+  category?: string,
+): SubscriptionTheme {
   if (typeof theme === 'string') {
     if (VALID_SUBSCRIPTION_THEMES.has(theme as SubscriptionTheme)) {
       return theme as SubscriptionTheme;
@@ -155,7 +190,8 @@ export class SubscriptionsService {
       }))
       .filter(
         ({ subscription, daysUntilRenewal }) =>
-          (this.statusFor(subscription) === 'active' || this.statusFor(subscription) === 'paused') &&
+          (this.statusFor(subscription) === 'active' ||
+            this.statusFor(subscription) === 'paused') &&
           (daysUntilRenewal === 7 || daysUntilRenewal === 1),
       )
       .sort((a, b) => a.daysUntilRenewal - b.daysUntilRenewal),
@@ -184,12 +220,29 @@ export class SubscriptionsService {
     this.loadPromise = (async () => {
       try {
         const [subscriptions, payments, renewals, priceChanges] = await Promise.all([
-          this.supabase.client.from('subscriptions').select('*').order('next_renewal_date', { ascending: true }),
-          this.supabase.client.from('subscription_payments').select('*').order('paid_on', { ascending: false }),
-          this.supabase.client.from('subscription_renewals').select('*').order('renewed_on', { ascending: false }),
+          this.supabase.client
+            .from('subscriptions')
+            .select(
+              'id, owner_id, name, category, amount, billing_cycle, start_date, next_renewal_date, end_date, payment_account_id, auto_renewal, status, theme, cancelled_on, notes, created_at, updated_at',
+            )
+            .order('next_renewal_date', { ascending: true }),
+          this.supabase.client
+            .from('subscription_payments')
+            .select(
+              'id, owner_id, subscription_id, renewal_id, amount, paid_on, transaction_id, notes, created_at',
+            )
+            .order('paid_on', { ascending: false }),
+          this.supabase.client
+            .from('subscription_renewals')
+            .select(
+              'id, owner_id, subscription_id, due_on, renewed_on, amount, status, notes, created_at',
+            )
+            .order('renewed_on', { ascending: false }),
           this.supabase.client
             .from('subscription_price_changes')
-            .select('*')
+            .select(
+              'id, owner_id, subscription_id, old_amount, new_amount, effective_on, notes, created_at',
+            )
             .order('effective_on', { ascending: false }),
         ]);
 
@@ -216,7 +269,9 @@ export class SubscriptionsService {
             console.error('Failed to persist expired subscription statuses', expiryError);
           } else {
             loadedSubscriptions = loadedSubscriptions.map((subscription) =>
-              expiredIds.includes(subscription.id) ? { ...subscription, status: 'expired' as const } : subscription,
+              expiredIds.includes(subscription.id)
+                ? { ...subscription, status: 'expired' as const }
+                : subscription,
             );
           }
         }
@@ -264,9 +319,10 @@ export class SubscriptionsService {
   async create(input: CreateSubscriptionInput): Promise<Subscription> {
     const ownerId = this.requireUserId();
     this.validateInput(input);
-    const theme = input.theme && isSubscriptionTheme(input.theme)
-      ? input.theme
-      : detectSubscriptionTheme(input.name, input.category);
+    const theme =
+      input.theme && isSubscriptionTheme(input.theme)
+        ? input.theme
+        : detectSubscriptionTheme(input.name, input.category);
 
     const payload: Record<string, unknown> = {
       owner_id: ownerId,
@@ -285,19 +341,14 @@ export class SubscriptionsService {
       notes: input.notes?.trim() || null,
     };
 
-    let result = await this.supabase.client
-      .from('subscriptions')
-      .insert(payload)
-      .select()
-      .single();
+    let result = await this.supabase.client.from('subscriptions').insert(payload).select().single();
 
-    if (result.error && (result.error.message?.includes('theme') || result.error.code === 'PGRST204')) {
+    if (
+      result.error &&
+      (result.error.message?.includes('theme') || result.error.code === 'PGRST204')
+    ) {
       delete payload['theme'];
-      result = await this.supabase.client
-        .from('subscriptions')
-        .insert(payload)
-        .select()
-        .single();
+      result = await this.supabase.client.from('subscriptions').insert(payload).select().single();
     }
     if (result.error) throw result.error;
 
@@ -334,9 +385,18 @@ export class SubscriptionsService {
     }
 
     const nextStatus = changes.status ?? current.status;
-    const targetTheme: SubscriptionTheme = changes.theme !== undefined
-      ? (isSubscriptionTheme(changes.theme) ? changes.theme : current.theme)
-      : (changes.name ? resolveSubscriptionTheme(current.theme, changes.name, changes.category ?? current.category) : current.theme);
+    const targetTheme: SubscriptionTheme =
+      changes.theme !== undefined
+        ? isSubscriptionTheme(changes.theme)
+          ? changes.theme
+          : current.theme
+        : changes.name
+          ? resolveSubscriptionTheme(
+              current.theme,
+              changes.name,
+              changes.category ?? current.category,
+            )
+          : current.theme;
 
     const payload: Record<string, unknown> = {
       ...(changes.name === undefined ? {} : { name: changes.name.trim() }),
@@ -344,7 +404,9 @@ export class SubscriptionsService {
       ...(changes.amount === undefined ? {} : { amount: roundCurrency(changes.amount) }),
       ...(changes.billing_cycle === undefined ? {} : { billing_cycle: changes.billing_cycle }),
       ...(changes.start_date === undefined ? {} : { start_date: changes.start_date }),
-      ...(changes.next_renewal_date === undefined ? {} : { next_renewal_date: changes.next_renewal_date }),
+      ...(changes.next_renewal_date === undefined
+        ? {}
+        : { next_renewal_date: changes.next_renewal_date }),
       ...(changes.end_date === undefined ? {} : { end_date: changes.end_date || null }),
       ...(changes.payment_account_id === undefined
         ? {}
@@ -355,7 +417,7 @@ export class SubscriptionsService {
       ...(changes.notes === undefined ? {} : { notes: changes.notes?.trim() || null }),
       cancelled_on:
         nextStatus === 'cancelled'
-          ? changes.cancelled_on ?? current.cancelled_on ?? todayIso()
+          ? (changes.cancelled_on ?? current.cancelled_on ?? todayIso())
           : changes.status === undefined
             ? current.cancelled_on
             : null,
@@ -370,7 +432,10 @@ export class SubscriptionsService {
       .select()
       .single();
 
-    if (updateRes.error && (updateRes.error.message?.includes('theme') || updateRes.error.code === 'PGRST204')) {
+    if (
+      updateRes.error &&
+      (updateRes.error.message?.includes('theme') || updateRes.error.code === 'PGRST204')
+    ) {
       delete payload['theme'];
       updateRes = await this.supabase.client
         .from('subscriptions')
@@ -389,7 +454,8 @@ export class SubscriptionsService {
       amount: Number(data['amount']),
       status: this.statusFor(data as unknown as Subscription),
     };
-    const amountChanged = changes.amount !== undefined && !isEqualCurrency(Number(current.amount), changes.amount);
+    const amountChanged =
+      changes.amount !== undefined && !isEqualCurrency(Number(current.amount), changes.amount);
 
     if (amountChanged) {
       const { data: priceChange, error: priceError } = await this.supabase.client
@@ -404,7 +470,10 @@ export class SubscriptionsService {
         .select()
         .single();
       if (priceError) {
-        await this.supabase.client.from('subscriptions').update({ amount: current.amount }).eq('id', id);
+        await this.supabase.client
+          .from('subscriptions')
+          .update({ amount: current.amount })
+          .eq('id', id);
         throw priceError;
       }
       this._priceChanges.update((list) => [
@@ -436,13 +505,16 @@ export class SubscriptionsService {
     if (transactionId) {
       const { data: transaction, error } = await this.supabase.client
         .from('transactions')
-        .select('*')
+        .select(
+          'id, owner_id, occurred_on, amount, direction, category_id, notes, source, source_ref_id, payment_mode, bank_account_id, created_at',
+        )
         .eq('id', transactionId)
         .eq('owner_id', ownerId)
         .maybeSingle();
       if (error) throw error;
       if (!transaction) throw new Error('The selected transaction could not be found.');
-      if (transaction.direction !== 'out') throw new Error('Only expense transactions can be linked.');
+      if (transaction.direction !== 'out')
+        throw new Error('Only expense transactions can be linked.');
       if (!isEqualCurrency(Number(transaction.amount), input.amount)) {
         throw new Error('Payment amount must match the selected expense transaction.');
       }
@@ -455,7 +527,11 @@ export class SubscriptionsService {
     } else {
       const matchingCategory = this.categoriesService
         .categories()
-        .find((category) => category.kind === 'expense' && category.name.toLowerCase() === subscription.category.toLowerCase());
+        .find(
+          (category) =>
+            category.kind === 'expense' &&
+            category.name.toLowerCase() === subscription.category.toLowerCase(),
+        );
       createdTransaction = await this.transactionsService.create({
         amount: input.amount,
         direction: 'out',
@@ -486,7 +562,10 @@ export class SubscriptionsService {
         .select()
         .single();
       if (renewalResult.error) throw renewalResult.error;
-      renewal = { ...(renewalResult.data as SubscriptionRenewal), amount: Number(renewalResult.data.amount) };
+      renewal = {
+        ...(renewalResult.data as SubscriptionRenewal),
+        amount: Number(renewalResult.data.amount),
+      };
 
       const paymentResult = await this.supabase.client
         .from('subscription_payments')
@@ -503,25 +582,35 @@ export class SubscriptionsService {
         .single();
       if (paymentResult.error) throw paymentResult.error;
 
-      const payment = { ...(paymentResult.data as SubscriptionPayment), amount: Number(paymentResult.data.amount) };
+      const payment = {
+        ...(paymentResult.data as SubscriptionPayment),
+        amount: Number(paymentResult.data.amount),
+      };
       // Expiry and renewal are the same date in this app: the explicit new
       // expiry date wins; otherwise fall back to advancing one billing cycle.
       const nextRenewalDate =
-        input.new_expiry_date ?? advanceDate(subscription.next_renewal_date, subscription.billing_cycle);
+        input.new_expiry_date ??
+        advanceDate(subscription.next_renewal_date, subscription.billing_cycle);
       const nextEndDate =
         input.new_expiry_date ??
-        (subscription.end_date ? advanceDate(subscription.end_date, subscription.billing_cycle) : null);
+        (subscription.end_date
+          ? advanceDate(subscription.end_date, subscription.billing_cycle)
+          : null);
       const updated = await this.update(subscription.id, {
         next_renewal_date: nextRenewalDate,
         ...(nextEndDate ? { end_date: nextEndDate } : {}),
       });
-      if (updated) this._subscriptions.update((list) => list.map((item) => (item.id === updated.id ? updated : item)));
+      if (updated)
+        this._subscriptions.update((list) =>
+          list.map((item) => (item.id === updated.id ? updated : item)),
+        );
       this._renewals.update((list) => [renewal!, ...list]);
       this._payments.update((list) => [payment, ...list]);
       await this.transactionsService.refresh();
       return payment;
     } catch (error) {
-      if (renewal) await this.supabase.client.from('subscription_renewals').delete().eq('id', renewal.id);
+      if (renewal)
+        await this.supabase.client.from('subscription_renewals').delete().eq('id', renewal.id);
       if (createdTransaction) {
         try {
           await this.transactionsService.delete(createdTransaction.id);
@@ -623,12 +712,4 @@ function advanceDate(date: string, cycle: SubscriptionBillingCycle): string {
 function parseIsoDate(value: string): Date {
   const [year, month, day] = value.split('-').map(Number);
   return new Date(year, (month || 1) - 1, day || 1);
-}
-
-function toIsoDate(value: Date): string {
-  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-}
-
-function todayIso(): string {
-  return toIsoDate(new Date());
 }

@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { LucideAngularModule } from 'lucide-angular';
@@ -10,6 +10,7 @@ import { LucideAngularModule } from 'lucide-angular';
 @Component({
   selector: 'app-riba-guide-dialog',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MatDialogModule, MatButtonModule, LucideAngularModule],
   template: `
     <div class="dialog-container">
@@ -56,15 +57,36 @@ import { LucideAngularModule } from 'lucide-angular';
           <h3>4. Where Can I Give It?</h3>
           <table class="guide-table">
             <thead>
-              <tr><th>Purpose</th><th>Guidance</th></tr>
+              <tr>
+                <th>Purpose</th>
+                <th>Guidance</th>
+              </tr>
             </thead>
             <tbody>
-              <tr><td>Poor and needy people</td><td class="ok">Permitted</td></tr>
-              <tr><td>Needy Muslim families</td><td class="ok">Permitted</td></tr>
-              <tr><td>Poor relatives</td><td class="warn">Subject to conditions</td></tr>
-              <tr><td>Mosque construction</td><td class="warn">Scholarly disagreement</td></tr>
-              <tr><td>Personal expenses</td><td class="no">Not permitted</td></tr>
-              <tr><td>Zakat payment</td><td class="no">Not permitted</td></tr>
+              <tr>
+                <td>Poor and needy people</td>
+                <td class="ok">Permitted</td>
+              </tr>
+              <tr>
+                <td>Needy Muslim families</td>
+                <td class="ok">Permitted</td>
+              </tr>
+              <tr>
+                <td>Poor relatives</td>
+                <td class="warn">Subject to conditions</td>
+              </tr>
+              <tr>
+                <td>Mosque construction</td>
+                <td class="warn">Scholarly disagreement</td>
+              </tr>
+              <tr>
+                <td>Personal expenses</td>
+                <td class="no">Not permitted</td>
+              </tr>
+              <tr>
+                <td>Zakat payment</td>
+                <td class="no">Not permitted</td>
+              </tr>
             </tbody>
           </table>
         </section>
@@ -102,8 +124,13 @@ import { LucideAngularModule } from 'lucide-angular';
         </section>
 
         <div class="disclaimer">
-          <p><strong>Reminder:</strong> This is a quick reference, not a personal Fatwa. Scholarly rulings can differ in certain situations.</p>
-          <p class="dua">May Allah protect our wealth from Riba and grant us Halal earnings. Ameen.</p>
+          <p>
+            <strong>Reminder:</strong> This is a quick reference, not a personal Fatwa. Scholarly
+            rulings can differ in certain situations.
+          </p>
+          <p class="dua">
+            May Allah protect our wealth from Riba and grant us Halal earnings. Ameen.
+          </p>
         </div>
       </mat-dialog-content>
 
@@ -114,9 +141,25 @@ import { LucideAngularModule } from 'lucide-angular';
   `,
   styles: [
     `
-      h2 { margin: 0 !important; padding: 0 !important; font-size: 18px !important; font-weight: 700 !important; line-height: 1.25 !important; }
-      .dialog-container { max-width: 560px; background: var(--app-surface); color: var(--app-ink); }
-      .dialog-header { display: flex; gap: 12px; align-items: flex-start; padding: 4px 16px 14px; border-bottom: 1px solid var(--app-hairline); }
+      h2 {
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        line-height: 1.25 !important;
+      }
+      .dialog-container {
+        max-width: 560px;
+        background: var(--app-surface);
+        color: var(--app-ink);
+      }
+      .dialog-header {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 4px 16px 14px;
+        border-bottom: 1px solid var(--app-hairline);
+      }
       .header-icon {
         display: grid;
         place-items: center;
@@ -127,16 +170,51 @@ import { LucideAngularModule } from 'lucide-angular';
         background: var(--app-accent-soft);
         color: var(--app-accent);
       }
-      .header-icon lucide-icon { width: 19px; height: 19px; }
-      .dialog-subtitle { margin: 3px 0 0; color: var(--app-ink-muted); font-size: 12px; line-height: 1.35; }
-      .dialog-content { max-height: 75vh; padding: 16px !important; }
+      .header-icon lucide-icon {
+        width: 19px;
+        height: 19px;
+      }
+      .dialog-subtitle {
+        margin: 3px 0 0;
+        color: var(--app-ink-muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .dialog-content {
+        max-height: 75vh;
+        padding: 16px !important;
+      }
 
-      .guide-section { margin-bottom: 18px; }
-      .guide-section h3 { margin: 0 0 7px; color: var(--app-ink); font-size: 14px; font-weight: 700; }
-      .guide-section p { margin: 0 0 6px; color: var(--app-ink); font-size: 13px; line-height: 1.5; }
-      .guide-section ul, .guide-section ol { margin: 0; padding-left: 20px; }
-      .guide-section li { color: var(--app-ink); font-size: 13px; line-height: 1.55; margin-bottom: 3px; }
-      .citation { font-size: 12.5px !important; color: var(--app-ink-muted) !important; }
+      .guide-section {
+        margin-bottom: 18px;
+      }
+      .guide-section h3 {
+        margin: 0 0 7px;
+        color: var(--app-ink);
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .guide-section p {
+        margin: 0 0 6px;
+        color: var(--app-ink);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .guide-section ul,
+      .guide-section ol {
+        margin: 0;
+        padding-left: 20px;
+      }
+      .guide-section li {
+        color: var(--app-ink);
+        font-size: 13px;
+        line-height: 1.55;
+        margin-bottom: 3px;
+      }
+      .citation {
+        font-size: 12.5px !important;
+        color: var(--app-ink-muted) !important;
+      }
       blockquote {
         margin: 4px 0 6px;
         padding: 9px 12px;
@@ -159,22 +237,49 @@ import { LucideAngularModule } from 'lucide-angular';
         font-size: 12px;
         line-height: 1.4;
       }
-      .note lucide-icon { width: 15px; height: 15px; flex: 0 0 auto; color: var(--app-accent); }
+      .note lucide-icon {
+        width: 15px;
+        height: 15px;
+        flex: 0 0 auto;
+        color: var(--app-accent);
+      }
 
-      .guide-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-      .guide-table th, .guide-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--app-hairline); }
+      .guide-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12.5px;
+      }
+      .guide-table th,
+      .guide-table td {
+        padding: 8px 10px;
+        text-align: left;
+        border-bottom: 1px solid var(--app-hairline);
+      }
       .guide-table th {
         color: var(--app-ink-muted);
         font-size: 10.5px;
         font-weight: 700;
-        letter-spacing: .05em;
+        letter-spacing: 0.05em;
         text-transform: uppercase;
       }
-      .guide-table td { color: var(--app-ink); }
-      .guide-table td.ok { color: var(--app-positive); font-weight: 600; }
-      .guide-table td.warn { color: #b43403; font-weight: 600; }
-      .guide-table td.no { color: var(--app-negative, #dc2626); font-weight: 600; }
-      .guide-table tbody tr:last-child td { border-bottom: 0; }
+      .guide-table td {
+        color: var(--app-ink);
+      }
+      .guide-table td.ok {
+        color: var(--app-positive);
+        font-weight: 600;
+      }
+      .guide-table td.warn {
+        color: #b43403;
+        font-weight: 600;
+      }
+      .guide-table td.no {
+        color: var(--app-negative, #dc2626);
+        font-weight: 600;
+      }
+      .guide-table tbody tr:last-child td {
+        border-bottom: 0;
+      }
 
       .disclaimer {
         padding: 12px 14px;
@@ -182,10 +287,24 @@ import { LucideAngularModule } from 'lucide-angular';
         border-radius: 13px;
         background: var(--app-input-bg);
       }
-      .disclaimer p { margin: 0; color: var(--app-ink-muted); font-size: 12.5px; line-height: 1.5; }
-      .disclaimer .dua { margin-top: 7px; color: var(--app-ink); font-style: italic; }
-      .dialog-actions { padding: 0 16px 14px !important; gap: 8px; }
-      .dialog-actions button { border-radius: 999px; }
+      .disclaimer p {
+        margin: 0;
+        color: var(--app-ink-muted);
+        font-size: 12.5px;
+        line-height: 1.5;
+      }
+      .disclaimer .dua {
+        margin-top: 7px;
+        color: var(--app-ink);
+        font-style: italic;
+      }
+      .dialog-actions {
+        padding: 0 16px 14px !important;
+        gap: 8px;
+      }
+      .dialog-actions button {
+        border-radius: 999px;
+      }
     `,
   ],
 })

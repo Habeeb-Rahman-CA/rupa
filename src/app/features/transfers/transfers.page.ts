@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { MatButtonModule } from '@angular/material/button';
@@ -20,6 +20,7 @@ import { TransferSheetComponent, TransferSheetData } from './transfer-sheet.comp
 @Component({
   selector: 'app-transfers-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe,
     MatButtonModule,
@@ -31,7 +32,12 @@ import { TransferSheetComponent, TransferSheetData } from './transfer-sheet.comp
   ],
   template: `
     <app-page-header title="Transfers" subtitle="Move money between your accounts">
-      <button class="add-transfer-btn" type="button" (click)="openAdd()" [disabled]="accounts().length < 2">
+      <button
+        class="add-transfer-btn"
+        type="button"
+        (click)="openAdd()"
+        [disabled]="accounts().length < 2"
+      >
         <lucide-icon name="plus" />
         <span>Transfer</span>
       </button>
@@ -68,7 +74,9 @@ import { TransferSheetComponent, TransferSheetData } from './transfer-sheet.comp
         <div class="summary-icon"><lucide-icon name="arrow-left-right" /></div>
         <div>
           <div class="micro-label">Transfer history</div>
-          <strong>{{ transfers().length }} transfer{{ transfers().length === 1 ? '' : 's' }}</strong>
+          <strong
+            >{{ transfers().length }} transfer{{ transfers().length === 1 ? '' : 's' }}</strong
+          >
         </div>
         <span class="summary-note">Excluded from income &amp; expenses</span>
       </section>
@@ -88,7 +96,9 @@ import { TransferSheetComponent, TransferSheetData } from './transfer-sheet.comp
             </div>
 
             <div class="transfer-meta">
-              <span><lucide-icon name="calendar" /> {{ transfer.occurred_on | date: 'MMM d, y' }}</span>
+              <span
+                ><lucide-icon name="calendar" /> {{ transfer.occurred_on | date: 'MMM d, y' }}</span
+              >
               @if (transfer.notes) {
                 <span class="note"><lucide-icon name="sticky-note" /> {{ transfer.notes }}</span>
               }
@@ -115,42 +125,208 @@ import { TransferSheetComponent, TransferSheetData } from './transfer-sheet.comp
   `,
   styles: [
     `
-      .add-transfer-btn { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--app-ink-dark); color: #fff; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; }
-      .add-transfer-btn:disabled { opacity: .5; cursor: not-allowed; }
-      .add-transfer-btn lucide-icon { width: 17px; height: 17px; }
-      .empty-actions { display: flex; justify-content: center; margin-top: 16px; }
-      .empty-actions button { border-radius: 999px; }
-      .empty-actions lucide-icon { width: 17px; height: 17px; margin-right: 5px; }
-      .summary { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding: 14px 16px; }
-      .summary-icon { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border-radius: 13px; background: var(--app-accent-soft); color: var(--app-accent); }
-      .summary-icon lucide-icon { width: 19px; height: 19px; }
-      .summary strong { display: block; margin-top: 2px; color: var(--app-ink); font-size: 16px; }
-      .summary-note { margin-left: auto; color: var(--app-ink-muted); font-size: 11px; text-align: right; }
-      .transfer-list { display: flex; flex-direction: column; gap: 12px; list-style: none; margin: 0; padding: 0; }
-      .transfer-card { padding: 16px; }
-      .transfer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-      .transfer-route { display: flex; align-items: center; gap: 11px; min-width: 0; }
-      .account-icon { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border-radius: 12px; background: var(--app-accent-soft); color: var(--app-accent); }
-      .account-icon lucide-icon { width: 19px; height: 19px; }
-      .route-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-      .route-copy strong, .route-copy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .route-copy strong { color: var(--app-ink); font-size: 14px; }
-      .route-copy span { color: var(--app-ink-muted); font-size: 12px; }
-      .transfer-amount { flex: 0 0 auto; color: var(--app-accent); font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
-      .transfer-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 13px; padding-top: 11px; border-top: 1px solid var(--app-hairline); color: var(--app-ink-muted); font-size: 11px; }
-      .transfer-meta span { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
-      .transfer-meta lucide-icon { width: 14px; height: 14px; flex: 0 0 auto; }
-      .transfer-meta .note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .transfer-actions { display: grid; grid-template-columns: minmax(0, 1fr) 40px; gap: 8px; margin-top: 13px; }
-      .transfer-actions button:first-child { min-height: 40px; border-radius: 999px; font-size: 12px; font-weight: 700; }
-      .transfer-actions button:first-child lucide-icon { width: 16px; height: 16px; margin-right: 4px; }
-      .delete-btn { width: 40px; height: 40px; border-radius: 999px !important; background: var(--app-negative-soft) !important; color: var(--app-negative) !important; }
-      .delete-btn lucide-icon { width: 18px; height: 18px; }
+      .add-transfer-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 40px;
+        padding: 0 14px;
+        border: 0;
+        border-radius: 999px;
+        background: var(--app-ink-dark);
+        color: #fff;
+        cursor: pointer;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .add-transfer-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .add-transfer-btn lucide-icon {
+        width: 17px;
+        height: 17px;
+      }
+      .empty-actions {
+        display: flex;
+        justify-content: center;
+        margin-top: 16px;
+      }
+      .empty-actions button {
+        border-radius: 999px;
+      }
+      .empty-actions lucide-icon {
+        width: 17px;
+        height: 17px;
+        margin-right: 5px;
+      }
+      .summary {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+        padding: 14px 16px;
+      }
+      .summary-icon {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        flex: 0 0 auto;
+        border-radius: 13px;
+        background: var(--app-accent-soft);
+        color: var(--app-accent);
+      }
+      .summary-icon lucide-icon {
+        width: 19px;
+        height: 19px;
+      }
+      .summary strong {
+        display: block;
+        margin-top: 2px;
+        color: var(--app-ink);
+        font-size: 16px;
+      }
+      .summary-note {
+        margin-left: auto;
+        color: var(--app-ink-muted);
+        font-size: 11px;
+        text-align: right;
+      }
+      .transfer-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .transfer-card {
+        padding: 16px;
+      }
+      .transfer-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .transfer-route {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        min-width: 0;
+      }
+      .account-icon {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        flex: 0 0 auto;
+        border-radius: 12px;
+        background: var(--app-accent-soft);
+        color: var(--app-accent);
+      }
+      .account-icon lucide-icon {
+        width: 19px;
+        height: 19px;
+      }
+      .route-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+      }
+      .route-copy strong,
+      .route-copy span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .route-copy strong {
+        color: var(--app-ink);
+        font-size: 14px;
+      }
+      .route-copy span {
+        color: var(--app-ink-muted);
+        font-size: 12px;
+      }
+      .transfer-amount {
+        flex: 0 0 auto;
+        color: var(--app-accent);
+        font-size: 17px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .transfer-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 14px;
+        margin-top: 13px;
+        padding-top: 11px;
+        border-top: 1px solid var(--app-hairline);
+        color: var(--app-ink-muted);
+        font-size: 11px;
+      }
+      .transfer-meta span {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        min-width: 0;
+      }
+      .transfer-meta lucide-icon {
+        width: 14px;
+        height: 14px;
+        flex: 0 0 auto;
+      }
+      .transfer-meta .note {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .transfer-actions {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 40px;
+        gap: 8px;
+        margin-top: 13px;
+      }
+      .transfer-actions button:first-child {
+        min-height: 40px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .transfer-actions button:first-child lucide-icon {
+        width: 16px;
+        height: 16px;
+        margin-right: 4px;
+      }
+      .delete-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 999px !important;
+        background: var(--app-negative-soft) !important;
+        color: var(--app-negative) !important;
+      }
+      .delete-btn lucide-icon {
+        width: 18px;
+        height: 18px;
+      }
       @media (max-width: 480px) {
-        .add-transfer-btn span { display: none; }
-        .add-transfer-btn { width: 40px; justify-content: center; padding: 0; }
-        .summary-note { max-width: 112px; }
-        .transfer-head { align-items: flex-start; }
+        .add-transfer-btn span {
+          display: none;
+        }
+        .add-transfer-btn {
+          width: 40px;
+          justify-content: center;
+          padding: 0;
+        }
+        .summary-note {
+          max-width: 112px;
+        }
+        .transfer-head {
+          align-items: flex-start;
+        }
       }
     `,
   ],
@@ -201,7 +377,9 @@ export class TransfersPage {
       await this.transfersService.delete(transfer.id);
       this.snack.open('Transfer deleted.', undefined, { duration: 2000 });
     } catch (error: unknown) {
-      this.snack.open(errText(error, 'Could not delete the transfer.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(errText(error, 'Could not delete the transfer.'), 'Dismiss', {
+        duration: 4000,
+      });
     }
   }
 }

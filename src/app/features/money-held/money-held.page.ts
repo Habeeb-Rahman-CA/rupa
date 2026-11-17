@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { MatButtonModule } from '@angular/material/button';
@@ -25,6 +25,7 @@ import {
 @Component({
   selector: 'app-money-held-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe,
     MatButtonModule,
@@ -124,7 +125,9 @@ import {
               @for (record of balance.records; track record.id) {
                 <li class="history-row">
                   <div class="history-icon" [class.returned]="record.direction === 'returned'">
-                    <lucide-icon [name]="record.direction === 'received' ? 'arrow-down' : 'arrow-up'" />
+                    <lucide-icon
+                      [name]="record.direction === 'received' ? 'arrow-down' : 'arrow-up'"
+                    />
                   </div>
                   <div class="history-main">
                     <div class="history-title">
@@ -133,7 +136,9 @@ import {
                     <div class="history-meta">
                       {{ record.occurred_on | date: 'MMM d, y' }} ·
                       {{ record.payment_mode === 'bank' ? 'Bank' : 'Cash' }}
-                      @if (record.notes) { · {{ record.notes }} }
+                      @if (record.notes) {
+                        · {{ record.notes }}
+                      }
                     </div>
                   </div>
                   <div
@@ -141,7 +146,9 @@ import {
                     [class.received]="record.direction === 'received'"
                     [class.returned]="record.direction === 'returned'"
                   >
-                    {{ record.amount | signedMoney: (record.direction === 'received' ? 'in' : 'out') }}
+                    {{
+                      record.amount | signedMoney: (record.direction === 'received' ? 'in' : 'out')
+                    }}
                   </div>
                   <button
                     mat-icon-button
@@ -178,10 +185,23 @@ import {
         font-size: 13px;
         font-weight: 600;
       }
-      .add-person-btn lucide-icon { width: 17px; height: 17px; }
-      .empty-actions { display: flex; justify-content: center; margin-top: 16px; }
-      .empty-actions button { border-radius: 999px; }
-      .empty-actions lucide-icon { width: 17px; height: 17px; margin-right: 5px; }
+      .add-person-btn lucide-icon {
+        width: 17px;
+        height: 17px;
+      }
+      .empty-actions {
+        display: flex;
+        justify-content: center;
+        margin-top: 16px;
+      }
+      .empty-actions button {
+        border-radius: 999px;
+      }
+      .empty-actions lucide-icon {
+        width: 17px;
+        height: 17px;
+        margin-right: 5px;
+      }
       .summary {
         display: flex;
         align-items: center;
@@ -190,7 +210,13 @@ import {
         margin-bottom: 12px;
         padding: 16px 20px;
       }
-      .summary-main, .person-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+      .summary-main,
+      .person-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
       .summary-icon {
         display: grid;
         place-items: center;
@@ -200,9 +226,24 @@ import {
         background: var(--app-accent-soft);
         color: var(--app-accent);
       }
-      .summary-total { margin-top: 2px; color: var(--app-ink); font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
-      .summary-count { display: flex; flex-direction: column; align-items: flex-end; color: var(--app-ink-muted); font-size: 12px; }
-      .summary-count strong { color: var(--app-ink); font-size: 20px; }
+      .summary-total {
+        margin-top: 2px;
+        color: var(--app-ink);
+        font-size: 24px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .summary-count {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        color: var(--app-ink-muted);
+        font-size: 12px;
+      }
+      .summary-count strong {
+        color: var(--app-ink);
+        font-size: 20px;
+      }
       .privacy-note {
         display: flex;
         align-items: center;
@@ -211,16 +252,65 @@ import {
         color: var(--app-ink-muted);
         font-size: 12px;
       }
-      .privacy-note lucide-icon { width: 15px; height: 15px; flex: 0 0 auto; }
-      .person-card { margin-bottom: 16px; padding: 16px; }
-      .person-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-      .avatar { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 999px; color: #fff; font-size: 15px; font-weight: 700; flex: 0 0 auto; }
-      h2 { margin: 0; color: var(--app-ink); font-size: 15px; font-weight: 700; }
-      .record-count { display: block; margin-top: 2px; color: var(--app-ink-muted); font-size: 12px; }
-      .person-balance { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; }
-      .person-balance strong { margin-top: 2px; color: var(--app-positive); font-size: 17px; font-variant-numeric: tabular-nums; }
-      .person-balance.settled strong { color: var(--app-ink-muted); }
-      .person-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+      .privacy-note lucide-icon {
+        width: 15px;
+        height: 15px;
+        flex: 0 0 auto;
+      }
+      .person-card {
+        margin-bottom: 16px;
+        padding: 16px;
+      }
+      .person-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .avatar {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        color: #fff;
+        font-size: 15px;
+        font-weight: 700;
+        flex: 0 0 auto;
+      }
+      h2 {
+        margin: 0;
+        color: var(--app-ink);
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .record-count {
+        display: block;
+        margin-top: 2px;
+        color: var(--app-ink-muted);
+        font-size: 12px;
+      }
+      .person-balance {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        min-width: 0;
+      }
+      .person-balance strong {
+        margin-top: 2px;
+        color: var(--app-positive);
+        font-size: 17px;
+        font-variant-numeric: tabular-nums;
+      }
+      .person-balance.settled strong {
+        color: var(--app-ink-muted);
+      }
+      .person-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 14px;
+      }
       .person-actions button {
         min-width: 0;
         min-height: 40px;
@@ -238,32 +328,126 @@ import {
         background: var(--app-negative-soft) !important;
         color: var(--app-negative) !important;
       }
-      .person-actions .receive-btn:hover { background: rgba(22, 163, 74, .2) !important; }
-      .person-actions .return-btn:hover:not(:disabled) { background: rgba(239, 68, 68, .18) !important; }
-      .person-actions lucide-icon { width: 16px; height: 16px; margin-right: 4px; }
-      .history-head { margin-top: 18px; padding-bottom: 8px; border-bottom: 1px solid var(--app-hairline); color: var(--app-ink-muted); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
-      .history-list { list-style: none; margin: 0; padding: 0; }
-      .history-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto auto; gap: 9px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--app-hairline); }
-      .history-row:last-child { border-bottom: 0; }
-      .history-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: var(--app-positive-soft); color: var(--app-positive); }
-      .history-icon.returned { background: var(--app-negative-soft); color: var(--app-negative); }
-      .history-icon lucide-icon { width: 15px; height: 15px; }
-      .history-main { min-width: 0; }
-      .history-title { color: var(--app-ink); font-size: 13px; font-weight: 600; }
-      .history-meta { margin-top: 2px; overflow: hidden; color: var(--app-ink-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-      .history-amount { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-      .history-amount.received { color: var(--app-positive); }
-      .history-amount.returned { color: var(--app-negative); }
-      .history-row button { width: 32px; height: 32px; }
-      .history-row button lucide-icon { width: 17px; height: 17px; }
-      .history-empty { padding: 14px 0 2px; color: var(--app-ink-muted); font-size: 13px; text-align: center; }
+      .person-actions .receive-btn:hover {
+        background: rgba(22, 163, 74, 0.2) !important;
+      }
+      .person-actions .return-btn:hover:not(:disabled) {
+        background: rgba(239, 68, 68, 0.18) !important;
+      }
+      .person-actions lucide-icon {
+        width: 16px;
+        height: 16px;
+        margin-right: 4px;
+      }
+      .history-head {
+        margin-top: 18px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--app-hairline);
+        color: var(--app-ink-muted);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .history-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .history-row {
+        display: grid;
+        grid-template-columns: 30px minmax(0, 1fr) auto auto;
+        gap: 9px;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--app-hairline);
+      }
+      .history-row:last-child {
+        border-bottom: 0;
+      }
+      .history-icon {
+        display: grid;
+        place-items: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 9px;
+        background: var(--app-positive-soft);
+        color: var(--app-positive);
+      }
+      .history-icon.returned {
+        background: var(--app-negative-soft);
+        color: var(--app-negative);
+      }
+      .history-icon lucide-icon {
+        width: 15px;
+        height: 15px;
+      }
+      .history-main {
+        min-width: 0;
+      }
+      .history-title {
+        color: var(--app-ink);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .history-meta {
+        margin-top: 2px;
+        overflow: hidden;
+        color: var(--app-ink-muted);
+        font-size: 11px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .history-amount {
+        font-size: 13px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .history-amount.received {
+        color: var(--app-positive);
+      }
+      .history-amount.returned {
+        color: var(--app-negative);
+      }
+      .history-row button {
+        width: 32px;
+        height: 32px;
+      }
+      .history-row button lucide-icon {
+        width: 17px;
+        height: 17px;
+      }
+      .history-empty {
+        padding: 14px 0 2px;
+        color: var(--app-ink-muted);
+        font-size: 13px;
+        text-align: center;
+      }
       @media (max-width: 480px) {
-        .add-person-btn span { display: none; }
-        .add-person-btn { width: 40px; justify-content: center; padding: 0; }
-        .person-head { align-items: flex-start; }
-        .history-row { grid-template-columns: 30px minmax(0, 1fr) auto; }
-        .history-row button { grid-column: 3; grid-row: 1; }
-        .history-amount { grid-column: 2; grid-row: 2; justify-self: start; }
+        .add-person-btn span {
+          display: none;
+        }
+        .add-person-btn {
+          width: 40px;
+          justify-content: center;
+          padding: 0;
+        }
+        .person-head {
+          align-items: flex-start;
+        }
+        .history-row {
+          grid-template-columns: 30px minmax(0, 1fr) auto;
+        }
+        .history-row button {
+          grid-column: 3;
+          grid-row: 1;
+        }
+        .history-amount {
+          grid-column: 2;
+          grid-row: 2;
+          justify-self: start;
+        }
       }
     `,
   ],
@@ -312,7 +496,9 @@ export class MoneyHeldPage {
       await this.moneyHeldService.delete(record);
       this.snack.open('Money-held record deleted.', undefined, { duration: 2000 });
     } catch (error: unknown) {
-      this.snack.open(errText(error, 'Couldn’t delete — please try again.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(errText(error, 'Couldn’t delete — please try again.'), 'Dismiss', {
+        duration: 4000,
+      });
     }
   }
 }

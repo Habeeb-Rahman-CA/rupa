@@ -1,4 +1,11 @@
-import { Component, DestroyRef, ViewChild, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ViewChild,
+  inject,
+  signal,
+} from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -22,11 +29,8 @@ import { openConfirm } from '../../shared/components/confirm-dialog.component';
 @Component({
   selector: 'app-lock-page',
   standalone: true,
-  imports: [
-    MatButtonModule,
-    LucideAngularModule,
-    MpinKeypadComponent,
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MatButtonModule, LucideAngularModule, MpinKeypadComponent],
   template: `
     <div class="lock-screen">
       <div class="brand">

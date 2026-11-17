@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -31,6 +31,7 @@ export interface SubscriptionDialogData {
 @Component({
   selector: 'app-subscription-dialog',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     MatDialogModule,
     MatButtonModule,
@@ -106,7 +107,8 @@ export interface SubscriptionDialogData {
             [value]="amount()"
             [invalid]="touched() && !amountValid()"
             (valueChange)="amount.set(toNumber($event))"
-          ><span prefix>₹</span></app-text-field>
+            ><span prefix>₹</span></app-text-field
+          >
 
           <div class="full field-group">
             <label class="ft-label">Billing cycle</label>
@@ -203,23 +205,61 @@ export interface SubscriptionDialogData {
           (click)="save()"
           [disabled]="!canSave() || submitting()"
         >
-          {{ submitting() ? 'Saving…' : (isEdit ? 'Save changes' : 'Add Subscription') }}
+          {{ submitting() ? 'Saving…' : isEdit ? 'Save changes' : 'Add Subscription' }}
         </button>
       </mat-dialog-actions>
     </div>
   `,
   styles: [
     `
-      h2 { margin: 0 !important; padding: 0 !important; font-size: 18px !important; font-weight: 700 !important; line-height: 1.2 !important; }
-      .dialog-container { max-width: 640px; background: var(--app-surface); color: var(--app-ink); }
-      .dialog-header { display: flex; gap: 12px; align-items: flex-start; padding: 4px 16px 14px; border-bottom: 1px solid var(--app-hairline); }
-      .dialog-title { margin: 0 !important; padding: 0 !important; font-size: 18px !important; font-weight: 700 !important; }
-      .dialog-subtitle { margin: 3px 0 0; color: var(--app-ink-muted); font-size: 12px; line-height: 1.35; }
-      .dialog-content { max-height: 75vh; padding: 16px !important; }
+      h2 {
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        line-height: 1.2 !important;
+      }
+      .dialog-container {
+        max-width: 640px;
+        background: var(--app-surface);
+        color: var(--app-ink);
+      }
+      .dialog-header {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 4px 16px 14px;
+        border-bottom: 1px solid var(--app-hairline);
+      }
+      .dialog-title {
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+      }
+      .dialog-subtitle {
+        margin: 3px 0 0;
+        color: var(--app-ink-muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .dialog-content {
+        max-height: 75vh;
+        padding: 16px !important;
+      }
 
       /* Swatches */
-      .theme-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
-      .current-theme-label { font-size: 11px; font-weight: 600; color: var(--app-accent); }
+      .theme-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 8px;
+      }
+      .current-theme-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--app-accent);
+      }
       .theme-picker {
         display: flex;
         flex-wrap: wrap;
@@ -237,7 +277,10 @@ export interface SubscriptionDialogData {
         place-items: center;
         color: #ffffff;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.24);
-        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.15s ease,
+          border-color 0.15s ease;
         padding: 0;
         background: transparent;
       }
@@ -246,7 +289,9 @@ export interface SubscriptionDialogData {
       }
       .theme-swatch.active {
         border-color: #ffffff;
-        box-shadow: 0 0 0 2px var(--app-canvas), 0 0 0 4px var(--app-accent);
+        box-shadow:
+          0 0 0 2px var(--app-canvas),
+          0 0 0 4px var(--app-accent);
         transform: scale(1.14);
       }
       .theme-swatch .check-icon {
@@ -255,25 +300,87 @@ export interface SubscriptionDialogData {
       }
 
       /* Swatch bubble colors */
-      .theme-swatch[data-theme='mint'] { background: linear-gradient(135deg, #10a37f, #054e3b); }
-      .theme-swatch[data-theme='neon'] { background: linear-gradient(135deg, #1db954, #0b5e28); }
-      .theme-swatch[data-theme='rose'] { background: linear-gradient(135deg, #fc3c44, #8b004f); }
-      .theme-swatch[data-theme='amber'] { background: linear-gradient(135deg, #ff6b35, #b43403); }
-      .theme-swatch[data-theme='scarlet'] { background: linear-gradient(135deg, #e50914, #7f0007); }
-      .theme-swatch[data-theme='slate'] { background: linear-gradient(135deg, #475569, #0f172a); }
-      .theme-swatch[data-theme='violet'] { background: linear-gradient(135deg, #6366f1, #312e81); }
+      .theme-swatch[data-theme='mint'] {
+        background: linear-gradient(135deg, #10a37f, #054e3b);
+      }
+      .theme-swatch[data-theme='neon'] {
+        background: linear-gradient(135deg, #1db954, #0b5e28);
+      }
+      .theme-swatch[data-theme='rose'] {
+        background: linear-gradient(135deg, #fc3c44, #8b004f);
+      }
+      .theme-swatch[data-theme='amber'] {
+        background: linear-gradient(135deg, #ff6b35, #b43403);
+      }
+      .theme-swatch[data-theme='scarlet'] {
+        background: linear-gradient(135deg, #e50914, #7f0007);
+      }
+      .theme-swatch[data-theme='slate'] {
+        background: linear-gradient(135deg, #475569, #0f172a);
+      }
+      .theme-swatch[data-theme='violet'] {
+        background: linear-gradient(135deg, #6366f1, #312e81);
+      }
 
-      .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
-      .full { grid-column: 1 / -1; }
-      .field-group { display: flex; flex-direction: column; gap: 6px; }
-      .ft-label { color: var(--app-ink); font-size: 13px; font-weight: 500; }
-      .cycle-toggle, .status-toggle { display: flex; width: 100%; overflow-x: auto; }
-      .cycle-toggle mat-button-toggle, .status-toggle mat-button-toggle { flex: 1 0 auto; }
-      .date-help, .price-notice { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--app-accent-soft); color: var(--app-ink-muted); font-size: 12px; line-height: 1.35; }
-      .date-help lucide-icon, .price-notice lucide-icon { width: 16px; height: 16px; flex: 0 0 auto; color: var(--app-accent); }
-      .dialog-actions { padding: 0 16px 14px !important; gap: 8px; }
-      .dialog-actions button { border-radius: 999px; }
-      @media (max-width: 540px) { .form-grid { grid-template-columns: 1fr; } }
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 12px;
+      }
+      .full {
+        grid-column: 1 / -1;
+      }
+      .field-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .ft-label {
+        color: var(--app-ink);
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .cycle-toggle,
+      .status-toggle {
+        display: flex;
+        width: 100%;
+        overflow-x: auto;
+      }
+      .cycle-toggle mat-button-toggle,
+      .status-toggle mat-button-toggle {
+        flex: 1 0 auto;
+      }
+      .date-help,
+      .price-notice {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: var(--app-accent-soft);
+        color: var(--app-ink-muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .date-help lucide-icon,
+      .price-notice lucide-icon {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+        color: var(--app-accent);
+      }
+      .dialog-actions {
+        padding: 0 16px 14px !important;
+        gap: 8px;
+      }
+      .dialog-actions button {
+        border-radius: 999px;
+      }
+      @media (max-width: 540px) {
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+      }
     `,
   ],
 })
@@ -290,12 +397,19 @@ export class SubscriptionDialogComponent {
   readonly name = signal(this.data.subscription?.name ?? '');
   readonly category = signal(this.data.subscription?.category ?? '');
   readonly amount = signal<number | null>(this.data.subscription?.amount ?? null);
-  readonly billingCycle = signal<SubscriptionBillingCycle>(this.data.subscription?.billing_cycle ?? 'monthly');
-  readonly startDate = signal<Date | null>(parseIsoDate(this.data.subscription?.start_date) ?? new Date());
-  readonly endDate = signal<Date | null>(
-    parseIsoDate(this.data.subscription?.end_date) ?? parseIsoDate(this.data.subscription?.next_renewal_date),
+  readonly billingCycle = signal<SubscriptionBillingCycle>(
+    this.data.subscription?.billing_cycle ?? 'monthly',
   );
-  readonly paymentAccountId = signal<string | null>(this.data.subscription?.payment_account_id ?? null);
+  readonly startDate = signal<Date | null>(
+    parseIsoDate(this.data.subscription?.start_date) ?? new Date(),
+  );
+  readonly endDate = signal<Date | null>(
+    parseIsoDate(this.data.subscription?.end_date) ??
+      parseIsoDate(this.data.subscription?.next_renewal_date),
+  );
+  readonly paymentAccountId = signal<string | null>(
+    this.data.subscription?.payment_account_id ?? null,
+  );
   readonly status = signal<SubscriptionStatus>(this.data.subscription?.status ?? 'active');
   readonly cancelledOn = signal<Date | null>(parseIsoDate(this.data.subscription?.cancelled_on));
   readonly notes = signal(this.data.subscription?.notes ?? '');
@@ -323,7 +437,9 @@ export class SubscriptionDialogComponent {
   readonly accountOptions = () =>
     this.bankAccountsService.bankAccounts().map<SelectOption<string>>((account) => ({
       value: account.id,
-      label: account.is_primary ? `${account.bank_name} · ${account.account_name} ★` : `${account.bank_name} · ${account.account_name}`,
+      label: account.is_primary
+        ? `${account.bank_name} · ${account.account_name} ★`
+        : `${account.bank_name} · ${account.account_name}`,
       icon: account.card_type === 'credit' ? 'credit-card' : 'landmark',
     }));
 
@@ -349,12 +465,20 @@ export class SubscriptionDialogComponent {
   }
 
   amountChanged(): boolean {
-    return this.isEdit && this.amount() !== null && this.amount() !== this.data.subscription?.amount;
+    return (
+      this.isEdit && this.amount() !== null && this.amount() !== this.data.subscription?.amount
+    );
   }
 
   canSave(): boolean {
     const start = this.startDate();
-    return !!this.name().trim() && this.amountValid() && !!start && this.endDateValid() && !!this.paymentAccountId();
+    return (
+      !!this.name().trim() &&
+      this.amountValid() &&
+      !!start &&
+      this.endDateValid() &&
+      !!this.paymentAccountId()
+    );
   }
 
   endDateValid(): boolean {
@@ -410,7 +534,11 @@ export class SubscriptionDialogComponent {
       }
       this.ref.close({ saved: true });
     } catch (error: unknown) {
-      this.snack.open(errorText(error, 'Couldn’t save subscription — please try again.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(
+        errorText(error, 'Couldn’t save subscription — please try again.'),
+        'Dismiss',
+        { duration: 4000 },
+      );
       this.submitting.set(false);
     }
   }

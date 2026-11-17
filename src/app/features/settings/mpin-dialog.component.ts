@@ -1,9 +1,12 @@
-import { Component, ViewChild, computed, inject, signal } from '@angular/core';
 import {
-  MAT_DIALOG_DATA,
-  MatDialogModule,
-  MatDialogRef,
-} from '@angular/material/dialog';
+  ChangeDetectionStrategy,
+  Component,
+  ViewChild,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -38,6 +41,7 @@ type Stage = 'length' | 'verify' | 'enter' | 'confirm';
 @Component({
   selector: 'app-mpin-dialog',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     MatDialogModule,
     MatButtonModule,
@@ -80,8 +84,8 @@ type Stage = 'length' | 'verify' | 'enter' | 'confirm';
               <mat-button-toggle [value]="6">6 digits</mat-button-toggle>
             </mat-button-toggle-group>
             <p class="hint">
-              You'll be asked to enter it twice to confirm. It locks the app on
-              launch and when you return after the auto-lock timeout.
+              You'll be asked to enter it twice to confirm. It locks the app on launch and when you
+              return after the auto-lock timeout.
             </p>
           </div>
         } @else {
@@ -98,7 +102,13 @@ type Stage = 'length' | 'verify' | 'enter' | 'confirm';
       </mat-dialog-content>
 
       <mat-dialog-actions align="end" class="dialog-actions">
-        <button mat-button type="button" [disabled]="busy()" (click)="ref.close(false)" class="cancel-btn">
+        <button
+          mat-button
+          type="button"
+          [disabled]="busy()"
+          (click)="ref.close(false)"
+          class="cancel-btn"
+        >
           Cancel
         </button>
         @if (stage() === 'length') {
@@ -142,8 +152,13 @@ type Stage = 'length' | 'verify' | 'enter' | 'confirm';
         background: var(--app-negative-soft);
         color: var(--app-negative);
       }
-      .header-icon lucide-icon { width: 19px; height: 19px; }
-      .header-text { min-width: 0; }
+      .header-icon lucide-icon {
+        width: 19px;
+        height: 19px;
+      }
+      .header-text {
+        min-width: 0;
+      }
       h2 {
         margin: 0 !important;
         padding: 0 !important;
@@ -178,7 +193,11 @@ type Stage = 'length' | 'verify' | 'enter' | 'confirm';
         font-weight: 600;
         line-height: 1.35;
       }
-      .error-notice lucide-icon { width: 16px; height: 16px; flex: 0 0 auto; }
+      .error-notice lucide-icon {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+      }
 
       .field-group {
         display: flex;
@@ -195,7 +214,9 @@ type Stage = 'length' | 'verify' | 'enter' | 'confirm';
         width: 100%;
         display: flex;
       }
-      .length-toggle mat-button-toggle { flex: 1; }
+      .length-toggle mat-button-toggle {
+        flex: 1;
+      }
       .hint {
         margin: 8px 0 0;
         color: var(--app-ink-muted);
@@ -216,9 +237,7 @@ type Stage = 'length' | 'verify' | 'enter' | 'confirm';
   ],
 })
 export class MpinDialogComponent {
-  readonly ref = inject<MatDialogRef<MpinDialogComponent, boolean>>(
-    MatDialogRef,
-  );
+  readonly ref = inject<MatDialogRef<MpinDialogComponent, boolean>>(MatDialogRef);
   readonly data = inject<MpinDialogData>(MAT_DIALOG_DATA);
 
   private readonly mpin = inject(MpinService);
@@ -259,10 +278,18 @@ export class MpinDialogComponent {
     const mode = this.data.mode;
     const stage = this.stage();
     if (mode === 'setup') {
-      return stage === 'length' ? 'Set up App Lock' : stage === 'enter' ? 'Enter a new MPIN' : 'Confirm your MPIN';
+      return stage === 'length'
+        ? 'Set up App Lock'
+        : stage === 'enter'
+          ? 'Enter a new MPIN'
+          : 'Confirm your MPIN';
     }
     if (mode === 'change') {
-      return stage === 'verify' ? 'Enter your current MPIN' : stage === 'enter' ? 'Enter a new MPIN' : 'Confirm your new MPIN';
+      return stage === 'verify'
+        ? 'Enter your current MPIN'
+        : stage === 'enter'
+          ? 'Enter a new MPIN'
+          : 'Confirm your new MPIN';
     }
     if (mode === 'disable') return 'Enter your current MPIN';
     return stage === 'enter' ? 'Choose a new MPIN' : 'Confirm your MPIN';

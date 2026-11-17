@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -11,12 +11,8 @@ import { errorText } from '../../shared/utils/error-utils';
 @Component({
   selector: 'app-person-dialog',
   standalone: true,
-  imports: [
-    CommonModule,
-    MatDialogModule,
-    MatButtonModule,
-    TextFieldComponent,
-  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [CommonModule, MatDialogModule, MatButtonModule, TextFieldComponent],
   template: `
     <div class="dialog-container">
       <!-- Header -->
@@ -42,7 +38,15 @@ import { errorText } from '../../shared/utils/error-utils';
 
       <!-- Actions Footer -->
       <mat-dialog-actions align="end" class="dialog-actions">
-        <button mat-button type="button" (click)="close()" [disabled]="submitting()" class="cancel-btn">Cancel</button>
+        <button
+          mat-button
+          type="button"
+          (click)="close()"
+          [disabled]="submitting()"
+          class="cancel-btn"
+        >
+          Cancel
+        </button>
         <button
           mat-flat-button
           color="primary"
@@ -128,7 +132,9 @@ export class PersonDialogComponent {
       this.snack.open('Person added.', undefined, { duration: 2000 });
       this.ref.close({ saved: true });
     } catch (e: unknown) {
-      this.snack.open(errorText(e, 'Couldn’t add — please try again.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(errorText(e, 'Couldn’t add — please try again.'), 'Dismiss', {
+        duration: 4000,
+      });
       this.submitting.set(false);
     }
   }

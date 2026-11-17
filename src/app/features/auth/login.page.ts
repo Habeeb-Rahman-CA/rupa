@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
@@ -16,6 +16,7 @@ type Mode = 'login' | 'signup';
 @Component({
   selector: 'app-login-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
     RouterLink,
@@ -28,13 +29,7 @@ type Mode = 'login' | 'signup';
       <!-- Hero -->
       <section class="hero">
         <div class="hero-inner">
-          <img
-            class="brand-logo"
-            src="rupa-logo-light.png"
-            alt="rūpa"
-            width="88"
-            height="34"
-          />
+          <img class="brand-logo" src="rupa-logo-light.png" alt="rūpa" width="88" height="34" />
           <h1>{{ heroTitle() }}</h1>
           <p>{{ heroSubtitle() }}</p>
         </div>
@@ -44,18 +39,10 @@ type Mode = 'login' | 'signup';
       <section class="card">
         <!-- Mode toggle -->
         <div class="mode-toggle">
-          <button
-            type="button"
-            [class.active]="mode() === 'login'"
-            (click)="setMode('login')"
-          >
+          <button type="button" [class.active]="mode() === 'login'" (click)="setMode('login')">
             Log in
           </button>
-          <button
-            type="button"
-            [class.active]="mode() === 'signup'"
-            (click)="setMode('signup')"
-          >
+          <button type="button" [class.active]="mode() === 'signup'" (click)="setMode('signup')">
             Sign up
           </button>
         </div>
@@ -124,11 +111,7 @@ type Mode = 'login' | 'signup';
             <div class="info" role="status">{{ infoMessage() }}</div>
           }
 
-          <button
-            type="submit"
-            class="submit"
-            [disabled]="!canSubmit() || submitting()"
-          >
+          <button type="submit" class="submit" [disabled]="!canSubmit() || submitting()">
             @if (submitting()) {
               <div class="submit-loading">
                 <mat-spinner diameter="18" class="submit-spinner" />
@@ -145,11 +128,7 @@ type Mode = 'login' | 'signup';
           </p>
 
           <div class="contact-row">
-            <button
-              type="button"
-              class="contact-btn"
-              (click)="openContact()"
-            >
+            <button type="button" class="contact-btn" (click)="openContact()">
               <lucide-icon name="mail" />
               <span>Contact us</span>
             </button>
@@ -162,7 +141,10 @@ type Mode = 'login' | 'signup';
   `,
   styles: [
     `
-      :host { display: block; height: 100%; }
+      :host {
+        display: block;
+        height: 100%;
+      }
 
       .page {
         min-height: 100vh;
@@ -174,8 +156,7 @@ type Mode = 'login' | 'signup';
 
       /* ---------- Hero -------------------------------------------- */
       .hero {
-        background:
-          radial-gradient(120% 100% at 0% 0%, #2a2d35 0%, #14161b 55%, #0b0d10 100%);
+        background: radial-gradient(120% 100% at 0% 0%, #2a2d35 0%, #14161b 55%, #0b0d10 100%);
         color: #fff;
         padding: calc(56px + env(safe-area-inset-top)) 24px 96px;
         position: relative;
@@ -243,7 +224,9 @@ type Mode = 'login' | 'signup';
         letter-spacing: -0.005em;
         border-radius: 999px;
         cursor: pointer;
-        transition: background .15s ease, color .15s ease;
+        transition:
+          background 0.15s ease,
+          color 0.15s ease;
       }
       .mode-toggle button.active {
         background: #fff;
@@ -269,8 +252,13 @@ type Mode = 'login' | 'signup';
         height: 32px;
         border-radius: 999px;
 
-        lucide-icon { width: 20px; height: 20px; }
-        &:hover { color: var(--app-ink); }
+        lucide-icon {
+          width: 20px;
+          height: 20px;
+        }
+        &:hover {
+          color: var(--app-ink);
+        }
       }
 
       /* ---------- Forgot + hint + error + submit -------------------- */
@@ -291,8 +279,13 @@ type Mode = 'login' | 'signup';
         padding: 4px 6px;
         border-radius: 8px;
 
-        &:hover { color: var(--app-ink); }
-        &:disabled { cursor: default; opacity: 0.6; }
+        &:hover {
+          color: var(--app-ink);
+        }
+        &:disabled {
+          cursor: default;
+          opacity: 0.6;
+        }
       }
       .signup-hint {
         margin: -4px 0 0;
@@ -328,11 +321,20 @@ type Mode = 'login' | 'signup';
         margin-top: 4px;
         display: grid;
         place-items: center;
-        transition: transform .1s ease, opacity .15s ease;
+        transition:
+          transform 0.1s ease,
+          opacity 0.15s ease;
 
-        &:hover:not(:disabled) { opacity: 0.94; }
-        &:active:not(:disabled) { transform: scale(0.99); }
-        &:disabled { opacity: 0.55; cursor: default; }
+        &:hover:not(:disabled) {
+          opacity: 0.94;
+        }
+        &:active:not(:disabled) {
+          transform: scale(0.99);
+        }
+        &:disabled {
+          opacity: 0.55;
+          cursor: default;
+        }
       }
 
       .submit-loading {
@@ -363,7 +365,9 @@ type Mode = 'login' | 'signup';
         text-decoration: underline;
         text-underline-offset: 3px;
       }
-      .terms-link:hover { color: var(--app-accent); }
+      .terms-link:hover {
+        color: var(--app-accent);
+      }
 
       .contact-row {
         display: flex;
@@ -383,9 +387,15 @@ type Mode = 'login' | 'signup';
         font-size: 12px;
         font-weight: 600;
         cursor: pointer;
-        transition: background .12s ease, color .12s ease, border-color .12s ease;
+        transition:
+          background 0.12s ease,
+          color 0.12s ease,
+          border-color 0.12s ease;
 
-        lucide-icon { width: 14px; height: 14px; }
+        lucide-icon {
+          width: 14px;
+          height: 14px;
+        }
 
         &:hover {
           color: var(--app-ink);
@@ -511,7 +521,9 @@ export class LoginPage {
     const em = this.email().trim();
     if (!isEmail(em)) {
       this.touched.set(true);
-      this.snack.open('Type your email above first, then tap "Forgot password".', undefined, { duration: 3500 });
+      this.snack.open('Type your email above first, then tap "Forgot password".', undefined, {
+        duration: 3500,
+      });
       return;
     }
     this.sendingReset.set(true);
@@ -520,7 +532,9 @@ export class LoginPage {
     if (error) {
       this.snack.open(error.message, 'Dismiss', { duration: 4000 });
     } else {
-      this.snack.open('A reset link is on its way — check your inbox.', undefined, { duration: 3500 });
+      this.snack.open('A reset link is on its way — check your inbox.', undefined, {
+        duration: 3500,
+      });
     }
   }
 }

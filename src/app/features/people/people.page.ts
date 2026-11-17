@@ -1,4 +1,11 @@
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -21,6 +28,7 @@ import { errText } from '../../shared/utils/error-utils';
 @Component({
   selector: 'app-people-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     MatButtonModule,
     LucideAngularModule,
@@ -32,16 +40,8 @@ import { errText } from '../../shared/utils/error-utils';
     SwipeableRowComponent,
   ],
   template: `
-    <app-page-header
-      title="People"
-      subtitle="Friends and family in your money circle"
-    >
-      <button
-        class="add-btn"
-        type="button"
-        (click)="openAddDialog()"
-        aria-label="Add person"
-      >
+    <app-page-header title="People" subtitle="Friends and family in your money circle">
+      <button class="add-btn" type="button" (click)="openAddDialog()" aria-label="Add person">
         <lucide-icon name="plus" />
       </button>
     </app-page-header>
@@ -71,7 +71,11 @@ import { errText } from '../../shared/utils/error-utils';
           class="sort-btn"
           [class.active]="sortOrder() === 'desc'"
           (click)="toggleSort()"
-          [title]="sortOrder() === 'asc' ? 'Sorted A to Z (Click to sort Z to A)' : 'Sorted Z to A (Click to sort A to Z)'"
+          [title]="
+            sortOrder() === 'asc'
+              ? 'Sorted A to Z (Click to sort Z to A)'
+              : 'Sorted Z to A (Click to sort A to Z)'
+          "
           [attr.aria-label]="sortOrder() === 'asc' ? 'Sort descending' : 'Sort ascending'"
         >
           <lucide-icon [name]="sortOrder() === 'asc' ? 'arrow-down-a-z' : 'arrow-up-a-z'" />
@@ -124,7 +128,10 @@ import { errText } from '../../shared/utils/error-utils';
         place-items: center;
         cursor: pointer;
         flex: 0 0 auto;
-        transition: background .15s ease, border-color .15s ease, color .15s ease;
+        transition:
+          background 0.15s ease,
+          border-color 0.15s ease,
+          color 0.15s ease;
       }
       .sort-btn:hover {
         background: var(--app-surface);
@@ -157,7 +164,10 @@ import { errText } from '../../shared/utils/error-utils';
         gap: 12px;
         align-items: flex-end;
       }
-      .name { flex: 1; min-width: 0; }
+      .name {
+        flex: 1;
+        min-width: 0;
+      }
       .list {
         list-style: none;
         margin: 0 0 18px 0;
@@ -186,7 +196,11 @@ import { errText } from '../../shared/utils/error-utils';
         font-weight: 700;
         font-size: 15px;
       }
-      .title { font-size: 14px; font-weight: 600; color: var(--app-ink); }
+      .title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--app-ink);
+      }
     `,
   ],
 })
@@ -263,7 +277,9 @@ export class PeoplePage {
     try {
       await this.service.delete(id);
     } catch (e: unknown) {
-      this.snack.open(errText(e, 'Couldn’t delete — please try again.'), 'Dismiss', { duration: 4000 });
+      this.snack.open(errText(e, 'Couldn’t delete — please try again.'), 'Dismiss', {
+        duration: 4000,
+      });
     }
   }
 

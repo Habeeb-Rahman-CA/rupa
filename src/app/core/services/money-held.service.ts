@@ -12,6 +12,7 @@ import { PeopleService } from './people.service';
 import { BankAccountsService } from './bank-accounts.service';
 import { OfflineQueueService } from './offline-queue.service';
 import { roundCurrency } from '../../shared/utils/currency-utils';
+import { todayIso } from '../../shared/utils/budget-utils';
 
 export interface RecordMoneyHeldInput {
   held_person_id: string;
@@ -138,7 +139,7 @@ export class MoneyHeldService {
       try {
         const peopleResult = await this.supabase.client
           .from('money_held_people')
-          .select('*')
+          .select('id, owner_id, person_id, created_at')
           .order('created_at', { ascending: true });
 
         if (peopleResult.error) {
@@ -149,7 +150,9 @@ export class MoneyHeldService {
 
         const transactionResult = await this.supabase.client
           .from('money_held_transactions')
-          .select('*')
+          .select(
+            'id, owner_id, held_person_id, direction, amount, occurred_on, payment_mode, bank_account_id, notes, created_at',
+          )
           .order('occurred_on', { ascending: false })
           .order('created_at', { ascending: false });
 
@@ -362,9 +365,4 @@ function sumByDirection(records: MoneyHeldTransaction[], direction: MoneyHeldDir
       .filter((record) => record.direction === direction)
       .reduce((sum, record) => sum + Number(record.amount), 0),
   );
-}
-
-function todayIso(): string {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
