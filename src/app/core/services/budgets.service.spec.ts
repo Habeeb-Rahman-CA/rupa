@@ -120,7 +120,9 @@ describe('BudgetsService', () => {
         { provide: AuthService, useValue: authState },
         {
           provide: TransactionsService,
-          useValue: { transactions },
+          // Budgets read the unpaginated stats dataset; alias the same signal
+          // so the mock covers both names.
+          useValue: { transactions, statsTransactions: transactions },
         },
         {
           provide: CategoriesService,

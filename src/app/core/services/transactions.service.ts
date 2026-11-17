@@ -1,5 +1,11 @@
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
-import { Transaction, TxDirection, PaymentMode, isSavingsCategory } from '../models/domain.models';
+import {
+  Transaction,
+  StatsTransaction,
+  TxDirection,
+  PaymentMode,
+  isSavingsCategory,
+} from '../models/domain.models';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { CategoriesService } from './categories.service';
@@ -37,6 +43,7 @@ export class TransactionsService {
   private readonly offlineQueue = inject(OfflineQueueService);
 
   private readonly _transactions = signal<Transaction[]>([]);
+  private readonly _stats = signal<StatsTransaction[]>([]);
   private readonly _balance = signal<number>(0);
   private readonly _openingBalance = signal<number | null>(null);
   private readonly _isLoading = signal(false);
@@ -49,8 +56,17 @@ export class TransactionsService {
   readonly isLoading = this._isLoading.asReadonly();
   readonly hasMore = this._hasMore.asReadonly();
 
+  /**
+   * Every transaction, narrow columns only — no pagination.
+   *
+   * `_transactions` above is the paginated *display* list; reading totals from
+   * it made figures change as the user scrolled. All aggregates read this
+   * instead.
+   */
+  readonly statsTransactions = this._stats.asReadonly();
+
   readonly monthly = computed<MonthlyStats>(() => {
-    const txs = this._transactions();
+    const txs = this._stats();
     const categories = this.categoriesService.categories();
     const savingsCatIds = new Set<string>(
       categories.filter((c) => isSavingsCategory(c)).map((c) => c.id),
@@ -92,7 +108,7 @@ export class TransactionsService {
   });
 
   readonly totalSavings = computed<number>(() => {
-    const txs = this._transactions();
+    const txs = this._stats();
     const categories = this.categoriesService.categories();
     const savingsCatIds = new Set<string>(
       categories.filter((c) => isSavingsCategory(c)).map((c) => c.id),
@@ -115,6 +131,7 @@ export class TransactionsService {
         void this.refresh();
       } else {
         this._transactions.set([]);
+        this._stats.set([]);
         this._balance.set(0);
         this._openingBalance.set(null);
       }
@@ -154,41 +171,41 @@ export class TransactionsService {
         if (!created) throw new Error('Transaction was not returned after sync.');
         // Replace the optimistic local entry with the server version.
         this._transactions.update((list) => list.map((t) => (t.id === p['localId'] ? created : t)));
+        this._stats.update((list) => list.map((t) => (t.id === p['localId'] ? created : t)));
       } else if (action.type === 'delete') {
         const { error } = await this.supabase.client.rpc('delete_transaction_with_balance_update', {
           p_transaction_id: p['id'] as string,
         });
         if (error) throw error;
         this._transactions.update((list) => list.filter((t) => t.id !== p['id']));
+        this._stats.update((list) => list.filter((t) => t.id !== p['id']));
       }
     });
   }
 
   async mapUnassignedTransactionsToPrimary(bankAccountId: string): Promise<void> {
-    const current = this._transactions();
+    // Both datasets are checked: the stats load and the display load resolve
+    // independently, so either may be populated first.
+    const unassignedIds = new Set<string>();
+    const isUnassigned = (t: Transaction | StatsTransaction): boolean =>
+      t.payment_mode === 'bank' && !t.bank_account_id;
+    for (const t of this._transactions()) if (isUnassigned(t)) unassignedIds.add(t.id);
+    for (const t of this._stats()) if (isUnassigned(t)) unassignedIds.add(t.id);
+    if (unassignedIds.size === 0) return;
+
     // Only bank-mode transactions are eligible for migration. Older cash
     // transactions have no bank_account_id by design and must not be silently
     // reassigned to a newly-created primary account.
-    const unassigned = current.filter((t) => t.payment_mode === 'bank' && !t.bank_account_id);
-    if (unassigned.length === 0) return;
+    const claimPrimary = <T extends Transaction | StatsTransaction>(t: T): T =>
+      isUnassigned(t) ? { ...t, bank_account_id: bankAccountId } : t;
 
-    const updatedList = current.map((t) => {
-      if (t.payment_mode === 'bank' && !t.bank_account_id) {
-        return {
-          ...t,
-          bank_account_id: bankAccountId,
-        };
-      }
-      return t;
-    });
+    this._transactions.update((list) => list.map(claimPrimary));
+    this._stats.update((list) => list.map(claimPrimary));
 
-    this._transactions.set(updatedList);
-
-    const unassignedIds = unassigned.map((t) => t.id);
     try {
       const { error: mapErr } = await this.supabase.client.rpc('assign_transactions_to_account', {
         p_account_id: bankAccountId,
-        p_transaction_ids: unassignedIds,
+        p_transaction_ids: [...unassignedIds],
       });
       if (mapErr) {
         console.error('Failed to map bank transactions to the primary account', mapErr);
@@ -203,6 +220,7 @@ export class TransactionsService {
   async refresh(): Promise<void> {
     if (!this.auth.isAuthenticated()) {
       this._transactions.set([]);
+      this._stats.set([]);
       this._balance.set(0);
       this._openingBalance.set(null);
       return;
@@ -215,7 +233,12 @@ export class TransactionsService {
         // Reset pagination state on full refresh
         this._hasMore.set(false);
         this._lastCursor.set(null);
-        await Promise.all([this.loadTransactions(), this.loadBalance(), this.loadOpeningBalance()]);
+        await Promise.all([
+          this.loadTransactions(),
+          this.loadStats(),
+          this.loadBalance(),
+          this.loadOpeningBalance(),
+        ]);
         try {
           const bankAccountsService = this.injector.get(BankAccountsService);
           const primary = bankAccountsService.primaryAccount();
@@ -277,6 +300,48 @@ export class TransactionsService {
     const cursor = this._lastCursor();
     if (!cursor || !this._hasMore()) return;
     await this.loadTransactions(50, cursor);
+  }
+
+  /**
+   * Loads every transaction (narrow columns) for aggregate math.
+   *
+   * Paged explicitly because PostgREST applies a default row cap — an
+   * unbounded select would silently truncate and put us back to wrong totals.
+   */
+  async loadStats(): Promise<void> {
+    const ownerId = this.auth.user()?.id;
+    if (!ownerId) {
+      this._stats.set([]);
+      return;
+    }
+
+    const pageSize = 1000;
+    const all: StatsTransaction[] = [];
+
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await this.supabase.client
+        .from('transactions')
+        .select(
+          'id, occurred_on, amount, direction, category_id, notes, source, payment_mode, bank_account_id',
+        )
+        .eq('owner_id', ownerId)
+        .order('occurred_on', { ascending: false })
+        .order('created_at', { ascending: false })
+        .range(from, from + pageSize - 1);
+
+      if (error) {
+        // Never publish a partial dataset — a truncated total is worse than
+        // a stale one. Matches loadTransactions(), which also keeps prior data.
+        console.error('Failed to load transaction stats', error);
+        return;
+      }
+
+      const rows = (data ?? []) as StatsTransaction[];
+      all.push(...rows);
+      if (rows.length < pageSize) break;
+    }
+
+    this._stats.set(all);
   }
 
   async loadBalance(): Promise<void> {
@@ -356,6 +421,7 @@ export class TransactionsService {
       });
 
       this._transactions.update((list) => [optimistic, ...list]);
+      this._stats.update((list) => [optimistic, ...list]);
       this.applyToTotals(optimistic, +1);
       return optimistic;
     }
@@ -387,6 +453,7 @@ export class TransactionsService {
     }
 
     this._transactions.update((list) => [created, ...list]);
+    this._stats.update((list) => [created, ...list]);
     this.applyToTotals(created, +1);
     return created;
   }
@@ -404,6 +471,7 @@ export class TransactionsService {
 
     // 1. Optimistic removal from state for immediate UI feedback
     this._transactions.update((list) => list.filter((t) => t.id !== id));
+    this._stats.update((list) => list.filter((t) => t.id !== id));
     this.applyToTotals(removed, -1);
 
     // Offline path: enqueue for later sync, skip online-only debt_payment cleanup.
@@ -481,6 +549,7 @@ export class TransactionsService {
       console.error('Failed to delete transaction', error);
       // Revert state if backend request fails
       this._transactions.update((list) => [removed, ...list]);
+      this._stats.update((list) => [removed, ...list]);
       this.applyToTotals(removed, +1);
       throw error;
     }

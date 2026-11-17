@@ -15,6 +15,8 @@ describe('DashboardPage periodStats', () => {
   const createPage = (txs: any[], cats: any[], range: 'week' | 'month' | 'year' = 'month') => {
     mockTxService = {
       transactions: signal(txs),
+      // Aggregates read the unpaginated stats dataset.
+      statsTransactions: signal(txs),
       openingBalance: signal(null),
     } as unknown as Partial<TransactionsService>;
 

@@ -11,7 +11,7 @@ import {
   Budget,
   BudgetPeriod,
   Category,
-  Transaction,
+  StatsTransaction,
   isSavingsCategory,
 } from '../../core/models/domain.models';
 import { roundCurrency } from './currency-utils';
@@ -157,7 +157,7 @@ export function budgetPhase(range: DateRange, today: string): BudgetPhase {
  */
 export function computeBudgetSpent(
   budget: Pick<Budget, 'category_id' | 'start_date' | 'end_date'>,
-  transactions: Transaction[],
+  transactions: readonly StatsTransaction[],
   categories: Category[],
 ): number {
   const categoryById = new Map(categories.map((c) => [c.id, c]));

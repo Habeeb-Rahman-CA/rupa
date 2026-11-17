@@ -35,6 +35,7 @@ describe('TransactionsService', () => {
     mockQueryBuilder.maybeSingle = jasmine.createSpy().and.resolveTo({ data: null, error: null });
     mockQueryBuilder.single = jasmine.createSpy().and.resolveTo({ data: { id: 'tx_1', amount: 100, direction: 'in' }, error: null });
     mockQueryBuilder.order = jasmine.createSpy().and.returnValue(mockQueryBuilder);
+    mockQueryBuilder.range = jasmine.createSpy().and.returnValue(mockQueryBuilder);
     mockQueryBuilder.limit = jasmine.createSpy().and.resolveTo({ data: [], error: null });
 
     mockSupabase = {

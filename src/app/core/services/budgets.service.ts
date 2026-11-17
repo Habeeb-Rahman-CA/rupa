@@ -199,7 +199,7 @@ export class BudgetsService {
 
   /** Every budget with its live usage, newest period first. */
   readonly rows = computed<BudgetRow[]>(() => {
-    const transactions = this.transactionsService.transactions();
+    const transactions = this.transactionsService.statsTransactions();
     const categories = this.categoriesService.categories();
     const today = todayIso();
 
@@ -249,7 +249,7 @@ export class BudgetsService {
   spentIn(start: string, end: string): number {
     return computeBudgetSpent(
       { category_id: null, start_date: start, end_date: end },
-      this.transactionsService.transactions(),
+      this.transactionsService.statsTransactions(),
       this.categoriesService.categories(),
     );
   }

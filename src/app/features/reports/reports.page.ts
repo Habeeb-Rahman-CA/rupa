@@ -35,7 +35,7 @@ import { MoneyHeldService, MoneyHeldBalance } from '../../core/services/money-he
 import { PeopleService } from '../../core/services/people.service';
 import {
   Category,
-  Transaction,
+  StatsTransaction,
   isSavingsCategory,
   BankAccount,
 } from '../../core/models/domain.models';
@@ -941,7 +941,7 @@ interface BankReportRow extends BankAccount {
         border-radius: 12px;
         display: grid;
         place-items: center;
-        color: #fff;
+        color: var(--app-ink-inverse);
       }
       .cat-icon lucide-icon {
         width: 22px;
@@ -1212,7 +1212,7 @@ export class ReportsPage {
 
   constructor() {
     effect(() => {
-      const txs = this.txService.transactions();
+      const txs = this.txService.statsTransactions();
       if (txs.length > 0) {
         const latestIso = txs[0].occurred_on;
         const [y, m] = latestIso.split('-').map(Number);
@@ -1236,7 +1236,7 @@ export class ReportsPage {
     let spent = 0;
     let received = 0;
     let saved = 0;
-    for (const t of this.txService.transactions()) {
+    for (const t of this.txService.statsTransactions()) {
       if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);
       if (ty !== y || tm !== m) continue;
@@ -1262,7 +1262,7 @@ export class ReportsPage {
     let cashSpent = 0;
     let totalSpent = 0;
 
-    for (const t of this.txService.transactions()) {
+    for (const t of this.txService.statsTransactions()) {
       if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (t.direction !== 'out') continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);
@@ -1287,7 +1287,7 @@ export class ReportsPage {
     const accounts = this.bankAccountsService.bankAccounts();
 
     const accountSpendMap = new Map<string, number>();
-    for (const t of this.txService.transactions()) {
+    for (const t of this.txService.statsTransactions()) {
       if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (t.direction !== 'out' || t.payment_mode !== 'bank') continue;
       const [ty, tm] = t.occurred_on.split('-').map(Number);
@@ -1328,7 +1328,7 @@ export class ReportsPage {
     const startY = anchor.getFullYear();
     const startM = anchor.getMonth() - 11;
 
-    for (const t of this.txService.transactions()) {
+    for (const t of this.txService.statsTransactions()) {
       if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (t.direction !== 'out') continue;
       if (t.category_id && catsMap.get(t.category_id) === 'savings') continue;
@@ -1368,7 +1368,7 @@ export class ReportsPage {
     const totals = new Map<string, number>();
     let sum = 0;
 
-    for (const t of this.txService.transactions()) {
+    for (const t of this.txService.statsTransactions()) {
       if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (!t.occurred_on || !t.occurred_on.startsWith(prefix)) continue;
       const cat = t.category_id ? catMap.get(t.category_id) : undefined;
@@ -1404,7 +1404,7 @@ export class ReportsPage {
     const totals = new Map<string, number>();
     let sum = 0;
 
-    for (const t of this.txService.transactions()) {
+    for (const t of this.txService.statsTransactions()) {
       if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (t.direction !== 'out' || !t.occurred_on || !t.occurred_on.startsWith(prefix)) continue;
       const cat = t.category_id ? catMap.get(t.category_id) : undefined;
@@ -1441,7 +1441,7 @@ export class ReportsPage {
     const prefix = `${y}-${String(m).padStart(2, '0')}`;
     const catMap = this.categoryMap();
     const byDay = new Map<string, number>();
-    for (const t of this.txService.transactions()) {
+    for (const t of this.txService.statsTransactions()) {
       if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (t.direction !== 'out' || !t.occurred_on || !t.occurred_on.startsWith(prefix)) continue;
       const cat = t.category_id ? catMap.get(t.category_id) : undefined;
@@ -1837,7 +1837,7 @@ export class ReportsPage {
     const prefix = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`;
     const catMap = this.categoryMap();
     const rows: ReportDetailRow[] = [];
-    for (const t of this.txService.transactions()) {
+    for (const t of this.txService.statsTransactions()) {
       if (t.source === 'transfer' || t.source === 'wallet_recharge') continue;
       if (t.direction !== 'out') continue;
       if (t.category_id && catMap.get(t.category_id)?.kind === 'savings') continue;
@@ -1869,10 +1869,10 @@ export class ReportsPage {
   }
 
   /** All non-transfer transactions of the selected month (mirrors monthly()). */
-  private monthTx(): Transaction[] {
+  private monthTx(): StatsTransaction[] {
     const prefix = this.monthPrefix();
     return this.txService
-      .transactions()
+      .statsTransactions()
       .filter(
         (t) =>
           t.source !== 'transfer' &&
@@ -1882,7 +1882,7 @@ export class ReportsPage {
   }
 
   /** Outgoing, non-savings month expenses (mirrors categoryRows/topDays). */
-  private monthExpenseTx(): Transaction[] {
+  private monthExpenseTx(): StatsTransaction[] {
     const catMap = this.categoryMap();
     return this.monthTx().filter(
       (t) =>
@@ -1892,13 +1892,13 @@ export class ReportsPage {
   }
 
   /** Grouping key used by categoryRows(). */
-  private categoryKey(t: Transaction): string {
+  private categoryKey(t: StatsTransaction): string {
     return t.source === 'wallet_spend'
       ? '__wallet_spending__'
       : (t.category_id ?? '__uncategorized__');
   }
 
-  private txRow(t: Transaction, catMap: Map<string, Category>): ReportDetailRow {
+  private txRow(t: StatsTransaction, catMap: Map<string, Category>): ReportDetailRow {
     const cat = t.category_id ? catMap.get(t.category_id) : undefined;
     const fallback =
       t.source === 'wallet_spend' ? 'Wallet spending' : (cat?.name ?? 'Uncategorized');

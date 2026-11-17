@@ -153,6 +153,26 @@ export interface Transaction {
   created_at: string;
 }
 
+/**
+ * The subset of `Transaction` that every total/aggregate reads.
+ *
+ * Stats are computed from ALL rows (narrow columns, no row cap) so dashboard,
+ * reports and budget figures never depend on how many list pages the user has
+ * scrolled through — see `TransactionsService.statsTransactions`.
+ */
+export type StatsTransaction = Pick<
+  Transaction,
+  | 'id'
+  | 'occurred_on'
+  | 'amount'
+  | 'direction'
+  | 'category_id'
+  | 'notes'
+  | 'source'
+  | 'payment_mode'
+  | 'bank_account_id'
+>;
+
 export interface AccountTransfer {
   id: string;
   owner_id: string;

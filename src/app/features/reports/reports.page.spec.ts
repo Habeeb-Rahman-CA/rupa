@@ -17,7 +17,11 @@ describe('ReportsPage savingsCategoryRows', () => {
   let mockCategoriesService: Partial<CategoriesService>;
 
   const createPage = (txs: any[], cats: any[]) => {
-    mockTxService = { transactions: signal(txs) } as unknown as Partial<TransactionsService>;
+    mockTxService = {
+      transactions: signal(txs),
+      // Aggregates read the unpaginated stats dataset.
+      statsTransactions: signal(txs),
+    } as unknown as Partial<TransactionsService>;
     mockCategoriesService = { categories: signal(cats) } as unknown as Partial<CategoriesService>;
 
     TestBed.configureTestingModule({

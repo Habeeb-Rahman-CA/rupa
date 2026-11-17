@@ -18,6 +18,7 @@ import {
   Category,
   CategoryKind,
   Transaction,
+  StatsTransaction,
   isSavingsCategory,
 } from '../../core/models/domain.models';
 import { SetOpeningBalanceSheetComponent } from './set-opening-balance-sheet.component';
@@ -669,7 +670,7 @@ export class DashboardPage {
   readonly range = signal<Range>('month');
 
   readonly periodStats = computed(() => {
-    const txs = this.txService.transactions();
+    const txs = this.txService.statsTransactions();
     const catMap = this.categoryMap();
     const range = this.range();
     const now = new Date();
@@ -764,7 +765,7 @@ export class DashboardPage {
 
   // Chart data based on range.
   readonly chart = computed<ChartPoint[]>(() => {
-    const txs = this.txService.transactions();
+    const txs = this.txService.statsTransactions();
     switch (this.range()) {
       case 'week':
         return this.bucketDaily(txs, 7);
@@ -799,7 +800,7 @@ export class DashboardPage {
 
   readonly topCategories = computed<CategorySpend[]>(() => {
     const catMap = this.categoryMap();
-    const txs = this.txService.transactions();
+    const txs = this.txService.statsTransactions();
     const now = new Date();
     const y = now.getFullYear();
     const m = now.getMonth() + 1;
@@ -848,7 +849,7 @@ export class DashboardPage {
 
   // -------- chart bucketing helpers ----------------------------------------
 
-  private bucketDaily(txs: Transaction[], days: number): ChartPoint[] {
+  private bucketDaily(txs: StatsTransaction[], days: number): ChartPoint[] {
     const buckets: ChartPoint[] = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -878,7 +879,7 @@ export class DashboardPage {
     return buckets;
   }
 
-  private bucketMonthly(txs: Transaction[], months: number): ChartPoint[] {
+  private bucketMonthly(txs: StatsTransaction[], months: number): ChartPoint[] {
     const buckets: ChartPoint[] = [];
     const today = new Date();
 
