@@ -108,12 +108,19 @@ export interface QuickAddSheetData {
       <div class="scan-bar" [class.is-offline]="isOffline()">
         <span class="scan-tag">
           <lucide-icon
-            [name]="isOffline() ? 'wifi' : scanningBill() ? 'sparkles' : 'receipt'"
+            [name]="isOffline() ? 'wifi-off' : scanningBill() ? 'sparkles' : 'bot'"
             class="scan-tag-icon"
+            [class.spin]="scanningBill()"
           />
-          <span>{{
-            isOffline() ? 'Offline (AI Disabled)' : scanningBill() ? 'Scanning…' : 'Scan Bill'
-          }}</span>
+          <span>
+            {{
+              isOffline()
+                ? 'AI Offline'
+                : scanningBill()
+                  ? 'AI Scanning…'
+                  : 'AI Bill Scanner'
+            }}
+          </span>
         </span>
         <div class="scan-actions">
           <button
@@ -146,6 +153,18 @@ export interface QuickAddSheetData {
           </button>
         </div>
       </div>
+
+      @if (scanningBill()) {
+        <div class="scan-progress">
+          <div class="scan-progress-track">
+            <div
+              class="scan-progress-fill"
+              [style.width.%]="scanProgress()"
+            ></div>
+          </div>
+          <span class="scan-progress-label">{{ scanProgress() }}%</span>
+        </div>
+      }
 
       <app-text-field
         label="Amount"
@@ -326,22 +345,30 @@ export interface QuickAddSheetData {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 6px 12px;
-        background: var(--app-bg-hover, rgba(99, 102, 241, 0.06));
-        border: 1px solid var(--app-border, rgba(99, 102, 241, 0.15));
-        border-radius: var(--app-radius-md, 10px);
+        padding: 8px 14px;
+        background: var(--app-surface);
+        border: 1px solid var(--app-hairline);
+        border-radius: var(--app-radius-lg);
+        box-shadow: var(--app-shadow-sm);
+      }
+      .scan-bar.is-offline {
+        background: var(--app-bg-hover);
+        border-color: var(--app-hairline);
+        opacity: 0.85;
       }
       .scan-tag {
         display: flex;
         align-items: center;
-        gap: 6px;
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--app-accent, #6366f1);
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--app-accent);
+        letter-spacing: 0.2px;
       }
       .scan-tag-icon {
-        width: 15px;
-        height: 15px;
+        width: 16px;
+        height: 16px;
+        animation: ai-pulse 2s ease-in-out infinite;
       }
       .scan-actions {
         display: flex;
@@ -352,20 +379,23 @@ export interface QuickAddSheetData {
         display: flex;
         align-items: center;
         gap: 5px;
-        padding: 4px 10px;
-        background: var(--app-surface);
-        border: 1px solid var(--app-border, #e5e7eb);
-        border-radius: 6px;
-        color: var(--app-ink, #374151);
-        font-size: 12px;
+        padding: 5px 12px;
+        background: transparent;
+        border: 1px solid var(--app-hairline);
+        border-radius: 8px;
+        color: var(--app-ink-muted);
+        font-size: 12.5px;
         font-weight: 500;
         cursor: pointer;
         transition: all 0.15s ease;
       }
       .scan-btn:hover:not([disabled]) {
-        background: var(--app-accent, #6366f1);
-        color: var(--mat-sys-on-primary);
-        border-color: var(--app-accent, #6366f1);
+        background: var(--app-accent-soft);
+        color: var(--app-accent);
+        border-color: var(--app-accent);
+      }
+      .scan-btn:active:not([disabled]) {
+        transform: translateY(-1px);
       }
       .scan-btn[disabled] {
         opacity: 0.5;
@@ -374,6 +404,46 @@ export interface QuickAddSheetData {
       .scan-btn-icon {
         width: 14px;
         height: 14px;
+      }
+      .scan-progress {
+        margin-top: 2px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .scan-progress-track {
+        flex: 1;
+        height: 4px;
+        background: var(--app-bg-hover);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .scan-progress-fill {
+        height: 100%;
+        background: var(--app-accent);
+        border-radius: 2px;
+        transition: width 0.2s ease;
+      }
+      .scan-progress-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--app-ink-muted);
+        min-width: 28px;
+      }
+      .scan-tag-icon.spin {
+        animation: ai-blink 1.2s ease-in-out infinite;
+      }
+
+      @keyframes ai-pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.6; transform: scale(1.1); }
+      }
+      @keyframes ai-blink {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(0.9); }
+      }
+      @keyframes ai-spin {
+        to { transform: rotate(360deg); }
       }
     `,
   ],
@@ -404,6 +474,7 @@ export class QuickAddSheetComponent {
   readonly selectedCategoryId = signal<string | null>(null);
   readonly newCategoryName = signal('');
   readonly notes = signal('');
+  readonly scanProgress = signal(0);
 
   readonly paymentMode = signal<PaymentMode>('bank');
   readonly selectedBankAccountId = signal<string | null>(null);
@@ -432,6 +503,28 @@ export class QuickAddSheetComponent {
         this.selectedBankAccountId.set(primary.id);
       }
     });
+
+    // Animate a pseudo-progress bar while scanning so the user knows work is
+    // happening. It climbs to ~90% and holds until the real scan completes,
+    // then jumps to 100% before being hidden.
+    effect(() => {
+      const scanning = this.scanningBill();
+      if (!scanning) {
+        this.scanProgress.set(0);
+        return;
+      }
+      let progress = 0;
+      const timer = setInterval(() => {
+        if (!this.scanningBill()) {
+          this.scanProgress.set(100);
+          clearInterval(timer);
+          return;
+        }
+        progress = Math.min(progress + 5, 90);
+        this.scanProgress.set(progress);
+      }, 250);
+      return () => clearInterval(timer);
+    });
   }
 
   setPaymentMode(mode: PaymentMode): void {
@@ -446,7 +539,7 @@ export class QuickAddSheetComponent {
 
   readonly relevantCategories = computed<Category[]>(() => {
     const kind = this.txKind();
-    return this.categoriesService.categories().filter((c) => {
+    const filtered = this.categoriesService.categories().filter((c) => {
       // Wallet spending is recorded through the wallet flow only — its system
       // category must not be offered for manual expenses.
       if (isWalletSpendingCategory(c)) return false;
@@ -454,6 +547,19 @@ export class QuickAddSheetComponent {
       if (kind === 'expense') return c.kind === 'expense' && !isSavingsCategory(c);
       if (kind === 'income') return c.kind === 'income' && !isSavingsCategory(c);
       return false;
+    });
+
+    // Count how many transactions use each category, then sort most-used first.
+    const usage = new Map<string, number>();
+    for (const t of this.transactionsService.transactions()) {
+      if (t.category_id) usage.set(t.category_id, (usage.get(t.category_id) ?? 0) + 1);
+    }
+
+    return filtered.sort((a, b) => {
+      const ba = usage.get(b.id) ?? 0;
+      const aa = usage.get(a.id) ?? 0;
+      if (ba !== aa) return ba - aa;
+      return a.name.localeCompare(b.name);
     });
   });
 
