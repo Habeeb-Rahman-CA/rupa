@@ -157,6 +157,19 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
             aria-label="Daily expense summary"
           />
         </li>
+        <li class="category-row">
+          <div class="category-text">
+            <span class="category-name">Daily confirm</span>
+            <span class="category-desc">Remind me at 10 PM to confirm today’s transactions</span>
+          </div>
+          <mat-slide-toggle
+            color="primary"
+            [checked]="push.dailyConfirmEnabled()"
+            [disabled]="push.busy()"
+            (change)="setCategory('daily_confirm', $event.checked)"
+            aria-label="Daily transaction confirm"
+          />
+        </li>
       </ul>
 
       <ul class="notes">

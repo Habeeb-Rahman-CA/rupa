@@ -35,7 +35,7 @@ const APP_TIME_ZONE = Deno.env.get('APP_TIME_ZONE') ?? 'Asia/Kolkata';
 const RENEWAL_WINDOW_DAYS = 3;
 
 /** Notification categories the user can toggle in the app. */
-type Category = 'renewals' | 'low_balance' | 'budget' | 'daily_expense';
+type Category = 'renewals' | 'low_balance' | 'budget' | 'daily_expense' | 'daily_confirm';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -116,6 +116,19 @@ function isEightAM(): boolean {
   }).formatToParts(new Date());
   const hour = parts.find((p) => p.type === 'hour')?.value;
   return hour === '08';
+}
+
+/** True when the current time in APP_TIME_ZONE is 22:00 (10 PM IST) — used
+ *  for the daily confirm reminder that runs every 15 minutes but should only
+ *  send once per night at 10 PM. */
+function isTenPM(): boolean {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: APP_TIME_ZONE,
+    hour: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+  const hour = parts.find((p) => p.type === 'hour')?.value;
+  return hour === '22';
 }
 
 /** '2026-11-20' → 'Nov 20' (date-only string, no timezone math). */
@@ -618,6 +631,53 @@ async function runScheduled(admin: SupabaseClient): Promise<Response> {
           },
         });
       }
+    }
+  }
+
+  // ---- 6. Daily confirm reminder (10 PM IST only) ---------------------------
+  // The cron runs every 15 minutes; this block fires once per night at 10 PM.
+  // Reminds the user to confirm all today's transactions are added.
+  // De-duplication via push_notification_log (ref: daily-confirm:<date>)
+  // ensures a single send even if multiple cron ticks fall in the 10 PM hour.
+  if (isTenPM()) {
+    const today = dayIso(0);
+
+    const ownerIds = [...new Set(
+      [...renewals, ...lowWallets, ...budgetAlerts.map((a) => a.budget)]
+        .map((row) => row.owner_id),
+    )];
+
+    const [prefs, deviceMap] = await Promise.all([
+      loadPrefs(admin, ownerIds),
+      loadDevices(admin, ownerIds),
+    ]);
+
+    for (const ownerId of ownerIds) {
+      if (!categoryEnabled(prefs, ownerId, 'daily_confirm')) continue;
+      const ref = `daily-confirm:${today}`;
+      if (!(await claim(admin, ownerId, 'daily_confirm', ref))) continue;
+      claimed++;
+
+      const devices = deviceMap.get(ownerId) ?? [];
+      sent += await sendToOwner(admin, devices, ownerId, {
+        notification: {
+          title: 'Confirm today’s transactions',
+          body: 'Have you added all your expenses and income for today?',
+          tag: `daily-confirm-${today}`,
+          icon: '/icons/icon-192x192.png',
+          badge: '/icons/icon-96x96.png',
+          requireInteraction: true,
+          data: {
+            url: '/dashboard',
+            onActionClick: {
+              default: {
+                url: '/dashboard',
+                operation: 'navigateLastFocusedOrOpen',
+              },
+            },
+          },
+        },
+      });
     }
   }
 

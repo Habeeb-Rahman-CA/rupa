@@ -7,7 +7,7 @@ import { SupabaseService } from './supabase.service';
 import { errorText } from '../../shared/utils/error-utils';
 import { TIMEOUTS } from '../time/timeouts';
 
-export type PushCategory = 'renewals' | 'low_balance' | 'budget' | 'daily_expense';
+export type PushCategory = 'renewals' | 'low_balance' | 'budget' | 'daily_expense' | 'daily_confirm';
 
 export type PushCategoryState = 'on' | 'off' | 'unknown';
 
@@ -57,6 +57,7 @@ export class PushService {
   readonly lowBalanceEnabled = signal(true);
   readonly budgetEnabled = signal(true);
   readonly dailyExpenseEnabled = signal(true);
+  readonly dailyConfirmEnabled = signal(true);
 
   readonly status = computed<PushStatus>(() => {
     if (!this.isSupported) return 'unsupported';
@@ -78,12 +79,16 @@ export class PushService {
   readonly dailyExpenseState = computed<PushCategoryState>(() =>
     this.dailyExpenseEnabled() ? 'on' : 'off',
   );
+  readonly dailyConfirmState = computed<PushCategoryState>(() =>
+    this.dailyConfirmEnabled() ? 'on' : 'off',
+  );
 
   private readonly categorySignals: Record<PushCategory, WritableSignal<boolean>> = {
     renewals: this.renewalsEnabled,
     low_balance: this.lowBalanceEnabled,
     budget: this.budgetEnabled,
     daily_expense: this.dailyExpenseEnabled,
+    daily_confirm: this.dailyConfirmEnabled,
   };
 
   private initialized = false;
@@ -116,6 +121,7 @@ export class PushService {
     this.lowBalanceEnabled.set(true);
     this.budgetEnabled.set(true);
     this.dailyExpenseEnabled.set(true);
+    this.dailyConfirmEnabled.set(true);
     this.message.set(null);
   }
 
@@ -303,6 +309,7 @@ export class PushService {
       this.lowBalanceEnabled.set(rows.find((r) => r.category === 'low_balance')?.enabled ?? true);
       this.budgetEnabled.set(rows.find((r) => r.category === 'budget')?.enabled ?? true);
       this.dailyExpenseEnabled.set(rows.find((r) => r.category === 'daily_expense')?.enabled ?? true);
+      this.dailyConfirmEnabled.set(rows.find((r) => r.category === 'daily_confirm')?.enabled ?? true);
     } catch (error: unknown) {
       console.error('Failed to load push preferences', error);
     }
