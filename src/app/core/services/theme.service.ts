@@ -1,6 +1,7 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
+import { DEVICE_KEYS } from '../config/storage-keys';
 
-const THEME_KEY = 'rupa:theme';
+const THEME_KEY = DEVICE_KEYS.THEME;
 
 type Theme = 'light' | 'dark' | 'system';
 

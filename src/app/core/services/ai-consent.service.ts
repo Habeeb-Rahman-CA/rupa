@@ -1,9 +1,10 @@
 import { Injectable, computed, signal } from '@angular/core';
+import { DEVICE_KEYS } from '../config/storage-keys';
 
 export type AiConsentState = 'unknown' | 'granted' | 'denied';
 
 /** localStorage key for the recorded AI-scan consent choice (per device). */
-const STORAGE_KEY = 'rupa:ai_scan_consent';
+const STORAGE_KEY = DEVICE_KEYS.AI_CONSENT;
 
 function readStored(): AiConsentState {
   if (typeof localStorage === 'undefined') return 'unknown';

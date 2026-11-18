@@ -4,6 +4,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { SNACKBAR_DURATION } from '../../core/ui/snackbar-durations';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { Budget } from '../../core/models/domain.models';
@@ -407,17 +408,17 @@ export class BudgetDialogComponent {
 
       if (this.isEdit) {
         await this.budgetsService.update(this.data.budget!.id, input);
-        this.snack.open('Budget updated.', undefined, { duration: 2000 });
+        this.snack.open('Budget updated.', undefined, { duration: SNACKBAR_DURATION.SHORT });
       } else {
         await this.budgetsService.create(input);
-        this.snack.open('Budget added.', undefined, { duration: 2000 });
+        this.snack.open('Budget added.', undefined, { duration: SNACKBAR_DURATION.SHORT });
       }
       this.ref.close({ saved: true });
     } catch (error: unknown) {
       this.snack.open(
         errorText(error, 'Couldn’t save the budget.'),
         'Dismiss',
-        { duration: 4000 },
+        { duration: SNACKBAR_DURATION.ERROR },
       );
       this.submitting.set(false);
     }

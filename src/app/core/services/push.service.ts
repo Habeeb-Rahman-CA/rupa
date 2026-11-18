@@ -5,6 +5,7 @@ import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { errorText } from '../../shared/utils/error-utils';
+import { TIMEOUTS } from '../time/timeouts';
 
 export type PushCategory = 'renewals' | 'low_balance' | 'budget';
 
@@ -340,7 +341,7 @@ export class PushService {
     if (existing) return existing;
     return Promise.race([
       navigator.serviceWorker.ready,
-      new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 30_000)),
+      new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), TIMEOUTS.PUSH_REQUEST_MS)),
     ]);
   }
 

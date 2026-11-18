@@ -1,6 +1,7 @@
 import { ErrorHandler, Injectable } from '@angular/core';
 
 import { getErrorMessage } from '../shared/utils/error-utils';
+import { SESSION_KEYS } from './config/storage-keys';
 
 const OVERLAY_ID = 'app-error-overlay';
 const BANNER_ID = 'app-error-banner';
@@ -22,7 +23,7 @@ const ESCALATION_THRESHOLD = 3;
 const FIRST_PAINT_GRACE_MS = 1_500;
 
 /** Bounded record of recent errors, kept for support/debugging. */
-const RECENT_ERRORS_KEY = 'rupa:last_errors';
+const RECENT_ERRORS_KEY = SESSION_KEYS.RECENT_ERRORS;
 const MAX_RECENT_ERRORS = 10;
 
 export interface RecordedError {

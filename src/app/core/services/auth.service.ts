@@ -7,6 +7,8 @@ import {
 } from '@angular/core';
 import { Session, User } from '@supabase/supabase-js';
 import { SupabaseService } from './supabase.service';
+import { TIMEOUTS } from '../time/timeouts';
+import { DEVICE_KEYS, STORAGE_PREFIX, USER_KEYS } from '../config/storage-keys';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -113,7 +115,7 @@ export class AuthService {
 
           if (isInvalidRefreshToken) {
             if (attempt < maxAttempts) {
-              await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+              await new Promise((resolve) => setTimeout(resolve, attempt * TIMEOUTS.RETRY_BASE_MS));
               continue;
             }
             console.warn('Session refresh failed with invalid refresh token after retries, logging out:', error.message);
@@ -167,7 +169,7 @@ export class AuthService {
 
   private clearUserLocalStorage(userId: string | null | undefined): void {
     if (!userId || typeof localStorage === 'undefined') return;
-    const prefix = `rupa:${userId}:`;
+    const prefix = `${STORAGE_PREFIX}:${userId}:`;
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -184,10 +186,10 @@ export class AuthService {
     }
     // Also remove the legacy unscoped keys to avoid cross-user leakage
     try {
-      localStorage.removeItem('rupa_bank_accounts');
-      localStorage.removeItem('rupa_openrouter_api_key');
-      localStorage.removeItem('openrouter_api_key');
-      localStorage.removeItem('rupa_dismiss_balance_banner');
+      localStorage.removeItem(DEVICE_KEYS.LEGACY_BANK_ACCOUNTS);
+      localStorage.removeItem(DEVICE_KEYS.LEGACY_OPENROUTER_API_KEY);
+      localStorage.removeItem(DEVICE_KEYS.LEGACY_OPENROUTER_API_KEY);
+      localStorage.removeItem(DEVICE_KEYS.LEGACY_DISMISS_BALANCE_BANNER);
     } catch {
       // Ignore
     }

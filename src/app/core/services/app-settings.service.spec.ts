@@ -5,6 +5,7 @@ import { AppSettingsService } from './app-settings.service';
 import { AiKeyVaultService } from './ai-key-vault.service';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
+import { DEVICE_KEYS, USER_KEYS } from '../../core/config/storage-keys';
 
 interface QueryCall {
   table: string;
@@ -72,8 +73,8 @@ describe('AppSettingsService', () => {
   }
 
   beforeEach(() => {
-    localStorage.removeItem('openrouter_api_key');
-    localStorage.removeItem('rupa:u1:openrouter_api_key');
+    localStorage.removeItem(DEVICE_KEYS.LEGACY_OPENROUTER_API_KEY);
+    localStorage.removeItem(USER_KEYS.OPENROUTER_API_KEY('u1'));
 
     queryCalls = [];
     tableResults = {};
@@ -101,8 +102,8 @@ describe('AppSettingsService', () => {
   });
 
   afterEach(() => {
-    localStorage.removeItem('openrouter_api_key');
-    localStorage.removeItem('rupa:u1:openrouter_api_key');
+    localStorage.removeItem(DEVICE_KEYS.LEGACY_OPENROUTER_API_KEY);
+    localStorage.removeItem(USER_KEYS.OPENROUTER_API_KEY('u1'));
   });
 
   // ------------------------------------------------------------ load / decrypt
@@ -190,7 +191,7 @@ describe('AppSettingsService', () => {
   // ------------------------------------------------------- legacy localStorage
 
   it('migrates a legacy localStorage key as ciphertext and clears it', async () => {
-    localStorage.setItem('rupa:u1:openrouter_api_key', 'sk-legacy-local');
+    localStorage.setItem(USER_KEYS.OPENROUTER_API_KEY('u1'), 'sk-legacy-local');
     // 1st select: no DB key. Upsert: ack. 2nd select: verification reads back
     // exactly what was written.
     const written = await mockVault.encrypt('sk-legacy-local');
@@ -204,13 +205,13 @@ describe('AppSettingsService', () => {
     expect(upsertPayload()['ai_api_key']).toBe(written);
     expect(upsertPayload()['ai_api_key']).not.toContain('sk-legacy-local');
     expect(service.aiApiKey()).toBe('sk-legacy-local');
-    expect(localStorage.getItem('rupa:u1:openrouter_api_key')).toBeNull();
-    expect(localStorage.getItem('openrouter_api_key')).toBeNull();
+    expect(localStorage.getItem(USER_KEYS.OPENROUTER_API_KEY('u1'))).toBeNull();
+    expect(localStorage.getItem(DEVICE_KEYS.LEGACY_OPENROUTER_API_KEY)).toBeNull();
   });
 
   it('keeps the legacy key in localStorage when verification fails', async () => {
     spyOn(console, 'error');
-    localStorage.setItem('rupa:u1:openrouter_api_key', 'sk-legacy-local');
+    localStorage.setItem(USER_KEYS.OPENROUTER_API_KEY('u1'), 'sk-legacy-local');
     tableResults['app_settings'] = [
       { data: null, error: null },
       { data: { ai_api_key: 'someone-elses-value' }, error: null },
@@ -218,7 +219,7 @@ describe('AppSettingsService', () => {
 
     await service.loadRemoteSettings();
 
-    expect(localStorage.getItem('rupa:u1:openrouter_api_key')).toBe('sk-legacy-local');
+    expect(localStorage.getItem(USER_KEYS.OPENROUTER_API_KEY('u1'))).toBe('sk-legacy-local');
     expect(service.aiApiKey()).toBe('');
   });
 });

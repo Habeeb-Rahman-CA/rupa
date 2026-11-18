@@ -1,3 +1,5 @@
+import { APP_COLORS } from '../../core/theme/colors';
+
 /**
  * Central avatar and string formatting utilities.
  */
@@ -6,16 +8,12 @@
  * Generates a deterministic background color based on string input (e.g. person name).
  */
 export function getAvatarColor(name: string): string {
-  if (!name) return '#6b7280';
+  if (!name) return APP_COLORS.inkMuted;
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = (hash * 31 + name.charCodeAt(i)) & 0xffffffff;
   }
-  const palette = [
-    '#ef4444', '#f97316', '#f59e0b', '#22c55e',
-    '#10b981', '#14b8a6', '#0ea5e9', '#ec4899', '#475569'
-  ];
-  return palette[Math.abs(hash) % palette.length];
+  return APP_COLORS.category[Math.abs(hash) % APP_COLORS.category.length];
 }
 
 /**

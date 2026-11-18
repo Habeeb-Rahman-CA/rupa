@@ -1,9 +1,10 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
+import { DEVICE_KEYS } from '../config/storage-keys';
 
 /** localStorage key — holds ONLY salted PBKDF2 material, never a plain PIN. */
-const STORAGE_KEY = 'rupa-mpin';
+const STORAGE_KEY = DEVICE_KEYS.MPIN;
 
 /** PBKDF2 cost. 200k SHA-256 iterations is a solid choice for a 4/6-digit PIN. */
 const PBKDF2_ITERATIONS = 200_000;

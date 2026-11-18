@@ -668,6 +668,18 @@ lucide-angular {
   color: #ffffff !important;
 }
 
+// Make the snackbar action button (e.g. "OK") visible on the dark surface.
+.mat-mdc-snack-bar-container .mdc-snackbar__surface button,
+.mat-mdc-snack-bar-container .mdc-snackbar__action {
+  color: #ffffff !important;
+  opacity: 1 !important;
+}
+
+.mat-mdc-snack-bar-container .mdc-snackbar__surface button:hover,
+.mat-mdc-snack-bar-container .mdc-snackbar__surface button:focus {
+  opacity: 0.85 !important;
+}
+
 // ---------- Form field (FILL appearance) ------------------------------------
 // Every field in the app uses appearance="fill" so this styling reaches all
 // text inputs, selects, and datepickers. Matches the login-page look:

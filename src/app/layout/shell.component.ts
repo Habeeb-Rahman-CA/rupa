@@ -27,6 +27,7 @@ import { AuthService } from '../core/services/auth.service';
 import { ThemeService } from '../core/services/theme.service';
 import { DataSyncService } from '../core/services/data-sync.service';
 import { PwaUpdateService } from '../core/services/pwa-update.service';
+import { TIMEOUTS } from '../core/time/timeouts';
 import { TransactionsService } from '../core/services/transactions.service';
 import { CategoriesService } from '../core/services/categories.service';
 import { DebtsService } from '../core/services/debts.service';
@@ -210,7 +211,7 @@ export class ShellComponent implements AfterViewInit {
   async signOut(): Promise<void> {
     if (this.isSigningOut()) return;
     this.isSigningOut.set(true);
-    await new Promise((resolve) => setTimeout(resolve, 450));
+    await new Promise((resolve) => setTimeout(resolve, TIMEOUTS.PILL_ANIMATION_MS));
     await this.auth.signOut();
     await this.router.navigateByUrl('/login', { replaceUrl: true });
     this.isSigningOut.set(false);

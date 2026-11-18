@@ -1,5 +1,6 @@
-export type TxDirection = 'in' | 'out';
-export type TxSource =
+import { APP_COLORS } from '../theme/colors';
+
+export type TxDirection = 'in' | 'out';export type TxSource =
   | 'manual'
   | 'debt'
   | 'opening'
@@ -18,8 +19,10 @@ export interface Category {
   created_at: string;
 }
 
+import { USER_KEYS } from '../config/storage-keys';
+
 function savingsPrefix(userId: string): string {
-  return `rupa:${userId}:savings_cat_`;
+  return USER_KEYS.SAVINGS_CATEGORY(userId);
 }
 
 const inMemorySavingsCategories = new Set<string>();
@@ -288,13 +291,13 @@ export interface SubscriptionThemeOption {
 }
 
 export const SUBSCRIPTION_THEMES: readonly SubscriptionThemeOption[] = [
-  { id: 'mint', name: 'Mint', subtitle: 'Emerald mint', accent: '#10a37f', icon: 'bot' },
-  { id: 'neon', name: 'Neon', subtitle: 'Electric green', accent: '#1db954', icon: 'music' },
-  { id: 'rose', name: 'Rose', subtitle: 'Magenta rose', accent: '#fc3c44', icon: 'apple' },
-  { id: 'amber', name: 'Amber', subtitle: 'Blaze orange', accent: '#ff6b35', icon: 'dumbbell' },
-  { id: 'scarlet', name: 'Scarlet', subtitle: 'Crimson red', accent: '#e50914', icon: 'tv' },
-  { id: 'slate', name: 'Slate', subtitle: 'Carbon titanium', accent: '#94a3b8', icon: 'repeat' },
-  { id: 'violet', name: 'Violet', subtitle: 'Royal indigo', accent: '#6366f1', icon: 'zap' },
+  { id: 'mint', name: 'Mint', subtitle: 'Emerald mint', accent: APP_COLORS.theme.mint, icon: 'bot' },
+  { id: 'neon', name: 'Neon', subtitle: 'Electric green', accent: APP_COLORS.theme.neon, icon: 'music' },
+  { id: 'rose', name: 'Rose', subtitle: 'Magenta rose', accent: APP_COLORS.theme.rose, icon: 'apple' },
+  { id: 'amber', name: 'Amber', subtitle: 'Blaze orange', accent: APP_COLORS.theme.amber, icon: 'dumbbell' },
+  { id: 'scarlet', name: 'Scarlet', subtitle: 'Crimson red', accent: APP_COLORS.theme.scarlet, icon: 'tv' },
+  { id: 'slate', name: 'Slate', subtitle: 'Carbon titanium', accent: APP_COLORS.theme.slate, icon: 'repeat' },
+  { id: 'violet', name: 'Violet', subtitle: 'Royal indigo', accent: APP_COLORS.theme.violet, icon: 'zap' },
 ];
 
 export interface Subscription {

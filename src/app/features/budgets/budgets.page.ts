@@ -424,7 +424,7 @@ function monthRange(year: number, month: number): { start: string; end: string }
         transition: width 0.35s ease;
       }
       .progress-fill[data-tone='warning'] {
-        background: #f59e0b;
+        background: var(--app-warning, #f59e0b);
       }
       .progress-fill[data-tone='over'] {
         background: var(--app-negative);
@@ -528,7 +528,7 @@ function monthRange(year: number, month: number): { start: string; end: string }
       }
       .figure-pct[data-tone='warning'] {
         background: rgba(245, 158, 11, 0.15);
-        color: #b45309;
+        color: var(--app-warning-dark, #b45309);
       }
       .figure-pct[data-tone='over'] {
         background: var(--app-negative-soft);

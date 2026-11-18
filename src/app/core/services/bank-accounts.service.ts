@@ -3,9 +3,10 @@ import { BankAccount, CardType, PaymentNetwork, CardTheme } from '../models/doma
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { TransactionsService } from './transactions.service';
+import { USER_KEYS } from '../config/storage-keys';
 
 function legacyStorageKey(userId: string): string {
-  return `rupa:${userId}:bank_accounts`;
+  return USER_KEYS.BANK_ACCOUNTS(userId);
 }
 
 @Injectable({ providedIn: 'root' })

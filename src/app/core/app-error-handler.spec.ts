@@ -6,6 +6,7 @@ import {
   handleFatalError,
   recordError,
 } from './app-error-handler';
+import { SESSION_KEYS } from './config/storage-keys';
 
 const OVERLAY_ID = 'app-error-overlay';
 const BANNER_ID = 'app-error-banner';
@@ -18,7 +19,7 @@ describe('AppErrorHandler', () => {
     TestBed.configureTestingModule({});
     handler = TestBed.inject(AppErrorHandler);
     consoleError = spyOn(console, 'error');
-    sessionStorage.removeItem('rupa:last_errors');
+    sessionStorage.removeItem(SESSION_KEYS.RECENT_ERRORS);
   });
 
   afterEach(() => {
@@ -27,7 +28,7 @@ describe('AppErrorHandler', () => {
     document.getElementById(OVERLAY_ID)?.remove();
     document.getElementById(BANNER_ID)?.remove();
     document.body.style.overflow = '';
-    sessionStorage.removeItem('rupa:last_errors');
+    sessionStorage.removeItem(SESSION_KEYS.RECENT_ERRORS);
   });
 
   // ------------------------------------------------------------- reporting

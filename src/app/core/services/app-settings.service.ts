@@ -2,9 +2,10 @@ import { Injectable, effect, inject, signal } from '@angular/core';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { AiKeyVaultService } from './ai-key-vault.service';
+import { USER_KEYS, DEVICE_KEYS } from '../config/storage-keys';
 
 function legacyKeyStorage(userId: string): string {
-  return `rupa:${userId}:openrouter_api_key`;
+  return USER_KEYS.OPENROUTER_API_KEY(userId);
 }
 
 /**

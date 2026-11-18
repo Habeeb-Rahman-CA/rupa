@@ -15,6 +15,7 @@ import { MpinService } from '../../core/services/mpin.service';
 import { MpinKeypadComponent } from '../../shared/components/mpin-keypad.component';
 import { MpinDialogComponent } from '../settings/mpin-dialog.component';
 import { openConfirm } from '../../shared/components/confirm-dialog.component';
+import { TIMEOUTS } from '../../core/time/timeouts';
 
 /**
  * The MPIN lock screen (route `/lock` — outside the shell, so no feature
@@ -112,13 +113,13 @@ import { openConfirm } from '../../shared/components/confirm-dialog.component';
       }
       .error {
         margin: 0 0 12px;
-        color: var(--app-negative, #dc2626);
+        color: var(--app-negative);
         font-size: 13.5px;
         font-weight: 600;
       }
       .lockout {
         margin: 14px 0 0;
-        color: var(--app-negative, #dc2626);
+        color: var(--app-negative);
         font-size: 13px;
         font-weight: 600;
         font-variant-numeric: tabular-nums;
@@ -227,7 +228,7 @@ export class LockPage {
     this.lockoutActive.set(true);
     this.tickCountdown();
     if (this.countdown === null) {
-      this.countdown = setInterval(() => this.tickCountdown(), 500);
+      this.countdown = setInterval(() => this.tickCountdown(), TIMEOUTS.MPIN_COUNTDOWN_INTERVAL_MS);
       this.destroyRef.onDestroy(() => this.stopCountdown());
     }
   }

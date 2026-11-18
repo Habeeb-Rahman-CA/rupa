@@ -24,6 +24,7 @@ import {
 import { SetOpeningBalanceSheetComponent } from './set-opening-balance-sheet.component';
 import { getCategoryColor, getCategoryIcon } from '../../shared/utils/category-utils';
 import { QuickAddSheetComponent } from '../transactions/quick-add-sheet.component';
+import { USER_KEYS } from '../../core/config/storage-keys';
 
 interface CategorySpend {
   id: string;
@@ -291,7 +292,7 @@ type Range = 'week' | 'month' | 'year';
       .range-fallback {
         margin-top: 6px;
         font-size: 11px;
-        color: var(--app-ink-muted, #64748b);
+        color: var(--app-ink-muted);
         font-weight: 500;
       }
 
@@ -629,7 +630,7 @@ export class DashboardPage {
     return (
       this._bannerDismissed() ||
       (typeof localStorage !== 'undefined' &&
-        localStorage.getItem(`rupa:${userId}:dismiss_balance_banner`) === 'true')
+        localStorage.getItem(USER_KEYS.DISMISS_BALANCE_BANNER(userId)) === 'true')
     );
   });
 
@@ -728,7 +729,7 @@ export class DashboardPage {
   dismissBalanceBanner(): void {
     const userId = this.auth.user()?.id;
     if (userId && typeof localStorage !== 'undefined') {
-      localStorage.setItem(`rupa:${userId}:dismiss_balance_banner`, 'true');
+      localStorage.setItem(USER_KEYS.DISMISS_BALANCE_BANNER(userId), 'true');
     }
     this._bannerDismissed.set(true);
   }

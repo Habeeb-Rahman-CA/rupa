@@ -1,5 +1,6 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { AuthService } from './auth.service';
+import { USER_KEYS } from '../config/storage-keys';
 
 export type OfflineActionType = 'create' | 'delete' | 'update';
 
@@ -15,7 +16,7 @@ export interface OfflineAction {
 const MAX_RETRIES = 5;
 
 function queueKey(userId: string): string {
-  return `rupa:${userId}:offline_queue`;
+  return USER_KEYS.OFFLINE_QUEUE(userId);
 }
 
 function readQueue(userId: string): OfflineAction[] {

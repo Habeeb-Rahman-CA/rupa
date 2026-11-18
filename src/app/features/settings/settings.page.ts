@@ -219,7 +219,7 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
       }
       .status-chip[data-status='dev'] {
         background: rgba(99, 102, 241, 0.12);
-        color: #3f4bb8;
+        color: var(--app-info, #3f4bb8);
       }
       .feedback {
         margin: 8px 0 0;

@@ -3,6 +3,7 @@ import { AppSettingsService } from './app-settings.service';
 import { AiConsentService } from './ai-consent.service';
 import { Category } from '../../core/models/domain.models';
 import { DEFAULT_EXTRACTION_PROMPT, buildCategoryAwarePrompt } from './prompts';
+import { TIMEOUTS } from '../time/timeouts';
 
 export interface ExtractionResult {
   title: string | null;
@@ -221,7 +222,7 @@ export class BillScannerService {
       }
       // Release the unread error body before retrying on this connection.
       void response.body?.cancel();
-      await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
+      await new Promise((resolve) => setTimeout(resolve, attempt * TIMEOUTS.RETRY_BASE_MS));
     }
   }
 
@@ -334,7 +335,7 @@ export class BillScannerService {
       };
       // Some browsers neither load nor error on undecodable formats — never
       // leave the scan spinner hanging.
-      const timer = setTimeout(() => finish({ blob: null, error: 'decode timed out' }), 10000);
+      const timer = setTimeout(() => finish({ blob: null, error: 'decode timed out' }), TIMEOUTS.HEIC_DECODE_MS);
 
       img.onload = () => {
         try {

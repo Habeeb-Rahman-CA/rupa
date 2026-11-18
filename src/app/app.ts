@@ -11,6 +11,8 @@ import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 
 import { ThemeService } from './core/services/theme.service';
+import { SESSION_KEYS } from './core/config/storage-keys';
+import { TIMEOUTS } from './core/time/timeouts';
 
 /**
  * How long the dev service-worker cleanup's reload marker stays valid.
@@ -108,7 +110,7 @@ export class App {
 
       // A timestamp (not a bare flag) so a marker left behind by an
       // ineffective cleanup expires instead of persisting for the tab's life.
-      const reloadKey = 'rupa_dev_service_worker_removed';
+      const reloadKey = SESSION_KEYS.DEV_SERVICE_WORKER_REMOVED;
       if (hadController && !isDevCleanupMarkerFresh(sessionStorage.getItem(reloadKey))) {
         sessionStorage.setItem(reloadKey, String(Date.now()));
         window.location.reload();
@@ -139,7 +141,7 @@ export class App {
     const splash = document.getElementById('app-splash');
     if (!splash) return;
     // Small minimum hold so the logo has time to breathe on fast networks.
-    const hold = 900;
+    const hold = TIMEOUTS.SPLASH_HOLD_MS;
     this.timer1 = window.setTimeout(() => {
       if (splash.parentNode) {
         splash.classList.add('splash-hidden');
@@ -149,7 +151,7 @@ export class App {
         if (splash.parentNode) {
           splash.remove();
         }
-      }, 400);
+      }, TIMEOUTS.SPLASH_FADE_MS);
     }, hold);
   }
 }
