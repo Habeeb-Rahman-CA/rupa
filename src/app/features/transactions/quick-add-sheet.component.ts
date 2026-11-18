@@ -17,12 +17,15 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatChipsModule } from '@angular/material/chips';
 import { LucideAngularModule } from 'lucide-angular';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 
 import { CategoriesService } from '../../core/services/categories.service';
 import { TransactionsService } from '../../core/services/transactions.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
 import { BillScannerService } from '../../core/services/bill-scanner.service';
+import { AiConsentService } from '../../core/services/ai-consent.service';
+import { openAiConsent } from '../../shared/components/ai-consent-dialog.component';
 import {
   Category,
   CategoryKind,
@@ -355,7 +358,7 @@ export interface QuickAddSheetData {
         align-items: center;
         gap: 5px;
         padding: 4px 10px;
-        background: var(--app-card-bg, #ffffff);
+        background: var(--app-surface);
         border: 1px solid var(--app-border, #e5e7eb);
         border-radius: 6px;
         color: var(--app-ink, #374151);
@@ -395,6 +398,8 @@ export class QuickAddSheetComponent {
   private readonly router = inject(Router);
   private readonly snack = inject(MatSnackBar);
   private readonly billScanner = inject(BillScannerService);
+  private readonly dialog = inject(MatDialog);
+  private readonly aiConsent = inject(AiConsentService);
 
   readonly txKind = signal<CategoryKind>(this.sheetData?.defaultKind ?? 'expense');
   readonly submitting = signal(false);
@@ -541,6 +546,26 @@ export class QuickAddSheetComponent {
     if (!input.files || input.files.length === 0) return;
 
     const file = input.files[0];
+
+    // Consent gate: the image is only sent to the external AI provider after
+    // an explicit "Allow". Prompt on the first scan; remember the choice so
+    // later scans skip the dialog. A prior decline re-prompts so the user can
+    // reverse it. Declining keeps scanning blocked and leaves manual entry.
+    if (!this.aiConsent.granted()) {
+      const allowed = await openAiConsent(this.dialog);
+      if (!allowed) {
+        this.aiConsent.deny();
+        input.value = '';
+        this.snack.open(
+          'No problem — enter the amount and details manually.',
+          undefined,
+          { duration: 3000 },
+        );
+        return;
+      }
+      this.aiConsent.grant();
+    }
+
     this.scanningBill.set(true);
 
     try {

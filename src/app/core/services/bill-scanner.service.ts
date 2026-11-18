@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { AppSettingsService } from './app-settings.service';
+import { AiConsentService } from './ai-consent.service';
 
 export interface ExtractionResult {
   title: string | null;
@@ -54,6 +55,7 @@ const PRIORITY_AMOUNT_KEYS = [
 })
 export class BillScannerService {
   private readonly appSettings = inject(AppSettingsService);
+  private readonly consent = inject(AiConsentService);
 
   private getApiKey(): string {
     return this.appSettings.aiApiKey();
@@ -70,6 +72,15 @@ export class BillScannerService {
     prompt: string = DEFAULT_EXTRACTION_PROMPT,
     options: ExtractOptions = {}
   ): Promise<ExtractionResult> {
+    // Hard consent gate: never upload a receipt image to the external AI
+    // provider unless the user has explicitly allowed it. This runs before
+    // any network/decode work so a blocked scan sends nothing.
+    if (!this.consent.granted()) {
+      throw new Error(
+        'AI scanning is turned off. Allow sending receipt images to the AI provider to scan bills.',
+      );
+    }
+
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       throw new Error('You are offline. AI bill scanning requires an active internet connection.');
     }

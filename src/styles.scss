@@ -489,6 +489,15 @@ lucide-angular {
 }
 
 // ---------- Dialogs ---------------------------------------------------------
+// Material's dialog background comes from --mat-sys-surface (a light-dark()
+// token), which body{color-scheme:light} pins to the light branch even in dark
+// mode — while our title/body text uses --app-ink (near-white in dark), making
+// dialogs unreadable. Force the surface to the app's own themed surface token
+// (white in light, #14161b in dark) so it always matches the text.
+.mat-mdc-dialog-container,
+.mat-mdc-dialog-surface {
+  --mat-dialog-container-color: var(--app-surface);
+}
 .mat-mdc-dialog-container .mdc-dialog__surface {
   border-radius: var(--app-radius-lg) !important;
   box-shadow: var(--app-shadow-modal) !important;

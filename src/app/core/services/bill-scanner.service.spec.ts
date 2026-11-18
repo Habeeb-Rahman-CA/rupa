@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { BillScannerService } from './bill-scanner.service';
 import { AppSettingsService } from './app-settings.service';
+import { AiConsentService } from './ai-consent.service';
 
 /**
  * Regression test for: HEIC bill photos returning "details could not be
@@ -27,6 +28,8 @@ describe('BillScannerService HEIC normalization', () => {
               aiHeaders: () => null,
             },
           },
+          // extractBill is gated on consent; grant it so the scan runs.
+          { provide: AiConsentService, useValue: { granted: () => true } },
         ],
       }).inject(BillScannerService);
 
@@ -113,4 +116,51 @@ describe('BillScannerService HEIC normalization', () => {
     },
     60000,
   );
+});
+
+describe('BillScannerService consent gate', () => {
+  function buildService(granted: boolean): BillScannerService {
+    return TestBed.configureTestingModule({
+      providers: [
+        BillScannerService,
+        {
+          provide: AppSettingsService,
+          useValue: {
+            aiApiKey: () => 'test-key',
+            aiModel: () => null,
+            aiBaseUrl: () => null,
+            aiHeaders: () => null,
+          },
+        },
+        { provide: AiConsentService, useValue: { granted: () => granted } },
+      ],
+    }).inject(BillScannerService);
+  }
+
+  const jpegFile = () => new File([new Uint8Array([1, 2, 3])], 'bill.jpg', { type: 'image/jpeg' });
+
+  it('throws before any network call when consent has not been granted', async () => {
+    const service = buildService(false);
+    const fetchSpy = spyOn(globalThis, 'fetch');
+
+    await expectAsync(service.extractBill(jpegFile())).toBeRejectedWithError(
+      /AI scanning is turned off/,
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('proceeds toward the provider when consent is granted', async () => {
+    const service = buildService(true);
+    const fetchSpy = spyOn(globalThis, 'fetch').and.returnValue(
+      Promise.resolve(
+        new Response(JSON.stringify({ choices: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+
+    await service.extractBill(jpegFile());
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
 });
