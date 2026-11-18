@@ -536,13 +536,6 @@ export interface BankAccountDialogData {
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
         z-index: 2;
       }
-
-      .card-footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
-        z-index: 2;
-      }
       .card-meta-label {
         font-size: 8px;
         font-weight: 700;
@@ -668,10 +661,6 @@ export interface BankAccountDialogData {
 
       .dialog-actions {
         padding-top: 12px;
-      }
-      .save-btn {
-        border-radius: var(--app-radius-md) !important;
-        font-weight: 600 !important;
       }
       .cancel-btn {
         border-radius: var(--app-radius-md) !important;

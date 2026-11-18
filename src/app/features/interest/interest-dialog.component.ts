@@ -154,11 +154,6 @@ import { isEqualCurrency, roundCurrency } from '../../shared/utils/currency-util
         max-height: 75vh;
         padding: 16px !important;
       }
-      .form-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 14px 12px;
-      }
       .full {
         grid-column: 1 / -1;
       }

@@ -260,21 +260,12 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
         background: var(--app-accent-soft);
         color: var(--app-accent);
       }
-      .overview-icon lucide-icon {
-        width: 19px;
-        height: 19px;
-      }
       .overview strong {
         display: block;
         margin-top: 2px;
         color: var(--app-ink);
         font-size: 20px;
         font-variant-numeric: tabular-nums;
-      }
-      .overview-count {
-        margin-left: auto;
-        color: var(--app-ink-muted);
-        font-size: 12px;
       }
 
       /* Cards Grid */
@@ -479,13 +470,6 @@ import { CardsTabsComponent } from '../../shared/components/cards-tabs.component
         letter-spacing: 2.5px;
         margin-bottom: 16px;
         text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-        z-index: 2;
-      }
-
-      .card-footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
         z-index: 2;
       }
       .meta-label {

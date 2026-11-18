@@ -365,25 +365,9 @@ import {
       .history-row:last-child {
         border-bottom: 0;
       }
-      .history-icon {
-        display: grid;
-        place-items: center;
-        width: 28px;
-        height: 28px;
-        border-radius: 9px;
-        background: var(--app-positive-soft);
-        color: var(--app-positive);
-      }
       .history-icon.returned {
         background: var(--app-negative-soft);
         color: var(--app-negative);
-      }
-      .history-icon lucide-icon {
-        width: 15px;
-        height: 15px;
-      }
-      .history-main {
-        min-width: 0;
       }
       .history-title {
         color: var(--app-ink);
@@ -417,12 +401,6 @@ import {
       .history-row button lucide-icon {
         width: 17px;
         height: 17px;
-      }
-      .history-empty {
-        padding: 14px 0 2px;
-        color: var(--app-ink-muted);
-        font-size: 13px;
-        text-align: center;
       }
       @media (max-width: 480px) {
         .add-person-btn span {

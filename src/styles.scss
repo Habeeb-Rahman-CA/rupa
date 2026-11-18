@@ -1084,3 +1084,240 @@ lucide-angular {
     transform: scale(1);
   }
 }
+
+/* ===== Shared component styles ============================================
+   Extracted from component `styles:` blocks. These rules were byte-identical
+   across multiple components, so they live here once instead of being
+   duplicated (and re-downloaded) inside every component's JS bundle.
+   NOTE (Angular 20): only files listed in angular.json `styles` are emitted as a
+   separate, cacheable CSS file. Component styles (inline or via `styleUrl`) are
+   always bundled into JS — so this is the only way to make component CSS
+   independently cacheable.
+   ======================================================================= */
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  z-index: 2;
+}
+
+.save-btn {
+  border-radius: var(--app-radius-md) !important;
+  font-weight: 600 !important;
+}
+
+.overview-icon lucide-icon {
+  width: 19px;
+  height: 19px;
+}
+
+.overview-count {
+  margin-left: auto;
+  color: var(--app-ink-muted);
+  font-size: 12px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 12px;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.empty-action {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.empty-action button {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.empty-action lucide-icon {
+  width: 17px;
+  height: 17px;
+  margin-right: 4px;
+}
+
+.add-card {
+  margin-bottom: 20px;
+  padding: 16px;
+}
+
+.placeholder {
+  color: var(--app-ink-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 24px 4px 10px;
+}
+
+.section-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.tx-row {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--app-surface);
+  border-radius: var(--app-radius-md);
+  border: 1px solid var(--app-hairline);
+  box-shadow: var(--app-shadow-sm);
+}
+
+.tx-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--app-ink-inverse);
+}
+
+.tx-icon lucide-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.tx-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.tx-sub {
+  font-size: 12px;
+  color: var(--app-ink-muted);
+  margin-top: 2px;
+}
+
+.tx-amount {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.payment-mode-toggle mat-button-toggle {
+  flex: 1;
+}
+
+.history-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--app-positive-soft);
+  color: var(--app-positive);
+}
+
+.history-icon lucide-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.history-main {
+  min-width: 0;
+}
+
+.history-empty {
+  padding: 14px 0 2px;
+  color: var(--app-ink-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.heading-icon lucide-icon {
+  width: 19px;
+  height: 19px;
+}
+
+.heading-text {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.status-hint {
+  margin: 12px 0 0;
+  color: var(--app-ink-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.primary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.pill-btn {
+  min-height: 38px;
+  border-radius: 999px !important;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pill-btn lucide-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+}
+
+.tab-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  color: var(--app-ink-muted);
+}
+
+.tab-icon lucide-icon {
+  width: 17px;
+  height: 17px;
+}
+
+.tab-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.tab-copy strong {
+  overflow: hidden;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-copy span {
+  overflow: hidden;
+  color: var(--app-ink-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

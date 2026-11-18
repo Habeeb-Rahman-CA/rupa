@@ -12,6 +12,31 @@ import { filter } from 'rxjs';
 
 import { ThemeService } from './core/services/theme.service';
 
+/**
+ * How long the dev service-worker cleanup's reload marker stays valid.
+ *
+ * The marker only needs to survive the single reload it triggers, so a minute
+ * is generous — but a stale one must not sit in sessionStorage for the rest of
+ * the tab's life (which is what happened when it was a bare `'true'` flag).
+ */
+export const DEV_CLEANUP_MARKER_TTL_MS = 60_000;
+
+/**
+ * True while the dev SW-removal reload marker is still within its TTL.
+ *
+ * Missing, expired, or malformed (including the legacy `'true'` value) all
+ * count as stale, so an old marker can never suppress cleanup forever.
+ */
+export function isDevCleanupMarkerFresh(raw: string | null, now = Date.now()): boolean {
+  if (raw === null) return false;
+  const at = Number(raw);
+  if (!Number.isFinite(at)) return false;
+  const age = now - at;
+  // Age must be within [0, TTL): a negative age means a future timestamp
+  // (clock skew or bad data) and must not read as fresh forever.
+  return age >= 0 && age < DEV_CLEANUP_MARKER_TTL_MS;
+}
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -81,11 +106,14 @@ export class App {
         await Promise.all(cacheNames.map((name) => caches.delete(name)));
       }
 
+      // A timestamp (not a bare flag) so a marker left behind by an
+      // ineffective cleanup expires instead of persisting for the tab's life.
       const reloadKey = 'rupa_dev_service_worker_removed';
-      if (hadController && sessionStorage.getItem(reloadKey) !== 'true') {
-        sessionStorage.setItem(reloadKey, 'true');
+      if (hadController && !isDevCleanupMarkerFresh(sessionStorage.getItem(reloadKey))) {
+        sessionStorage.setItem(reloadKey, String(Date.now()));
         window.location.reload();
       } else if (!hadController) {
+        // Cleanup succeeded (or there was nothing to do) — drop the marker.
         sessionStorage.removeItem(reloadKey);
       }
     } catch {

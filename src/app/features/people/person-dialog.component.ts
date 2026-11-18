@@ -103,10 +103,6 @@ import { errorText } from '../../shared/utils/error-utils';
       .dialog-actions {
         padding-top: 12px;
       }
-      .save-btn {
-        border-radius: var(--app-radius-md) !important;
-        font-weight: 600 !important;
-      }
       .cancel-btn {
         border-radius: var(--app-radius-md) !important;
         color: var(--app-ink-muted) !important;

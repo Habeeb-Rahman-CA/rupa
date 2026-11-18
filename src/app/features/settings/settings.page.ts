@@ -185,14 +185,6 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
         background: var(--app-accent-soft);
         color: var(--app-accent);
       }
-      .heading-icon lucide-icon {
-        width: 19px;
-        height: 19px;
-      }
-      .heading-text {
-        min-width: 0;
-        flex: 1 1 auto;
-      }
       .section-heading h2 {
         margin: 0;
         color: var(--app-ink);
@@ -229,13 +221,6 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
         background: rgba(99, 102, 241, 0.12);
         color: #3f4bb8;
       }
-
-      .status-hint {
-        margin: 12px 0 0;
-        color: var(--app-ink-muted);
-        font-size: 12.5px;
-        line-height: 1.5;
-      }
       .feedback {
         margin: 8px 0 0;
         padding: 9px 11px;
@@ -248,24 +233,6 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
       .feedback.error {
         background: var(--app-negative-soft, rgba(239, 68, 68, 0.1));
         color: var(--app-negative, #dc2626);
-      }
-
-      .primary-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 14px;
-      }
-      .pill-btn {
-        min-height: 38px;
-        border-radius: 999px !important;
-        font-size: 13px;
-        font-weight: 600;
-      }
-      .pill-btn lucide-icon {
-        width: 16px;
-        height: 16px;
-        margin-right: 6px;
       }
       .test-btn {
         color: var(--app-accent) !important;

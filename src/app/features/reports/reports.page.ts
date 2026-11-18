@@ -880,20 +880,6 @@ interface BankReportRow extends BankAccount {
           height: 14px;
         }
       }
-
-      /* ---------- Section headers ------------------------------------ */
-      .section-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin: 24px 4px 10px;
-      }
-      .section-head h2 {
-        margin: 0;
-        font-size: 15px;
-        font-weight: 600;
-        color: var(--app-ink);
-      }
       .section-hint {
         font-size: 12px;
         color: var(--app-ink-muted);
@@ -1181,12 +1167,6 @@ interface BankReportRow extends BankAccount {
       /* Clip row hover backgrounds to the card's rounded corners */
       .app-card-tight {
         overflow: hidden;
-      }
-
-      .placeholder {
-        color: var(--app-ink-muted);
-        font-size: 14px;
-        text-align: center;
       }
     `,
   ],

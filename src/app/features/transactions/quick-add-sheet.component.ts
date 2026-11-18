@@ -263,11 +263,6 @@ export interface QuickAddSheetData {
         font-size: 16px;
         font-weight: 600;
       }
-      .field-group {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
       .ft-label {
         font-size: 13px;
         font-weight: 500;
@@ -276,9 +271,6 @@ export interface QuickAddSheetData {
       .payment-mode-toggle {
         width: 100%;
         display: flex;
-      }
-      .payment-mode-toggle mat-button-toggle {
-        flex: 1;
       }
       .no-bank-notice {
         display: flex;

@@ -378,44 +378,6 @@ export interface DayGroup {
         display: flex;
         flex-direction: column;
       }
-      .tx-row {
-        display: grid;
-        grid-template-columns: 40px 1fr auto;
-        gap: 12px;
-        align-items: center;
-        padding: 12px 16px;
-        background: var(--app-surface);
-        border-radius: var(--app-radius-md);
-        border: 1px solid var(--app-hairline);
-        box-shadow: var(--app-shadow-sm);
-      }
-      .tx-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 12px;
-        display: grid;
-        place-items: center;
-        color: var(--app-ink-inverse);
-      }
-      .tx-icon lucide-icon {
-        width: 22px;
-        height: 22px;
-      }
-      .tx-title {
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--app-ink);
-      }
-      .tx-sub {
-        font-size: 12px;
-        color: var(--app-ink-muted);
-        margin-top: 2px;
-      }
-      .tx-amount {
-        font-size: 15px;
-        font-weight: 700;
-        font-variant-numeric: tabular-nums;
-      }
       @media (max-width: 720px) {
         .filter-grid {
           grid-template-columns: 1fr;

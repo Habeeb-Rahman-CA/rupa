@@ -665,22 +665,6 @@ function monthRange(year: number, month: number): { start: string; end: string }
         margin-left: 0;
       }
 
-      /* ------------------------------------------------------------ actions */
-      .empty-action {
-        display: flex;
-        justify-content: center;
-        margin-top: 16px;
-      }
-      .empty-action button {
-        border-radius: 999px;
-        font-weight: 700;
-      }
-      .empty-action lucide-icon {
-        width: 17px;
-        height: 17px;
-        margin-right: 4px;
-      }
-
       /* ------------------------------------------------------- narrow screens */
       @media (max-width: 480px) {
         .item-head {

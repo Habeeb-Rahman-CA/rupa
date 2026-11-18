@@ -122,11 +122,6 @@ import { errorText } from '../../shared/utils/error-utils';
         padding-bottom: 16px !important;
         min-width: 300px;
       }
-      .field-group {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
       .ft-label {
         display: block;
         font-size: 13px;
@@ -142,10 +137,6 @@ import { errorText } from '../../shared/utils/error-utils';
       }
       .dialog-actions {
         padding-top: 12px;
-      }
-      .save-btn {
-        border-radius: var(--app-radius-md) !important;
-        font-weight: 600 !important;
       }
       .cancel-btn {
         border-radius: var(--app-radius-md) !important;

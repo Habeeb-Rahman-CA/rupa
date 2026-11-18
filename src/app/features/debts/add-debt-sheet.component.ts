@@ -185,11 +185,6 @@ const NEW_PERSON = '__new__';
       .full {
         width: 100%;
       }
-      .field-group {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
       .ft-label {
         font-size: 13px;
         font-weight: 500;
@@ -198,9 +193,6 @@ const NEW_PERSON = '__new__';
       .payment-mode-toggle {
         width: 100%;
         display: flex;
-      }
-      .payment-mode-toggle mat-button-toggle {
-        flex: 1;
       }
       .no-bank-notice {
         display: flex;

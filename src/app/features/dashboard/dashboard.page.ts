@@ -406,20 +406,6 @@ type Range = 'week' | 'month' | 'year';
         overflow: hidden;
         text-overflow: ellipsis;
       }
-
-      /* ---------- Section headers -------------------------------------- */
-      .section-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin: 24px 4px 10px;
-      }
-      .section-head h2 {
-        margin: 0;
-        font-size: 15px;
-        font-weight: 600;
-        color: var(--app-ink);
-      }
       .see-all {
         color: var(--app-accent);
         font-size: 13px;
@@ -480,46 +466,8 @@ type Range = 'week' | 'month' | 'year';
         flex-direction: column;
         gap: 8px;
       }
-      .tx-row {
-        display: grid;
-        grid-template-columns: 40px 1fr auto;
-        gap: 12px;
-        align-items: center;
-        padding: 12px 16px;
-        background: var(--app-surface);
-        border-radius: var(--app-radius-md);
-        border: 1px solid var(--app-hairline);
-        box-shadow: var(--app-shadow-sm);
-      }
       .tx-row.last {
         border-bottom: 0;
-      }
-      .tx-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 12px;
-        display: grid;
-        place-items: center;
-        color: var(--app-ink-inverse);
-      }
-      .tx-icon lucide-icon {
-        width: 22px;
-        height: 22px;
-      }
-      .tx-title {
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--app-ink);
-      }
-      .tx-sub {
-        font-size: 12px;
-        color: var(--app-ink-muted);
-        margin-top: 2px;
-      }
-      .tx-amount {
-        font-size: 15px;
-        font-weight: 700;
-        font-variant-numeric: tabular-nums;
       }
 
       .w-full {

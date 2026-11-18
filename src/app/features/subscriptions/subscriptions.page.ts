@@ -271,20 +271,6 @@ import { RecordSubscriptionPaymentDialogComponent } from './record-subscription-
   `,
   styles: [
     `
-      .empty-action {
-        display: flex;
-        justify-content: center;
-        margin-top: 16px;
-      }
-      .empty-action button {
-        border-radius: 999px;
-        font-weight: 700;
-      }
-      .empty-action lucide-icon {
-        width: 17px;
-        height: 17px;
-        margin-right: 4px;
-      }
       .reminder-card {
         margin-bottom: 14px;
         border-left: 3px solid var(--app-negative);

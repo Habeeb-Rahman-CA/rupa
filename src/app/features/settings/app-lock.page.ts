@@ -111,14 +111,6 @@ import { MpinDialogComponent, MpinDialogMode } from './mpin-dialog.component';
         background: rgba(99, 102, 241, 0.12);
         color: #3f4bb8;
       }
-      .heading-icon lucide-icon {
-        width: 19px;
-        height: 19px;
-      }
-      .heading-text {
-        min-width: 0;
-        flex: 1 1 auto;
-      }
       .section-heading h2 {
         margin: 0;
         color: var(--app-ink);
@@ -146,31 +138,6 @@ import { MpinDialogComponent, MpinDialogMode } from './mpin-dialog.component';
       .status-chip[data-status='active'] {
         background: var(--app-positive-soft, rgba(16, 163, 127, 0.12));
         color: var(--app-positive);
-      }
-
-      .status-hint {
-        margin: 12px 0 0;
-        color: var(--app-ink-muted);
-        font-size: 12.5px;
-        line-height: 1.5;
-      }
-
-      .primary-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 14px;
-      }
-      .pill-btn {
-        min-height: 38px;
-        border-radius: 999px !important;
-        font-size: 13px;
-        font-weight: 600;
-      }
-      .pill-btn lucide-icon {
-        width: 16px;
-        height: 16px;
-        margin-right: 6px;
       }
       .danger-btn {
         color: var(--app-negative, #dc2626) !important;

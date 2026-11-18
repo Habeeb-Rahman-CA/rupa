@@ -321,19 +321,8 @@ export interface SubscriptionDialogData {
       .theme-swatch[data-theme='violet'] {
         background: linear-gradient(135deg, #6366f1, #312e81);
       }
-
-      .form-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 14px 12px;
-      }
       .full {
         grid-column: 1 / -1;
-      }
-      .field-group {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
       }
       .ft-label {
         color: var(--app-ink);

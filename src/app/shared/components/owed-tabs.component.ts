@@ -87,42 +87,8 @@ import { LucideAngularModule } from 'lucide-angular';
         box-shadow: var(--app-shadow-sm);
         color: var(--app-ink);
       }
-      .tab-icon {
-        display: grid;
-        place-items: center;
-        width: 32px;
-        height: 32px;
-        flex: 0 0 auto;
-        border-radius: 10px;
-        color: var(--app-ink-muted);
-      }
       .owed-tab.active .tab-icon {
         color: var(--app-accent);
-      }
-      .tab-icon lucide-icon {
-        width: 17px;
-        height: 17px;
-      }
-      .tab-copy {
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-        gap: 1px;
-      }
-      .tab-copy strong {
-        overflow: hidden;
-        color: inherit;
-        font-size: 12px;
-        font-weight: 700;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .tab-copy span {
-        overflow: hidden;
-        color: var(--app-ink-muted);
-        font-size: 10px;
-        text-overflow: ellipsis;
-        white-space: nowrap;
       }
       @media (max-width: 480px) {
         .owed-tabs {

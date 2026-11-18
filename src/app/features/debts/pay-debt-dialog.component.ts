@@ -188,11 +188,6 @@ export interface PayDebtDialogData {
         font-size: 13px;
         color: var(--app-ink-muted);
       }
-      .field-group {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
       .ft-label {
         display: block;
         font-size: 13px;
@@ -202,9 +197,6 @@ export interface PayDebtDialogData {
       .payment-mode-toggle {
         width: 100%;
         display: flex;
-      }
-      .payment-mode-toggle mat-button-toggle {
-        flex: 1;
       }
       .no-bank-notice {
         display: flex;
@@ -238,10 +230,6 @@ export interface PayDebtDialogData {
       }
       .dialog-actions {
         padding-top: 12px;
-      }
-      .save-btn {
-        border-radius: var(--app-radius-md) !important;
-        font-weight: 600 !important;
       }
       .cancel-btn {
         border-radius: var(--app-radius-md) !important;

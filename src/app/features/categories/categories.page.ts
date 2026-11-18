@@ -231,10 +231,6 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
           line-height: 34px !important;
         }
       }
-      .add-card {
-        margin-bottom: 20px;
-        padding: 16px;
-      }
       .add-form {
         display: flex;
         gap: 12px;
@@ -358,11 +354,6 @@ import { colorFor, iconFor } from '../../shared/utils/category-utils';
         font-size: 14px;
         font-weight: 600;
         color: var(--app-ink);
-      }
-      .placeholder {
-        color: var(--app-ink-muted);
-        font-size: 14px;
-        text-align: center;
       }
       .seed-wrap {
         display: flex;

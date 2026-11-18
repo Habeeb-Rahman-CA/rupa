@@ -191,11 +191,6 @@ export interface RecordMoneyHeldSheetData {
       .balance-hint strong {
         color: var(--app-ink);
       }
-      .field-group {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
       .ft-label {
         color: var(--app-ink);
         font-size: 13px;
@@ -204,9 +199,6 @@ export interface RecordMoneyHeldSheetData {
       .payment-mode-toggle {
         display: flex;
         width: 100%;
-      }
-      .payment-mode-toggle mat-button-toggle {
-        flex: 1;
       }
       .no-bank-notice {
         display: flex;

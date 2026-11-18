@@ -295,21 +295,12 @@ import {
         width: 40px;
         height: 40px;
       }
-      .overview-icon lucide-icon {
-        width: 19px;
-        height: 19px;
-      }
       .overview strong {
         display: block;
         margin-top: 2px;
         color: var(--app-ink);
         font-size: 20px;
         font-variant-numeric: tabular-nums;
-      }
-      .overview-count {
-        margin-left: auto;
-        color: var(--app-ink-muted);
-        font-size: 12px;
       }
       .wallet-list {
         display: flex;
@@ -572,25 +563,9 @@ import {
       .history-row:last-child {
         border-bottom: 0;
       }
-      .history-icon {
-        display: grid;
-        place-items: center;
-        width: 28px;
-        height: 28px;
-        border-radius: 9px;
-        background: var(--app-positive-soft);
-        color: var(--app-positive);
-      }
       .history-icon.spend {
         background: var(--app-negative-soft);
         color: var(--app-negative);
-      }
-      .history-icon lucide-icon {
-        width: 15px;
-        height: 15px;
-      }
-      .history-main {
-        min-width: 0;
       }
       .history-main strong {
         display: block;
@@ -630,12 +605,6 @@ import {
       .history-actions lucide-icon {
         width: 16px;
         height: 16px;
-      }
-      .history-empty {
-        padding: 14px 0 2px;
-        color: var(--app-ink-muted);
-        font-size: 13px;
-        text-align: center;
       }
       @media (max-width: 480px) {
         .add-wallet-btn span {

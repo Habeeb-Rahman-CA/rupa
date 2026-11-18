@@ -198,12 +198,6 @@ type Stage = 'length' | 'verify' | 'enter' | 'confirm';
         height: 16px;
         flex: 0 0 auto;
       }
-
-      .field-group {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
       .ft-label {
         display: block;
         font-size: 13px;

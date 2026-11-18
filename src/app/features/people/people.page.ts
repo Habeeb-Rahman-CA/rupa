@@ -155,10 +155,6 @@ import { errText } from '../../shared/utils/error-utils';
         width: 18px;
         height: 18px;
       }
-      .add-card {
-        margin-bottom: 20px;
-        padding: 16px;
-      }
       .add-form {
         display: flex;
         gap: 12px;
