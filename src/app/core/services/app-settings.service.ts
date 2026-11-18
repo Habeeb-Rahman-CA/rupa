@@ -1,6 +1,7 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
+import { AiKeyVaultService } from './ai-key-vault.service';
 
 function legacyKeyStorage(userId: string): string {
   return `rupa:${userId}:openrouter_api_key`;
@@ -17,7 +18,9 @@ function legacyKeyStorage(userId: string): string {
 export interface AppSettings {
   id?: string;
   owner_id?: string;
-  /** Column renamed from `openrouter_api_key` in migration 0022. */
+  /** Column renamed from `openrouter_api_key` in migration 0022.
+   *  At rest this holds device-encrypted ciphertext (`enc:v1:…`), decrypted
+   *  into memory by `AppSettingsService` — never stored as plain text. */
   ai_api_key?: string | null;
   /** OpenAI-compatible base URL, e.g. 'https://api.openai.com/v1'. */
   ai_base_url?: string | null;
@@ -33,6 +36,7 @@ export interface AppSettings {
 export class AppSettingsService {
   private readonly supabase = inject(SupabaseService);
   private readonly auth = inject(AuthService);
+  private readonly vault = inject(AiKeyVaultService);
 
   private readonly _aiApiKey = signal<string>('');
   readonly aiApiKey = this._aiApiKey.asReadonly();
@@ -74,10 +78,29 @@ export class AppSettingsService {
       return;
     }
 
-    // Provider config applies even when no key is stored yet.
-    this.applyAiConfig(data ?? null);
+    // Decrypt the stored key into memory. A plain-text value (legacy row, or
+    // a key typed straight into the DB) is transparently re-encrypted back to
+    // Supabase below, so at rest the column only ever holds ciphertext.
+    const storedKey = data?.ai_api_key ?? '';
+    let plaintextKey = '';
+    if (storedKey) {
+      try {
+        plaintextKey = await this.vault.decrypt(storedKey);
+        if (!this.vault.isEncrypted(storedKey)) {
+          await this.rewriteEncryptedKey(user.id, plaintextKey);
+        }
+      } catch (e) {
+        // Device key missing (e.g. site data cleared) — the ciphertext can't
+        // be recovered; leave the key unavailable rather than crash.
+        console.error('Failed to decrypt stored AI key', e);
+        plaintextKey = '';
+      }
+    }
 
-    if (data?.ai_api_key) {
+    // Provider config applies even when no key is stored yet.
+    this.applyAiConfig(data ?? null, plaintextKey);
+
+    if (storedKey) {
       this.clearLegacyKey(user.id);
       return;
     }
@@ -89,12 +112,20 @@ export class AppSettingsService {
       return;
     }
 
+    let legacyCipher: string;
+    try {
+      legacyCipher = await this.vault.encrypt(legacyKey);
+    } catch (e) {
+      console.error('Failed to encrypt legacy AI API key', e);
+      return;
+    }
+
     const { error: migrationError } = await this.supabase.client
       .from('app_settings')
       .upsert(
         {
           owner_id: user.id,
-          ai_api_key: legacyKey,
+          ai_api_key: legacyCipher,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'owner_id' },
@@ -110,7 +141,7 @@ export class AppSettingsService {
       .select('ai_api_key')
       .eq('owner_id', user.id)
       .maybeSingle();
-    if (verify.error || verify.data?.ai_api_key !== legacyKey) {
+    if (verify.error || verify.data?.ai_api_key !== legacyCipher) {
       console.error('Legacy AI API key migration could not be verified', verify.error);
       return;
     }
@@ -119,18 +150,51 @@ export class AppSettingsService {
     this.clearLegacyKey(user.id);
   }
 
+  /**
+   * Re-encrypt a plain-text key found at rest so the column only ever holds
+   * ciphertext going forward.
+   */
+  private async rewriteEncryptedKey(ownerId: string, plaintext: string): Promise<void> {
+    try {
+      const ciphertext = await this.vault.encrypt(plaintext);
+      const { error } = await this.supabase.client
+        .from('app_settings')
+        .upsert(
+          { owner_id: ownerId, ai_api_key: ciphertext, updated_at: new Date().toISOString() },
+          { onConflict: 'owner_id' },
+        );
+      if (error) {
+        console.error('Failed to re-encrypt stored AI key', error);
+      }
+    } catch (e) {
+      console.error('Failed to re-encrypt stored AI key', e);
+    }
+  }
+
   async saveAiApiKey(apiKey: string): Promise<void> {
     const trimmed = apiKey.trim();
 
     const user = this.auth.user();
     if (!user) throw new Error('Not signed in.');
 
+    // Encrypt before writing — only ciphertext ever reaches the database.
+    // The plaintext lives in the in-memory signal below.
+    let stored: string | null = null;
+    if (trimmed) {
+      try {
+        stored = await this.vault.encrypt(trimmed);
+      } catch (e) {
+        console.error('Failed to encrypt AI API key', e);
+        throw e;
+      }
+    }
+
     const { error } = await this.supabase.client
       .from('app_settings')
       .upsert(
         {
           owner_id: user.id,
-          ai_api_key: trimmed || null,
+          ai_api_key: stored,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'owner_id' },
@@ -143,8 +207,13 @@ export class AppSettingsService {
     this.clearLegacyKey(user.id);
   }
 
-  private applyAiConfig(data: AppSettings | null): void {
-    this._aiApiKey.set(data?.ai_api_key ?? '');
+  /**
+   * Push provider config into the signals. `plaintextKey` is the decrypted
+   * key (decryption happens in `loadRemoteSettings`) — the raw column value
+   * is ciphertext and must never be exposed through `aiApiKey`.
+   */
+  private applyAiConfig(data: AppSettings | null, plaintextKey: string): void {
+    this._aiApiKey.set(plaintextKey);
     this._aiBaseUrl.set(data?.ai_base_url?.trim() || null);
     this._aiModel.set(data?.ai_model?.trim() || null);
 
