@@ -42,6 +42,7 @@ import {
 import { errText } from '../../shared/utils/error-utils';
 import {
   filterTransactions,
+  relativeDayLabel,
   WALLET_CATEGORY_ID,
   summarizeTransactions,
   toIsoDate,
@@ -180,7 +181,11 @@ export interface DayGroup {
       @for (g of groups(); track g.date) {
         <section class="day">
           <div class="day-head">
-            <span class="day-date">{{ g.date | date: 'EEE, MMM d' }}</span>
+            @if (dayLabel(g.date); as label) {
+              <span class="day-date relative">{{ label }}</span>
+            } @else {
+              <span class="day-date">{{ g.date | date: 'EEE, MMM d' }}</span>
+            }
             <span
               class="day-total"
               [class.money-negative]="g.dayTotal < 0"
@@ -357,6 +362,9 @@ export interface DayGroup {
         text-transform: uppercase;
         letter-spacing: 0.06em;
         color: var(--app-ink-muted);
+      }
+      .day-date.relative {
+        color: var(--app-ink);
       }
       .day-total {
         font-size: 13px;
@@ -614,6 +622,15 @@ export class TransactionsPage {
 
     return Array.from(groupMap.values());
   });
+
+  /**
+   * Group-header label: "Today"/"Yesterday" when the day is recent, null for
+   * older days (the template falls back to "EEE, MMM d"). Called from the
+   * template rather than memoized so the label rolls over at local midnight.
+   */
+  dayLabel(isoDate: string): 'Today' | 'Yesterday' | null {
+    return relativeDayLabel(isoDate);
+  }
 
   clearFilters(): void {
     this.selectedCategoryId.set(null);

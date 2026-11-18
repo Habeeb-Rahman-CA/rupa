@@ -606,6 +606,11 @@ lucide-angular {
   color: var(--app-ink) !important;
   border: 1px solid var(--app-hairline);
   --mat-datepicker-calendar-container-shape: var(--app-radius-lg);
+  // Date numbers — must be set explicitly. Without it Material falls back to
+  // var(--mat-sys-on-surface), which body{color-scheme:light} pins to the light
+  // branch (near-black), making dates invisible on our dark popup background.
+  --mat-datepicker-calendar-date-text-color: var(--app-ink);
+  --mat-datepicker-calendar-date-disabled-state-text-color: var(--app-ink-subtle);
   --mat-datepicker-calendar-date-selected-state-background-color: var(--app-ink-dark);
   --mat-datepicker-calendar-date-selected-state-text-color: var(--mat-sys-on-primary);
   --mat-datepicker-calendar-date-today-outline-color: var(--app-ink-dark);

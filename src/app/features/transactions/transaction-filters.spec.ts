@@ -1,5 +1,5 @@
 import { Transaction } from '../../core/models/domain.models';
-import { filterTransactions, summarizeTransactions, toIsoDate, WALLET_CATEGORY_ID } from './transaction-filters';
+import { filterTransactions, relativeDayLabel, summarizeTransactions, toIsoDate, WALLET_CATEGORY_ID } from './transaction-filters';
 
 describe('transaction filters', () => {
   const transactions: Transaction[] = [
@@ -90,6 +90,20 @@ describe('transaction filters', () => {
   it('converts local dates to ISO dates without timezone shifting', () => {
     expect(toIsoDate(new Date(2026, 9, 20))).toBe('2026-10-20');
     expect(toIsoDate(null)).toBeNull();
+  });
+
+  it('labels today and yesterday relative to the current local date', () => {
+    const now = new Date(2026, 10, 18, 23, 59); // Nov 18 2026, late evening
+
+    expect(relativeDayLabel('2026-11-18', now)).toBe('Today');
+    expect(relativeDayLabel('2026-11-17', now)).toBe('Yesterday');
+    expect(relativeDayLabel('2026-11-16', now)).toBeNull();
+    expect(relativeDayLabel('2026-11-19', now)).toBeNull();
+  });
+
+  it('rolls the relative labels across month and year boundaries', () => {
+    expect(relativeDayLabel('2026-11-30', new Date(2026, 11, 1))).toBe('Yesterday');
+    expect(relativeDayLabel('2025-12-31', new Date(2026, 0, 1))).toBe('Yesterday');
   });
 });
 

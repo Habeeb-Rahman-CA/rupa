@@ -72,3 +72,22 @@ export function toIsoDate(date: Date | null): string | null {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * Relative label for a transaction date group: "Today" / "Yesterday", or null
+ * for anything older (the caller falls back to a formatted calendar date).
+ *
+ * `isoDate` is a local calendar date — the same shape `occurred_on` is stored
+ * in — so both sides are compared as local dates via `toIsoDate`, keeping the
+ * comparison free of timezone shifts. `now` is injectable for tests.
+ */
+export function relativeDayLabel(
+  isoDate: string,
+  now: Date = new Date(),
+): 'Today' | 'Yesterday' | null {
+  if (isoDate === toIsoDate(now)) return 'Today';
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (isoDate === toIsoDate(yesterday)) return 'Yesterday';
+  return null;
+}
