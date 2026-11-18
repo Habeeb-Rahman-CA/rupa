@@ -1,10 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { AppSettingsService } from './app-settings.service';
 import { AiConsentService } from './ai-consent.service';
+import { Category } from '../../core/models/domain.models';
+import { DEFAULT_EXTRACTION_PROMPT, buildCategoryAwarePrompt } from './prompts';
 
 export interface ExtractionResult {
   title: string | null;
   total_amount: string | null;
+  category_name: string | null;
+  category_alternatives: string[];
   raw_output: string;
   latency_ms: number;
   parsed_json: Record<string, any> | null;
@@ -14,11 +18,8 @@ export interface ExtractOptions {
   apiKey?: string;
   model?: string;
   baseUrl?: string;
+  categories?: Category[];
 }
-
-export const DEFAULT_EXTRACTION_PROMPT =
-  'Output ONLY a JSON object with the merchant name as \'title\' and total expense as \'total_amount\'. ' +
-  'No other text. Example: {"title": "Starbucks", "total_amount": "5.50"}';
 
 /**
  * Built-in AI provider fallbacks, used only when the matching
@@ -90,6 +91,13 @@ export class BillScannerService {
       throw new Error('AI API key is missing. Please set your key first.');
     }
 
+    // When categories are supplied and no custom prompt was given, use the
+    // category-aware prompt so the model picks from the user's categories.
+    const effectivePrompt =
+      options.categories && options.categories.length > 0 && prompt === DEFAULT_EXTRACTION_PROMPT
+        ? buildCategoryAwarePrompt(options.categories)
+        : prompt;
+
     const model = options.model || this.appSettings.aiModel() || DEFAULT_AI_MODEL;
     const baseUrl = (
       options.baseUrl ||
@@ -123,7 +131,7 @@ export class BillScannerService {
             },
             {
               type: 'text',
-              text: prompt,
+              text: effectivePrompt,
             },
           ],
         },
@@ -153,6 +161,8 @@ export class BillScannerService {
 
     let title: string | null = null;
     let totalAmount: string | null = null;
+    let categoryName: string | null = null;
+    let categoryAlternatives: string[] = [];
 
     const parsed = this.extractJsonFromText(rawOutput);
     if (parsed) {
@@ -166,11 +176,25 @@ export class BillScannerService {
         title = String(title);
       }
       totalAmount = this.findAmountInJson(parsed);
+
+      const cat = parsed['category'];
+      if (cat !== null && cat !== undefined) {
+        categoryName = String(cat);
+      }
+      const alts = parsed['category_alternatives'];
+      if (Array.isArray(alts)) {
+        categoryAlternatives = alts
+          .filter((a): a is string => typeof a === 'string')
+          .map((a) => a.trim())
+          .slice(0, 2);
+      }
     }
 
     return {
       title,
       total_amount: totalAmount,
+      category_name: categoryName,
+      category_alternatives: categoryAlternatives,
       raw_output: rawOutput,
       latency_ms: latencyMs,
       parsed_json: parsed,

@@ -129,6 +129,7 @@ export interface SelectOption<T = string> {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        text-align: left;
       }
       .sf-value.placeholder {
         color: var(--app-ink-subtle);

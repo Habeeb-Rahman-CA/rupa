@@ -23,7 +23,7 @@ import { Router } from '@angular/router';
 import { CategoriesService } from '../../core/services/categories.service';
 import { TransactionsService } from '../../core/services/transactions.service';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
-import { BillScannerService } from '../../core/services/bill-scanner.service';
+import { BillScannerService, ExtractionResult } from '../../core/services/bill-scanner.service';
 import { AiConsentService } from '../../core/services/ai-consent.service';
 import { openAiConsent } from '../../shared/components/ai-consent-dialog.component';
 import {
@@ -405,7 +405,7 @@ export class QuickAddSheetComponent {
   readonly newCategoryName = signal('');
   readonly notes = signal('');
 
-  readonly paymentMode = signal<PaymentMode>('cash');
+  readonly paymentMode = signal<PaymentMode>('bank');
   readonly selectedBankAccountId = signal<string | null>(null);
 
   readonly bankAccountOptions = computed<SelectOption[]>(() => {
@@ -482,6 +482,38 @@ export class QuickAddSheetComponent {
     this.txKind.set(next);
     this.selectedCategoryId.set(null);
     this.newCategoryName.set('');
+  }
+
+  /**
+   * Tries the AI's top category pick, then each ranked alternative, in order,
+   * against the user's relevant categories (case-insensitive). On exact match
+   * selects the existing category. On no match, pre-fills "+ New category"
+   * with the top suggestion so the existing save flow creates it.
+   */
+  matchCategory(suggested: string | null, alternatives: string[]): void {
+    const categories = this.relevantCategories();
+    const candidates: string[] = [];
+    if (suggested && suggested.trim()) candidates.push(suggested.trim());
+    for (const alt of alternatives) {
+      if (alt.trim()) candidates.push(alt.trim());
+    }
+
+    for (const candidate of candidates) {
+      const match = categories.find(
+        (c) => c.name.toLowerCase() === candidate.toLowerCase(),
+      );
+      if (match) {
+        this.selectedCategoryId.set(match.id);
+        this.newCategoryName.set('');
+        return;
+      }
+    }
+
+    // No existing category matched — offer to create a new one with the top suggestion.
+    this.selectedCategoryId.set(NEW_CATEGORY);
+    if (suggested && suggested.trim()) {
+      this.newCategoryName.set(suggested.trim());
+    }
   }
 
   async save(): Promise<void> {
@@ -564,7 +596,9 @@ export class QuickAddSheetComponent {
     this.scanningBill.set(true);
 
     try {
-      const result = await this.billScanner.extractBill(file);
+      const result = await this.billScanner.extractBill(file, undefined, {
+        categories: this.relevantCategories(),
+      });
 
       if (result.total_amount) {
         const cleaned = result.total_amount.replace(/[^0-9.]/g, '');
@@ -576,6 +610,11 @@ export class QuickAddSheetComponent {
 
       if (result.title) {
         this.notes.set(result.title);
+      }
+
+      // Auto-match the AI-suggested category against the user's categories.
+      if (result.category_name || result.category_alternatives.length > 0) {
+        this.matchCategory(result.category_name, result.category_alternatives);
       }
 
       const statusMsg =

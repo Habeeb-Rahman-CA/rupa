@@ -1,7 +1,11 @@
 import { TestBed } from '@angular/core/testing';
-import { BillScannerService } from './bill-scanner.service';
+import { BillScannerService, ExtractionResult } from './bill-scanner.service';
+import { buildCategoryAwarePrompt } from './prompts';
 import { AppSettingsService } from './app-settings.service';
 import { AiConsentService } from './ai-consent.service';
+import { Category } from '../../core/models/domain.models';
+import { QuickAddSheetComponent } from '../../features/transactions/quick-add-sheet.component';
+import { CategoriesService } from '../../core/services/categories.service';
 
 /**
  * Regression test for: HEIC bill photos returning "details could not be
@@ -162,5 +166,200 @@ describe('BillScannerService consent gate', () => {
 
     await service.extractBill(jpegFile());
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('BillScannerService category-aware prompt', () => {
+  const categories: Category[] = [
+    { id: 'c1', owner_id: 'u1', name: 'Groceries', kind: 'expense', created_at: '2026-01-01' },
+    { id: 'c2', owner_id: 'u1', name: 'Food', kind: 'expense', created_at: '2026-01-02' },
+    { id: 'c3', owner_id: 'u1', name: 'Transport', kind: 'expense', created_at: '2026-01-03' },
+  ];
+
+  it('includes every category name in the prompt', () => {
+    const prompt = buildCategoryAwarePrompt(categories);
+    for (const c of categories) {
+      expect(prompt).toContain(c.name);
+    }
+  });
+
+  it('asks for category and category_alternatives fields', () => {
+    const prompt = buildCategoryAwarePrompt(categories);
+    expect(prompt).toContain('category');
+    expect(prompt).toContain('category_alternatives');
+  });
+
+  it('asks for JSON-only output', () => {
+    const prompt = buildCategoryAwarePrompt(categories);
+    expect(prompt).toContain('JSON');
+  });
+});
+
+describe('BillScannerService category parsing', () => {
+  function buildService(): BillScannerService {
+    return TestBed.configureTestingModule({
+      providers: [
+        BillScannerService,
+        {
+          provide: AppSettingsService,
+          useValue: {
+            aiApiKey: () => 'test-key',
+            aiModel: () => null,
+            aiBaseUrl: () => null,
+            aiHeaders: () => null,
+          },
+        },
+        { provide: AiConsentService, useValue: { granted: () => true } },
+      ],
+    }).inject(BillScannerService);
+  }
+
+  const jpegFile = () => new File([new Uint8Array([1, 2, 3])], 'bill.jpg', { type: 'image/jpeg' });
+
+  function mockFetch(body: any): jasmine.Spy {
+    return spyOn(globalThis, 'fetch').and.returnValue(
+      Promise.resolve(
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+  }
+
+  it('parses category and category_alternatives from model output', async () => {
+    const service = buildService();
+    mockFetch({
+      choices: [{ message: { content: JSON.stringify({ title: 'Shop', total_amount: '10.00', category: 'Groceries', category_alternatives: ['Food', 'Dining'] }) } }],
+    });
+
+    const result: ExtractionResult = await service.extractBill(jpegFile());
+
+    expect(result.category_name).toBe('Groceries');
+    expect(result.category_alternatives).toEqual(['Food', 'Dining']);
+    expect(result.title).toBe('Shop');
+    expect(result.total_amount).toBe('10.00');
+  });
+
+  it('returns null category_name and empty alternatives when absent', async () => {
+    const service = buildService();
+    mockFetch({
+      choices: [{ message: { content: JSON.stringify({ title: 'Shop', total_amount: '10.00' }) } }],
+    });
+
+    const result: ExtractionResult = await service.extractBill(jpegFile());
+
+    expect(result.category_name).toBeNull();
+    expect(result.category_alternatives).toEqual([]);
+  });
+
+  it('uses the category-aware prompt when categories are passed', async () => {
+    const service = buildService();
+    mockFetch({
+      choices: [{ message: { content: JSON.stringify({ title: 'Shop', total_amount: '10.00', category: 'Groceries' }) } }],
+    });
+
+    const categories: Category[] = [
+      { id: 'c1', owner_id: 'u1', name: 'Groceries', kind: 'expense', created_at: '2026-01-01' },
+    ];
+    await service.extractBill(jpegFile(), undefined, { categories });
+
+    const init = (spyOn(globalThis, 'fetch') as jasmine.Spy).calls.mostRecent().args[1] as RequestInit;
+    const body = JSON.parse(String(init.body));
+    const promptText = body.messages[0].content[1].text as string;
+    expect(promptText).toContain('Groceries');
+    expect(promptText).toContain('category_alternatives');
+  });
+
+  it('uses the custom prompt when one is given even with categories', async () => {
+    const service = buildService();
+    mockFetch({
+      choices: [{ message: { content: JSON.stringify({ title: 'Shop', total_amount: '10.00' }) } }],
+    });
+
+    const categories: Category[] = [
+      { id: 'c1', owner_id: 'u1', name: 'Groceries', kind: 'expense', created_at: '2026-01-01' },
+    ];
+    await service.extractBill(jpegFile(), 'CUSTOM PROMPT', { categories });
+
+    const init = (spyOn(globalThis, 'fetch') as jasmine.Spy).calls.mostRecent().args[1] as RequestInit;
+    const body = JSON.parse(String(init.body));
+    const promptText = body.messages[0].content[1].text as string;
+    expect(promptText).toBe('CUSTOM PROMPT');
+  });
+});
+
+describe('QuickAddSheetComponent matchCategory', () => {
+  function buildComponent(categories: Category[]): QuickAddSheetComponent {
+    TestBed.configureTestingModule({
+      providers: [
+        QuickAddSheetComponent,
+        {
+          provide: CategoriesService,
+          useValue: { categories: () => categories },
+        },
+      ],
+    });
+    return TestBed.inject(QuickAddSheetComponent);
+  }
+
+  it('selects existing category on exact match with top suggestion', () => {
+    const categories: Category[] = [
+      { id: 'c1', owner_id: 'u1', name: 'Groceries', kind: 'expense', created_at: '2026-01-01' },
+      { id: 'c2', owner_id: 'u1', name: 'Food', kind: 'expense', created_at: '2026-01-02' },
+    ];
+    const comp = buildComponent(categories);
+
+    comp.matchCategory('Groceries', ['Food']);
+
+    expect(comp.selectedCategoryId()).toBe('c1');
+    expect(comp.newCategoryName()).toBe('');
+  });
+
+  it('falls back to the first matching alternative', () => {
+    const categories: Category[] = [
+      { id: 'c1', owner_id: 'u1', name: 'Groceries', kind: 'expense', created_at: '2026-01-01' },
+      { id: 'c2', owner_id: 'u1', name: 'Food', kind: 'expense', created_at: '2026-01-02' },
+    ];
+    const comp = buildComponent(categories);
+
+    comp.matchCategory('Supermarket', ['Food', 'Groceries']);
+
+    expect(comp.selectedCategoryId()).toBe('c2');
+  });
+
+  it('matches case-insensitively', () => {
+    const categories: Category[] = [
+      { id: 'c1', owner_id: 'u1', name: 'Groceries', kind: 'expense', created_at: '2026-01-01' },
+    ];
+    const comp = buildComponent(categories);
+
+    comp.matchCategory('groceries', []);
+
+    expect(comp.selectedCategoryId()).toBe('c1');
+  });
+
+  it('pre-fills new category when nothing matches', () => {
+    const categories: Category[] = [
+      { id: 'c1', owner_id: 'u1', name: 'Groceries', kind: 'expense', created_at: '2026-01-01' },
+    ];
+    const comp = buildComponent(categories);
+
+    comp.matchCategory('Pet Supplies', ['Pet Food']);
+
+    expect(comp.selectedCategoryId()).toBe('__new__');
+    expect(comp.newCategoryName()).toBe('Pet Supplies');
+  });
+
+  it('sets new category when suggested is null but alternatives exist', () => {
+    const categories: Category[] = [
+      { id: 'c1', owner_id: 'u1', name: 'Groceries', kind: 'expense', created_at: '2026-01-01' },
+    ];
+    const comp = buildComponent(categories);
+
+    comp.matchCategory(null, ['Pet Food']);
+
+    expect(comp.selectedCategoryId()).toBe('__new__');
+    expect(comp.newCategoryName()).toBe('');
   });
 });
