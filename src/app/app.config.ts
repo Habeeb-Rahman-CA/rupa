@@ -1,5 +1,6 @@
 import {
   ApplicationConfig,
+  ErrorHandler,
   importProvidersFrom,
   isDevMode,
   provideBrowserGlobalErrorListeners,
@@ -13,9 +14,13 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { routes } from './app.routes';
 import { APP_ICONS } from './shared/lucide-icons';
+import { AppErrorHandler } from './core/app-error-handler';
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    // Global error boundary: replaces the stock handler that only logs, so
+    // uncaught errors surface recovery UI instead of a frozen screen.
+    { provide: ErrorHandler, useClass: AppErrorHandler },
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(

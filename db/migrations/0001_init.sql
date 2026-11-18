@@ -50,6 +50,26 @@ create index if not exists transactions_owner_date_idx
   on public.transactions (owner_id, occurred_on desc);
 
 -- Convenience view: running account balance
+--
+-- SECURITY AUDIT NOTE — views have NO RLS of their own. This view is safe only
+-- because query privilege flows down to the base table `public.transactions`,
+-- whose policy is `owner_id = auth.uid()`. That inheritance holds ONLY when the
+-- view runs with `security_invoker = true`; a view created without it executes
+-- as its owner and bypasses base-table RLS entirely, exposing every user's
+-- balance to any authenticated caller.
+--
+-- This original definition predates that fix. It is SUPERSEDED by
+-- 0004_account_balance_security_invoker.sql, which recreates the view with
+-- `security_invoker = true`. Do not re-create this view without that option.
+--
+-- Rules for future migrations touching this view (or adding new views):
+--   1. Every view over owner-scoped tables MUST set `security_invoker = true`,
+--      or explicitly replicate `owner_id = auth.uid()` in its WHERE clause.
+--   2. Never wrap it in a SECURITY DEFINER function — that re-introduces the
+--      same owner-bypass.
+--   3. Keep RLS enabled on `public.transactions`; the view inherits from it.
+--   4. Any new SECURITY DEFINER function must re-check
+--      `owner_id = auth.uid()` on every row it reads or writes.
 create or replace view public.account_balance as
 select
   owner_id,
