@@ -87,6 +87,37 @@ export class AuthService {
   }
 
   /**
+   * True when a Supabase 401 is caused by client clock skew: the JWT's `iat`
+   * claim is in the future relative to Supabase's server clock. A fresh access
+   * token (obtained via refreshSession) will have a correct `iat` and should
+   * be accepted.
+   */
+  isClockSkewError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return false;
+    const status = (error as { status?: number }).status;
+    const message = String((error as { message?: string }).message ?? '').toLowerCase();
+    return (status === 401 || status === 400) && message.includes('issued at future');
+  }
+
+  /**
+   * If `error` is a clock-skew 401, refresh the session to obtain a new access
+   * token with a correct `iat`, then return true so the caller can retry.
+   * Returns false for non-clock-skew errors (caller should handle normally).
+   */
+  async refreshOnClockSkew(error: unknown): Promise<boolean> {
+    if (!this.isClockSkewError(error)) return false;
+    const currentSession = this._session();
+    if (!currentSession) return false;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return false;
+    try {
+      await this.refreshIfPossible();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Ask Supabase to refresh the access token using the persisted refresh
    * token. If the refresh token itself has expired or is invalid (HTTP 400/401),
    * sign out cleanly so the user can log in again. Transient mobile network

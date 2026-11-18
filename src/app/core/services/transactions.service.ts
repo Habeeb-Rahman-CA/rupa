@@ -345,10 +345,16 @@ export class TransactionsService {
   }
 
   async loadBalance(): Promise<void> {
-    const { data, error } = await this.supabase.client
+    let { data, error } = await this.supabase.client
       .from('account_balance')
       .select('balance')
       .maybeSingle();
+    if (error && await this.auth.refreshOnClockSkew(error)) {
+      ({ data, error } = await this.supabase.client
+        .from('account_balance')
+        .select('balance')
+        .maybeSingle());
+    }
     if (error) {
       console.error('Failed to load balance', error);
       return;
