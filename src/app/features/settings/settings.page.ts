@@ -144,6 +144,19 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
             aria-label="Budget alerts"
           />
         </li>
+        <li class="category-row">
+          <div class="category-text">
+            <span class="category-name">Daily expense summary</span>
+            <span class="category-desc">Remind me at 8 AM with yesterday’s total spending</span>
+          </div>
+          <mat-slide-toggle
+            color="primary"
+            [checked]="push.dailyExpenseEnabled()"
+            [disabled]="push.busy()"
+            (change)="setCategory('daily_expense', $event.checked)"
+            aria-label="Daily expense summary"
+          />
+        </li>
       </ul>
 
       <ul class="notes">

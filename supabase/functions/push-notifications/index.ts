@@ -35,7 +35,7 @@ const APP_TIME_ZONE = Deno.env.get('APP_TIME_ZONE') ?? 'Asia/Kolkata';
 const RENEWAL_WINDOW_DAYS = 3;
 
 /** Notification categories the user can toggle in the app. */
-type Category = 'renewals' | 'low_balance' | 'budget';
+type Category = 'renewals' | 'low_balance' | 'budget' | 'daily_expense';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -103,6 +103,19 @@ function dayIso(offsetDays = 0): string {
     month: '2-digit',
     day: '2-digit',
   }).format(d);
+}
+
+/** True when the current time in APP_TIME_ZONE is 08:00 (used for the daily
+ *  expense summary cron which runs every 15 minutes but should only send
+ *  once per day at 8 AM). */
+function isEightAM(): boolean {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: APP_TIME_ZONE,
+    hour: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+  const hour = parts.find((p) => p.type === 'hour')?.value;
+  return hour === '08';
 }
 
 /** '2026-11-20' → 'Nov 20' (date-only string, no timezone math). */
@@ -538,6 +551,74 @@ async function runScheduled(admin: SupabaseClient): Promise<Response> {
         },
       },
     });
+  }
+
+  // ---- 5. Daily expense summary (8 AM IST only) -----------------------------
+  // The cron runs every 15 minutes; this block fires once per day at 8 AM.
+  // De-duplication via push_notification_log (ref: daily-expense:<date>)
+  // ensures a single send even if multiple cron ticks fall in the 8 AM hour.
+  if (isEightAM()) {
+    const yesterday = dayIso(-1);
+
+    const { data: expenseRows, error: expenseError } = await admin
+      .from('transactions')
+      .select('owner_id, amount')
+      .eq('direction', 'out')
+      .eq('occurred_on', yesterday)
+      .gt('amount', 0);
+
+    if (expenseError) {
+      console.error('push: daily expense query failed', expenseError);
+    } else {
+      // Group totals per user
+      const perUser = new Map<string, number>();
+      for (const row of expenseRows ?? []) {
+        perUser.set(
+          row.owner_id,
+          (perUser.get(row.owner_id) ?? 0) + Number(row.amount),
+        );
+      }
+
+      const ownerIds = [...perUser.keys()];
+      const [prefs, deviceMap] = await Promise.all([
+        loadPrefs(admin, ownerIds),
+        loadDevices(admin, ownerIds),
+      ]);
+
+      const amountFmt = new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 2,
+      });
+
+      for (const [ownerId, totalAmount] of perUser) {
+        if (!categoryEnabled(prefs, ownerId, 'daily_expense')) continue;
+        const ref = `daily-expense:${yesterday}`;
+        if (!(await claim(admin, ownerId, 'daily_expense', ref))) continue;
+        claimed++;
+
+        const devices = deviceMap.get(ownerId) ?? [];
+        sent += await sendToOwner(admin, devices, ownerId, {
+          notification: {
+            title: `Yesterday's expenses`,
+            body: `You spent ${amountFmt.format(totalAmount)} yesterday`,
+            tag: `daily-expense-${yesterday}`,
+            icon: '/icons/icon-192x192.png',
+            badge: '/icons/icon-96x96.png',
+            requireInteraction: true,
+            data: {
+              url: '/dashboard',
+              onActionClick: {
+                default: {
+                  url: '/dashboard',
+                  operation: 'navigateLastFocusedOrOpen',
+                },
+              },
+            },
+          },
+        });
+      }
+    }
   }
 
   // Keep the de-duplication log small. Budget periods can run up to a year,

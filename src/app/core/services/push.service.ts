@@ -7,7 +7,7 @@ import { SupabaseService } from './supabase.service';
 import { errorText } from '../../shared/utils/error-utils';
 import { TIMEOUTS } from '../time/timeouts';
 
-export type PushCategory = 'renewals' | 'low_balance' | 'budget';
+export type PushCategory = 'renewals' | 'low_balance' | 'budget' | 'daily_expense';
 
 export type PushCategoryState = 'on' | 'off' | 'unknown';
 
@@ -56,6 +56,7 @@ export class PushService {
   readonly renewalsEnabled = signal(true);
   readonly lowBalanceEnabled = signal(true);
   readonly budgetEnabled = signal(true);
+  readonly dailyExpenseEnabled = signal(true);
 
   readonly status = computed<PushStatus>(() => {
     if (!this.isSupported) return 'unsupported';
@@ -74,11 +75,15 @@ export class PushService {
   readonly budgetState = computed<PushCategoryState>(() =>
     this.budgetEnabled() ? 'on' : 'off',
   );
+  readonly dailyExpenseState = computed<PushCategoryState>(() =>
+    this.dailyExpenseEnabled() ? 'on' : 'off',
+  );
 
   private readonly categorySignals: Record<PushCategory, WritableSignal<boolean>> = {
     renewals: this.renewalsEnabled,
     low_balance: this.lowBalanceEnabled,
     budget: this.budgetEnabled,
+    daily_expense: this.dailyExpenseEnabled,
   };
 
   private initialized = false;
@@ -110,6 +115,7 @@ export class PushService {
     this.renewalsEnabled.set(true);
     this.lowBalanceEnabled.set(true);
     this.budgetEnabled.set(true);
+    this.dailyExpenseEnabled.set(true);
     this.message.set(null);
   }
 
@@ -296,6 +302,7 @@ export class PushService {
       this.renewalsEnabled.set(rows.find((r) => r.category === 'renewals')?.enabled ?? true);
       this.lowBalanceEnabled.set(rows.find((r) => r.category === 'low_balance')?.enabled ?? true);
       this.budgetEnabled.set(rows.find((r) => r.category === 'budget')?.enabled ?? true);
+      this.dailyExpenseEnabled.set(rows.find((r) => r.category === 'daily_expense')?.enabled ?? true);
     } catch (error: unknown) {
       console.error('Failed to load push preferences', error);
     }
