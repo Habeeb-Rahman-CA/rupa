@@ -553,11 +553,11 @@ export class TransactionsPage {
               : getCategoryIcon(label);
       const color =
         t.source === 'transfer'
-          ? '#6366f1'
+          ? 'var(--app-accent)'
           : t.source === 'wallet_spend'
-            ? '#475569'
+            ? 'var(--app-ink-muted)'
             : isSavings
-              ? '#0ea5e9'
+              ? 'var(--app-savings)'
               : getCategoryColor(label);
 
       const enriched: EnrichedTransaction = {

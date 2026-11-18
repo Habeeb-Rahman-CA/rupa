@@ -154,6 +154,7 @@ export interface QuickAddSheetData {
         inputmode="decimal"
         [min]="0"
         [step]="0.01"
+        autocomplete="off"
         [value]="amount()"
         (valueChange)="amount.set(toNum($event))"
         (enter)="save()"
@@ -208,15 +209,16 @@ export interface QuickAddSheetData {
       </div>
 
       @if (selectedCategoryId() === NEW_CATEGORY) {
-        <app-text-field
-          #newCatField
-          [label]="'New ' + txKind() + ' category'"
-          [placeholder]="txKind() === 'savings' ? 'e.g. Gold Reserve' : 'e.g. Petrol'"
-          [maxlength]="40"
-          [value]="newCategoryName()"
-          (valueChange)="newCategoryName.set($event ? String($event) : '')"
-          (enter)="save()"
-        />
+      <app-text-field
+        #newCatField
+        [label]="'New ' + txKind() + ' category'"
+        [placeholder]="txKind() === 'savings' ? 'e.g. Gold Reserve' : 'e.g. Petrol'"
+        autocomplete="off"
+        [maxlength]="40"
+        [value]="newCategoryName()"
+        (valueChange)="newCategoryName.set($event ? String($event) : '')"
+        (enter)="save()"
+      />
       }
 
       <app-text-field
@@ -226,6 +228,7 @@ export interface QuickAddSheetData {
             ? 'e.g. Set aside from monthly salary'
             : 'A quick reminder for later'
         "
+        autocomplete="off"
         [maxlength]="120"
         [value]="notes()"
         (valueChange)="notes.set($event ? String($event) : '')"

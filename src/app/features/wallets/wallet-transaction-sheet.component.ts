@@ -74,6 +74,7 @@ export interface WalletTransactionSheetData {
         inputmode="decimal"
         [min]="0"
         [step]="0.01"
+        autocomplete="off"
         [value]="amount()"
         [invalid]="touched() && !amountValid()"
         [hint]="amountHint()"
@@ -128,6 +129,7 @@ export interface WalletTransactionSheetData {
       <app-text-field
         label="Note (optional)"
         placeholder="Add a note"
+        autocomplete="off"
         [maxlength]="120"
         [value]="notes()"
         (valueChange)="notes.set($any($event) ?? '')"

@@ -611,9 +611,9 @@ export class DashboardPage {
               ? 'wallet'
               : getCategoryIcon(label),
           color: isTransfer
-            ? '#6366f1'
+            ? 'var(--app-accent)'
             : t.source === 'wallet_spend'
-              ? '#475569'
+              ? 'var(--app-ink-muted)'
               : getCategoryColor(label),
         };
       });
@@ -858,7 +858,7 @@ export class DashboardPage {
     for (let i = months - 1; i >= 0; i--) {
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
       buckets.push({
-        label: d.toLocaleString('en-US', { month: 'short' }),
+        label: d.toLocaleString('en-IN', { month: 'short' }),
         value: 0,
       });
     }
@@ -877,7 +877,7 @@ export class DashboardPage {
   }
 
   private dayLabel(d: Date, span: number): string {
-    if (span <= 7) return d.toLocaleString('en-US', { weekday: 'short' }).slice(0, 1);
+    if (span <= 7) return d.toLocaleString('en-IN', { weekday: 'short' }).slice(0, 1);
     return d.getDate() % 5 === 0 || d.getDate() === 1 ? String(d.getDate()) : '';
   }
 }

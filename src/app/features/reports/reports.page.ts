@@ -1301,7 +1301,7 @@ export class ReportsPage {
     for (let i = 11; i >= 0; i--) {
       const d = new Date(anchor.getFullYear(), anchor.getMonth() - i, 1);
       buckets.push({
-        label: d.toLocaleString('en-US', { month: 'short' }).slice(0, 1),
+        label: d.toLocaleString('en-IN', { month: 'short' }).slice(0, 1),
         value: 0,
       });
     }
@@ -1650,7 +1650,7 @@ export class ReportsPage {
 
     this.openDetail({
       icon: 'calendar',
-      title: formatDate(day.date, 'EEE, MMM d', 'en-US'),
+      title: formatDate(day.date, 'EEE, MMM d', 'en-IN'),
       subtitle: `${this.monthLabel()} · biggest spending days`,
       total: day.amount,
       totalTone: 'out',
@@ -1695,7 +1695,7 @@ export class ReportsPage {
         meta:
           `${capitalize(s.billing_cycle)}` +
           (s.next_renewal_date
-            ? ` · renews ${formatDate(s.next_renewal_date, 'MMM d, y', 'en-US')}`
+            ? ` · renews ${formatDate(s.next_renewal_date, 'MMM d, y', 'en-IN')}`
             : ''),
         amount: monthlyEquivalent(s.amount, s.billing_cycle),
         tone: null,
@@ -1827,7 +1827,7 @@ export class ReportsPage {
 
     this.openDetail({
       icon: 'trending-up',
-      title: `Expenses · ${formatDate(month, 'MMM y', 'en-US')}`,
+      title: `Expenses · ${formatDate(month, 'MMM y', 'en-IN')}`,
       subtitle: '12-month trend',
       total: point.value,
       totalTone: 'out',
@@ -1845,7 +1845,7 @@ export class ReportsPage {
   }
 
   private monthLabel(): string {
-    return formatDate(this.monthDate(), 'MMMM y', 'en-US');
+    return formatDate(this.monthDate(), 'MMMM y', 'en-IN');
   }
 
   /** All non-transfer transactions of the selected month (mirrors monthly()). */
