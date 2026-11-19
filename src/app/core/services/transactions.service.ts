@@ -11,7 +11,6 @@ import { SupabaseService } from './supabase.service';
 import { CategoriesService } from './categories.service';
 import { DebtsService } from './debts.service';
 import { BankAccountsService } from './bank-accounts.service';
-import { OfflineQueueService, OfflineAction, OfflineActionType } from './offline-queue.service';
 import { todayIso } from '../../shared/utils/budget-utils';
 
 export interface CreateTransactionInput {
@@ -40,7 +39,6 @@ export class TransactionsService {
   private readonly auth = inject(AuthService);
   private readonly categoriesService = inject(CategoriesService);
   private readonly injector = inject(Injector);
-  private readonly offlineQueue = inject(OfflineQueueService);
 
   private readonly _transactions = signal<Transaction[]>([]);
   private readonly _stats = signal<StatsTransaction[]>([]);
@@ -145,41 +143,6 @@ export class TransactionsService {
           void this.mapUnassignedTransactionsToPrimary(primary.id);
         }
       } catch {}
-    });
-
-    // Register offline-sync handler for the transactions table.
-    this.offlineQueue.registerHandler('transactions', async (action) => {
-      const p = action.payload as Record<string, unknown>;
-      if (action.type === 'create') {
-        const { data, error } = await this.supabase.client.rpc(
-          'create_transaction_with_balance_update',
-          {
-            p_owner_id: p['owner_id'] as string,
-            p_amount: Number(p['amount']),
-            p_direction: p['direction'] as TxDirection,
-            p_occurred_on: p['occurred_on'] as string,
-            p_category_id: p['category_id'] as string | null,
-            p_notes: p['notes'] as string | null,
-            p_source: p['source'] as string,
-            p_source_ref_id: p['source_ref_id'] as string | null,
-            p_payment_mode: p['payment_mode'] as PaymentMode,
-            p_bank_account_id: p['bank_account_id'] as string | null,
-          },
-        );
-        if (error) throw error;
-        const created = (data as Transaction[])?.[0];
-        if (!created) throw new Error('Transaction was not returned after sync.');
-        // Replace the optimistic local entry with the server version.
-        this._transactions.update((list) => list.map((t) => (t.id === p['localId'] ? created : t)));
-        this._stats.update((list) => list.map((t) => (t.id === p['localId'] ? created : t)));
-      } else if (action.type === 'delete') {
-        const { error } = await this.supabase.client.rpc('delete_transaction_with_balance_update', {
-          p_transaction_id: p['id'] as string,
-        });
-        if (error) throw error;
-        this._transactions.update((list) => list.filter((t) => t.id !== p['id']));
-        this._stats.update((list) => list.filter((t) => t.id !== p['id']));
-      }
     });
   }
 
@@ -389,49 +352,6 @@ export class TransactionsService {
 
     const occurredOn = input.occurred_on ?? todayIso();
 
-    // Offline path: enqueue for later sync and apply optimistically to local state.
-    if (!this.offlineQueue.isOnline()) {
-      const localId = `local_${crypto.randomUUID?.() ?? Date.now().toString(36)}`;
-      const optimistic: Transaction = {
-        id: localId,
-        owner_id: ownerId,
-        occurred_on: occurredOn,
-        amount: input.amount,
-        direction: input.direction,
-        category_id: input.category_id ?? null,
-        notes: input.notes?.trim() || null,
-        source: input.source ?? ('manual' as const),
-        source_ref_id: input.source_ref_id ?? null,
-        payment_mode: mode,
-        bank_account_id: targetBankAccountId,
-        created_at: new Date().toISOString(),
-      };
-
-      await this.offlineQueue.enqueue({
-        type: 'create',
-        table: 'transactions',
-        payload: {
-          ...input,
-          localId,
-          owner_id: ownerId,
-          occurred_on: occurredOn,
-          amount: input.amount,
-          direction: input.direction,
-          category_id: input.category_id ?? null,
-          notes: input.notes?.trim() || null,
-          source: input.source ?? ('manual' as const),
-          source_ref_id: input.source_ref_id ?? null,
-          payment_mode: mode,
-          bank_account_id: targetBankAccountId,
-        },
-      });
-
-      this._transactions.update((list) => [optimistic, ...list]);
-      this._stats.update((list) => [optimistic, ...list]);
-      this.applyToTotals(optimistic, +1);
-      return optimistic;
-    }
-
     const { data, error } = await this.supabase.client.rpc(
       'create_transaction_with_balance_update',
       {
@@ -479,22 +399,6 @@ export class TransactionsService {
     this._transactions.update((list) => list.filter((t) => t.id !== id));
     this._stats.update((list) => list.filter((t) => t.id !== id));
     this.applyToTotals(removed, -1);
-
-    // Offline path: enqueue for later sync, skip online-only debt_payment cleanup.
-    if (!this.offlineQueue.isOnline()) {
-      await this.offlineQueue.enqueue({
-        type: 'delete',
-        table: 'transactions',
-        payload: {
-          id,
-          payment_mode: removed.payment_mode,
-          bank_account_id: removed.bank_account_id,
-          direction: removed.direction,
-          amount: Number(removed.amount),
-        },
-      });
-      return;
-    }
 
     try {
       // Clean up debt_payments referencing this transaction if any

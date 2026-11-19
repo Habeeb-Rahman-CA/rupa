@@ -105,20 +105,16 @@ export interface QuickAddSheetData {
         (change)="onFileSelected($event)"
       />
 
-      <div class="scan-bar" [class.is-offline]="isOffline()">
+      <div class="scan-bar">
         <span class="scan-tag">
           <lucide-icon
-            [name]="isOffline() ? 'wifi-off' : scanningBill() ? 'sparkles' : 'bot'"
+            [name]="scanningBill() ? 'sparkles' : 'bot'"
             class="scan-tag-icon"
             [class.spin]="scanningBill()"
           />
           <span>
             {{
-              isOffline()
-                ? 'AI Offline'
-                : scanningBill()
-                  ? 'AI Scanning…'
-                  : 'AI Bill Scanner'
+              scanningBill() ? 'AI Scanning…' : 'AI Bill Scanner'
             }}
           </span>
         </span>
@@ -127,12 +123,8 @@ export interface QuickAddSheetData {
             type="button"
             class="scan-btn"
             (click)="cameraInput.click()"
-            [disabled]="scanningBill() || isOffline()"
-            [title]="
-              isOffline()
-                ? 'AI scanning requires an active internet connection'
-                : 'Take Photo with Camera'
-            "
+            [disabled]="scanningBill()"
+            [title]="'Take Photo with Camera'"
           >
             <lucide-icon name="camera" class="scan-btn-icon" />
             <span>Camera</span>
@@ -141,12 +133,8 @@ export interface QuickAddSheetData {
             type="button"
             class="scan-btn"
             (click)="galleryInput.click()"
-            [disabled]="scanningBill() || isOffline()"
-            [title]="
-              isOffline()
-                ? 'AI scanning requires an active internet connection'
-                : 'Upload Image File'
-            "
+            [disabled]="scanningBill()"
+            [title]="'Upload Image File'"
           >
             <lucide-icon name="upload" class="scan-btn-icon" />
             <span>Upload</span>
@@ -351,11 +339,6 @@ export interface QuickAddSheetData {
         border-radius: var(--app-radius-lg);
         box-shadow: var(--app-shadow-sm);
       }
-      .scan-bar.is-offline {
-        background: var(--app-bg-hover);
-        border-color: var(--app-hairline);
-        opacity: 0.85;
-      }
       .scan-tag {
         display: flex;
         align-items: center;
@@ -469,7 +452,6 @@ export class QuickAddSheetComponent {
   readonly txKind = signal<CategoryKind>(this.sheetData?.defaultKind ?? 'expense');
   readonly submitting = signal(false);
   readonly scanningBill = signal(false);
-  readonly isOffline = signal(typeof navigator !== 'undefined' ? !navigator.onLine : false);
   readonly amount = signal<number | null>(null);
   readonly selectedCategoryId = signal<string | null>(null);
   readonly newCategoryName = signal('');
@@ -490,11 +472,6 @@ export class QuickAddSheetComponent {
   });
 
   constructor() {
-    if (typeof window !== 'undefined') {
-      window.addEventListener('online', () => this.isOffline.set(false));
-      window.addEventListener('offline', () => this.isOffline.set(true));
-    }
-
     effect(() => {
       const primary = this.bankAccountsService.primaryAccount();
       // Default to the primary bank account only when none has been selected yet.
@@ -629,7 +606,12 @@ export class QuickAddSheetComponent {
       let categoryId: string | null = null;
       if (this.selectedCategoryId() === NEW_CATEGORY) {
         const created = await this.categoriesService.create(this.newCategoryName(), this.txKind());
-        categoryId = created?.id ?? null;
+        // Never submit the transaction without the category the user just
+        // entered — a null category_id would fall back to "Expense"/"Income".
+        if (!created?.id) {
+          throw new Error('Couldn’t create the category — please try again.');
+        }
+        categoryId = created.id;
       } else {
         categoryId = this.selectedCategoryId();
       }

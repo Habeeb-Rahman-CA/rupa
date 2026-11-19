@@ -10,11 +10,16 @@ import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 import { PeopleService } from './people.service';
 import { BankAccountsService } from './bank-accounts.service';
-import { OfflineQueueService } from './offline-queue.service';
 import { roundCurrency } from '../../shared/utils/currency-utils';
 import { todayIso } from '../../shared/utils/budget-utils';
 
 export interface RecordMoneyHeldInput {
+  /**
+   * Client-generated id for the ledger row. A caller that may retry (the
+   * record sheet) must reuse the same id for every attempt, so a request that
+   * reached the database but lost its response is recorded exactly once.
+   */
+  id?: string;
   held_person_id: string;
   direction: MoneyHeldDirection;
   amount: number;
@@ -22,6 +27,19 @@ export interface RecordMoneyHeldInput {
   payment_mode?: PaymentMode;
   bank_account_id?: string | null;
   notes?: string | null;
+}
+
+/** The exact row shape sent to `money_held_transactions`. */
+interface MoneyHeldInsertPayload {
+  id: string;
+  owner_id: string;
+  held_person_id: string;
+  direction: MoneyHeldDirection;
+  amount: number;
+  occurred_on: string;
+  payment_mode: PaymentMode;
+  bank_account_id: string | null;
+  notes: string | null;
 }
 
 export interface MoneyHeldBalance {
@@ -40,12 +58,21 @@ export class MoneyHeldService {
   private readonly auth = inject(AuthService);
   private readonly peopleService = inject(PeopleService);
   private readonly bankAccountsService = inject(BankAccountsService);
-  private readonly offlineQueue = inject(OfflineQueueService);
 
   private readonly _heldPeople = signal<MoneyHeldPerson[]>([]);
   private readonly _transactions = signal<MoneyHeldTransaction[]>([]);
   private readonly _isLoading = signal(false);
   private readonly _isAvailable = signal(true);
+
+  /**
+   * Bumped before every local mutation of the money-held ledger.
+   *
+   * `load()` records it before issuing its SELECTs and throws the response
+   * away if it moved on while the request was in flight. Without that guard a
+   * slow refresh resolves after a write and reverts it with a pre-write
+   * snapshot — the saved row disappears and the balance jumps back.
+   */
+  private writeVersion = 0;
 
   readonly heldPeople = this._heldPeople.asReadonly();
   readonly transactions = this._transactions.asReadonly();
@@ -88,39 +115,6 @@ export class MoneyHeldService {
         this._isAvailable.set(true);
       }
     });
-
-    // Register offline-sync handler for money_held_transactions table.
-    this.offlineQueue.registerHandler('money_held_transactions', async (action) => {
-      const p = action.payload as Record<string, unknown>;
-      if (action.type === 'create') {
-        const { data, error } = await this.supabase.client
-          .from('money_held_transactions')
-          .insert({
-            owner_id: p['owner_id'] as string,
-            held_person_id: p['held_person_id'] as string,
-            direction: p['direction'],
-            amount: Number(p['amount']),
-            occurred_on: p['occurred_on'] as string,
-            payment_mode: p['payment_mode'],
-            bank_account_id: p['bank_account_id'] as string | null,
-            notes: p['notes'] as string | null,
-          })
-          .select()
-          .single();
-        if (error) throw error;
-        const created = data as MoneyHeldTransaction;
-        this._transactions.update((list) => list.map((t) => (t.id === p['localId'] ? created : t)));
-        await this.adjustBankBalance(created, 1);
-      } else if (action.type === 'delete') {
-        const { error } = await this.supabase.client
-          .from('money_held_transactions')
-          .delete()
-          .eq('id', p['id'] as string)
-          .eq('owner_id', this.auth.user()?.id);
-        if (error) throw error;
-        this._transactions.update((list) => list.filter((t) => t.id !== (p['id'] as string)));
-      }
-    });
   }
 
   private loadPromise: Promise<void> | null = null;
@@ -134,6 +128,7 @@ export class MoneyHeldService {
     if (!this._isAvailable()) return;
     if (this.loadPromise) return this.loadPromise;
 
+    const versionAtStart = this.writeVersion;
     this._isLoading.set(true);
     this.loadPromise = (async () => {
       try {
@@ -161,6 +156,11 @@ export class MoneyHeldService {
           console.error('Failed to load money-held transactions', transactionResult.error);
           return;
         }
+
+        // A record was written while these SELECTs were in flight, so this
+        // snapshot predates it. Applying it would make the saved record
+        // disappear; drop it and let the next sync reconcile instead.
+        if (versionAtStart !== this.writeVersion) return;
 
         this._heldPeople.set((peopleResult.data ?? []) as MoneyHeldPerson[]);
         this._transactions.set((transactionResult.data ?? []) as MoneyHeldTransaction[]);
@@ -191,6 +191,7 @@ export class MoneyHeldService {
 
     const created = data as MoneyHeldPerson;
     this._heldPeople.update((list) => [...list, created]);
+    this.writeVersion += 1;
     return created;
   }
 
@@ -211,68 +212,76 @@ export class MoneyHeldService {
     }
 
     const ownerId = this.requireUserId();
-    const paymentMode = input.payment_mode ?? 'cash';
+    const payload: MoneyHeldInsertPayload = {
+      id: input.id ?? newRecordId(),
+      owner_id: ownerId,
+      held_person_id: input.held_person_id,
+      direction: input.direction,
+      amount: input.amount,
+      occurred_on: input.occurred_on ?? todayIso(),
+      payment_mode: input.payment_mode ?? 'cash',
+      bank_account_id: input.bank_account_id ?? null,
+      notes: input.notes?.trim() || null,
+    };
 
-    // Offline path: enqueue money-held record and apply optimistically.
-    if (!this.offlineQueue.isOnline()) {
-      const localId = `local_${crypto.randomUUID?.() ?? Date.now().toString(36)}`;
-      const occurredOn = input.occurred_on ?? todayIso();
-      const optimistic: MoneyHeldTransaction = {
-        id: localId,
-        owner_id: ownerId,
-        held_person_id: input.held_person_id,
-        direction: input.direction,
-        amount: input.amount,
-        occurred_on: occurredOn,
-        payment_mode: paymentMode,
-        bank_account_id: input.bank_account_id ?? null,
-        notes: input.notes?.trim() || null,
-        created_at: new Date().toISOString(),
-      } as MoneyHeldTransaction;
+    return this.insertAndAdjust(payload);
+  }
 
-      await this.offlineQueue.enqueue({
-        type: 'create',
-        table: 'money_held_transactions',
-        payload: {
-          localId,
-          owner_id: ownerId,
-          held_person_id: input.held_person_id,
-          direction: input.direction,
-          amount: input.amount,
-          occurred_on: occurredOn,
-          payment_mode: paymentMode,
-          bank_account_id: input.bank_account_id ?? null,
-          notes: input.notes?.trim() || null,
-        },
-      });
-
-      this._transactions.update((list) => [optimistic, ...list]);
-      return optimistic;
-    }
+  /**
+   * Persist a ledger row and move the linked card balance.
+   *
+   * The row is written first, so a retry that finds it already present knows
+   * the previous attempt never reached the balance step. Replaying a
+   * half-finished attempt therefore neither duplicates the record nor applies
+   * the balance twice.
+   */
+  private async insertAndAdjust(payload: MoneyHeldInsertPayload): Promise<MoneyHeldTransaction> {
+    let created: MoneyHeldTransaction;
 
     const { data, error } = await this.supabase.client
       .from('money_held_transactions')
-      .insert({
-        owner_id: ownerId,
-        held_person_id: input.held_person_id,
-        direction: input.direction,
-        amount: input.amount,
-        occurred_on: input.occurred_on ?? todayIso(),
-        payment_mode: paymentMode,
-        bank_account_id: input.bank_account_id ?? null,
-        notes: input.notes?.trim() || null,
-      })
+      .insert({ ...payload })
       .select()
       .single();
+
     if (error) {
-      console.error('Failed to record money held', error);
-      throw error;
+      if (!isDuplicateKey(error)) {
+        console.error('Failed to record money held', error);
+        throw error;
+      }
+      const existing = await this.fetchTransaction(payload.id);
+      if (!existing) {
+        console.error('Failed to record money held', error);
+        throw error;
+      }
+      created = existing;
+    } else {
+      created = data as MoneyHeldTransaction;
     }
 
-    const created = data as MoneyHeldTransaction;
-    this._transactions.update((list) => [created, ...list]);
+    this._transactions.update((list) => {
+      const index = list.findIndex((item) => item.id === created.id);
+      if (index === -1) return [created, ...list];
+      const next = [...list];
+      next[index] = created;
+      return next;
+    });
+    this.writeVersion += 1;
+
     await this.adjustBankBalance(created, 1);
     return created;
+  }
+
+  private async fetchTransaction(id: string): Promise<MoneyHeldTransaction | null> {
+    const { data, error } = await this.supabase.client
+      .from('money_held_transactions')
+      .select(
+        'id, owner_id, held_person_id, direction, amount, occurred_on, payment_mode, bank_account_id, notes, created_at',
+      )
+      .eq('id', id)
+      .single();
+    if (error) return null;
+    return data as MoneyHeldTransaction;
   }
 
   async delete(record: MoneyHeldTransaction): Promise<void> {
@@ -288,21 +297,17 @@ export class MoneyHeldService {
     }
 
     this._transactions.update((list) => list.filter((item) => item.id !== record.id));
+    this.writeVersion += 1;
 
-    // Offline path: enqueue deletion, skip bank balance adjust (reconciled on sync).
-    if (!this.offlineQueue.isOnline()) {
-      await this.offlineQueue.enqueue({
-        type: 'delete',
-        table: 'money_held_transactions',
-        payload: {
-          id: record.id,
-          owner_id: record.owner_id,
-        },
-      });
-      return;
+    try {
+      await this.adjustBankBalance(record, -1);
+    } catch (err) {
+      // Nothing has reached the database yet, so put the record back and keep
+      // the list matching what is actually stored.
+      this._transactions.update((list) => [record, ...list]);
+      this.writeVersion += 1;
+      throw err;
     }
-
-    await this.adjustBankBalance(record, -1);
 
     const { error } = await this.supabase.client
       .from('money_held_transactions')
@@ -310,7 +315,12 @@ export class MoneyHeldService {
       .eq('id', record.id);
     if (error) {
       this._transactions.update((list) => [record, ...list]);
-      await this.adjustBankBalance(record, 1);
+      this.writeVersion += 1;
+      try {
+        await this.adjustBankBalance(record, 1);
+      } catch (balanceError) {
+        console.error('Failed to restore bank account balance for money held', balanceError);
+      }
       console.error('Failed to delete money-held transaction', error);
       throw error;
     }
@@ -330,6 +340,9 @@ export class MoneyHeldService {
       });
     } catch (error) {
       console.error('Failed to update bank account balance for money held', error);
+      // Swallowing this would leave the ledger and the card balance diverging
+      // with no way for the caller to notice. The caller may retry safely.
+      throw new Error('Couldn’t update the card balance — please try again.');
     }
   }
 
@@ -365,4 +378,29 @@ function sumByDirection(records: MoneyHeldTransaction[], direction: MoneyHeldDir
       .filter((record) => record.direction === direction)
       .reduce((sum, record) => sum + Number(record.amount), 0),
   );
+}
+
+/** Postgres unique-violation: this exact row id already exists. */
+function isDuplicateKey(error: { code?: string; message?: string }): boolean {
+  return error.code === '23505' || (error.message ?? '').toLowerCase().includes('duplicate key');
+}
+
+/**
+ * A random UUID v4 for a ledger row id. The id is generated on the client so
+ * that a retried request can be recognised as the same record instead of
+ * being inserted twice.
+ */
+export function newRecordId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+  throw new Error('Secure id generation is unavailable in this browser.');
 }

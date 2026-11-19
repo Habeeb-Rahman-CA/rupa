@@ -26,19 +26,5 @@
         ]
       }
     }
-  ],
-  "dataGroups": [
-    {
-      "name": "supabase-api",
-      "urls": [
-        "https://kulwhzrhmpcdgwgamjzx.supabase.co/rest/v1/**"
-      ],
-      "cacheConfig": {
-        "maxSize": 100,
-        "maxAge": "1h",
-        "strategy": "performance",
-        "timeout": "5s"
-      }
-    }
   ]
 }

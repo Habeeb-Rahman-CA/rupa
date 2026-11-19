@@ -21,6 +21,4 @@ export const SNACKBAR_DURATION = {
   CRITICAL: 4500,
   /** PWA update notifications. */
   PWA_UPDATE: 5000,
-  /** Offline-sync status messages. */
-  OFFLINE_SYNC: 15000,
 } as const;

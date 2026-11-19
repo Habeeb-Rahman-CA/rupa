@@ -15,7 +15,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { MoneyHeldDirection, PaymentMode } from '../../core/models/domain.models';
 import { BankAccountsService } from '../../core/services/bank-accounts.service';
-import { MoneyHeldService } from '../../core/services/money-held.service';
+import { MoneyHeldService, newRecordId } from '../../core/services/money-held.service';
 import { DateFieldComponent } from '../../shared/components/date-field.component';
 import { SelectFieldComponent, SelectOption } from '../../shared/components/select-field.component';
 import { TextFieldComponent } from '../../shared/components/text-field.component';
@@ -293,6 +293,13 @@ export class RecordMoneyHeldSheetComponent {
 
   private userExplicitlySetCash = false;
 
+  /**
+   * Id for the row this sheet is creating. Kept across failed attempts so a
+   * save that reached the database but lost its response is recorded exactly
+   * once when the user taps Save again.
+   */
+  private recordId: string | null = null;
+
   setPaymentMode(mode: PaymentMode): void {
     this.userExplicitlySetCash = mode === 'cash';
     this.paymentMode.set(mode);
@@ -310,6 +317,7 @@ export class RecordMoneyHeldSheetComponent {
     this.submitting.set(true);
     try {
       await this.moneyHeldService.record({
+        id: (this.recordId ??= newRecordId()),
         held_person_id: this.data.heldPersonId,
         direction: this.direction(),
         amount: Number(this.amount()),
@@ -318,6 +326,7 @@ export class RecordMoneyHeldSheetComponent {
         bank_account_id: this.paymentMode() === 'bank' ? this.selectedBankAccountId() : null,
         notes: this.notes() || null,
       });
+      this.recordId = null;
       this.snack.open('Money-held record saved.', undefined, { duration: 2000 });
       this.ref.dismiss({ saved: true });
     } catch (error: unknown) {

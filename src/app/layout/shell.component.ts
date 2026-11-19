@@ -25,13 +25,20 @@ import { LucideAngularModule } from 'lucide-angular';
 
 import { AuthService } from '../core/services/auth.service';
 import { ThemeService } from '../core/services/theme.service';
-import { DataSyncService } from '../core/services/data-sync.service';
 import { PwaUpdateService } from '../core/services/pwa-update.service';
 import { TIMEOUTS } from '../core/time/timeouts';
 import { TransactionsService } from '../core/services/transactions.service';
 import { CategoriesService } from '../core/services/categories.service';
 import { DebtsService } from '../core/services/debts.service';
 import { PeopleService } from '../core/services/people.service';
+import { BankAccountsService } from '../core/services/bank-accounts.service';
+import { MoneyHeldService } from '../core/services/money-held.service';
+import { TransfersService } from '../core/services/transfers.service';
+import { WalletsService } from '../core/services/wallets.service';
+import { SubscriptionsService } from '../core/services/subscriptions.service';
+import { InterestService } from '../core/services/interest.service';
+import { BudgetsService } from '../core/services/budgets.service';
+import { PushService } from '../core/services/push.service';
 import { APP_VERSION } from '../core/app-version';
 import { QuickAddSheetComponent } from '../features/transactions/quick-add-sheet.component';
 import { PullToRefreshDirective } from '../shared/directives/pull-to-refresh.directive';
@@ -66,12 +73,19 @@ export class ShellComponent implements AfterViewInit {
   private readonly bottomSheet = inject(MatBottomSheet);
   private readonly auth = inject(AuthService);
   readonly theme = inject(ThemeService);
-  private readonly dataSyncService = inject(DataSyncService);
   private readonly pwaUpdateService = inject(PwaUpdateService);
   private readonly transactionsService = inject(TransactionsService);
   private readonly categoriesService = inject(CategoriesService);
   private readonly debtsService = inject(DebtsService);
   private readonly peopleService = inject(PeopleService);
+  private readonly bankAccountsService = inject(BankAccountsService);
+  private readonly moneyHeldService = inject(MoneyHeldService);
+  private readonly transfersService = inject(TransfersService);
+  private readonly walletsService = inject(WalletsService);
+  private readonly subscriptionsService = inject(SubscriptionsService);
+  private readonly interestService = inject(InterestService);
+  private readonly budgetsService = inject(BudgetsService);
+  private readonly pushService = inject(PushService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -219,6 +233,19 @@ export class ShellComponent implements AfterViewInit {
 
   readonly refreshAll = async (): Promise<void> => {
     await this.auth.refreshIfPossible();
-    await this.dataSyncService.syncAll();
+    await Promise.all([
+      this.categoriesService.load(),
+      this.peopleService.load(),
+      this.bankAccountsService.load(),
+      this.transactionsService.refresh(),
+      this.debtsService.load(),
+      this.moneyHeldService.load(),
+      this.transfersService.load(),
+      this.walletsService.load(),
+      this.subscriptionsService.load(),
+      this.interestService.load(),
+      this.budgetsService.load(),
+      this.pushService.init(),
+    ]);
   };
 }

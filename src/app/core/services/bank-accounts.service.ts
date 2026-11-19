@@ -18,6 +18,16 @@ export class BankAccountsService {
   private readonly _bankAccounts = signal<BankAccount[]>([]);
   private readonly _isLoading = signal(false);
 
+  /**
+   * Bumped after every local write to the card list.
+   *
+   * `load()` records it before issuing its SELECT and throws the response
+   * away if it moved on in the meantime. Without that guard a refresh that
+   * was already in flight resolves after a balance change and restores the
+   * pre-write balance.
+   */
+  private writeVersion = 0;
+
   readonly bankAccounts = this._bankAccounts.asReadonly();
   readonly isLoading = this._isLoading.asReadonly();
   readonly isFirstCard = computed(() => this._bankAccounts().length === 0);
@@ -45,8 +55,17 @@ export class BankAccountsService {
     }
     if (this.loadPromise) return this.loadPromise;
 
+    const versionAtStart = this.writeVersion;
     this._isLoading.set(true);
     this.loadPromise = (async () => {
+      // A card write landed while this SELECT was in flight, so the snapshot
+      // predates it. Applying it would restore the pre-write balance; drop it
+      // and let the next sync reconcile instead.
+      const applySnapshot = (list: BankAccount[]): void => {
+        if (versionAtStart !== this.writeVersion) return;
+        this._bankAccounts.set(list);
+      };
+
       try {
         const ownerId = this.auth.user()?.id;
         if (!ownerId) return;
@@ -83,7 +102,7 @@ export class BankAccountsService {
 
           if (migrationError) {
             console.error('Failed to migrate legacy bank accounts', migrationError);
-            this._bankAccounts.set(remoteList);
+            applySnapshot(remoteList);
             return;
           }
 
@@ -96,7 +115,7 @@ export class BankAccountsService {
             .order('created_at', { ascending: false });
           if (refreshed.error) {
             console.error('Failed to reload migrated bank accounts', refreshed.error);
-            this._bankAccounts.set(remoteList);
+            applySnapshot(remoteList);
             return;
           }
           const refreshedList = (refreshed.data ?? []) as BankAccount[];
@@ -105,7 +124,7 @@ export class BankAccountsService {
           );
           if (missingIds.length > 0) {
             console.error('Migrated bank accounts were not readable after write', missingIds);
-            this._bankAccounts.set(remoteList);
+            applySnapshot(remoteList);
             return;
           }
           remoteList = refreshedList;
@@ -118,7 +137,7 @@ export class BankAccountsService {
           this.clearLegacyCards(ownerId);
         }
 
-        this._bankAccounts.set(remoteList);
+        applySnapshot(remoteList);
       } catch (err) {
         console.error('Failed to load bank accounts', err);
       }
@@ -193,6 +212,7 @@ export class BankAccountsService {
 
     updatedList = [newCard, ...updatedList];
     this._bankAccounts.set(updatedList);
+    this.writeVersion += 1;
 
     if (newCard.is_primary) {
       try {
@@ -250,6 +270,7 @@ export class BankAccountsService {
     }
 
     this._bankAccounts.set(updatedList);
+    this.writeVersion += 1;
 
     if (changes.is_primary) {
       try {
@@ -298,6 +319,7 @@ export class BankAccountsService {
     }
 
     this._bankAccounts.set(updatedList);
+    this.writeVersion += 1;
   }
 
   async setPrimary(id: string): Promise<void> {
@@ -324,6 +346,7 @@ export class BankAccountsService {
     if (othersError) throw othersError;
 
     this._bankAccounts.set(updatedList);
+    this.writeVersion += 1;
 
     try {
       const txService = this.injector.get(TransactionsService);

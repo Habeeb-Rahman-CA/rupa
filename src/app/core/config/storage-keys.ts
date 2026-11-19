@@ -40,8 +40,6 @@ export const USER_KEYS = {
   OPENROUTER_API_KEY: (userId: string) => userKey(userId, 'openrouter_api_key'),
   /** Bank account cards (legacy localStorage, migrated to Supabase). */
   BANK_ACCOUNTS: (userId: string) => userKey(userId, 'bank_accounts'),
-  /** Offline action queue for sync-when-online. */
-  OFFLINE_QUEUE: (userId: string) => userKey(userId, 'offline_queue'),
   /** Savings category marker: `true` when a category is marked as savings. */
   SAVINGS_CATEGORY: (userId: string) => userKey(userId, 'savings_cat_'),
   /** Dismissed balance banner flag. */

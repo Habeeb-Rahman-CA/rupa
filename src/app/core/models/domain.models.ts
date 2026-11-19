@@ -27,43 +27,15 @@ function savingsPrefix(userId: string): string {
 
 const inMemorySavingsCategories = new Set<string>();
 
-function safeGetLocalStorage(): Storage | null {
-  try {
-    return typeof localStorage !== 'undefined' ? localStorage : null;
-  } catch {
-    return null;
-  }
-}
-
 export function markAsSavingsCategory(id: string, userId: string): void {
   if (!id || !userId) return;
   inMemorySavingsCategories.add(id);
-  const storage = safeGetLocalStorage();
-  if (storage) {
-    try {
-      storage.setItem(savingsPrefix(userId) + id, 'true');
-    } catch (err) {
-      console.warn('Failed to persist savings category to localStorage', err);
-    }
-  }
 }
 
 export function isSavingsCategory(cat: Category | null | undefined, userId?: string): boolean {
   if (!cat) return false;
   if (cat.kind === 'savings') return true;
   if (cat.id && inMemorySavingsCategories.has(cat.id)) return true;
-
-  const storage = safeGetLocalStorage();
-  if (storage && cat.id && userId) {
-    try {
-      if (storage.getItem(savingsPrefix(userId) + cat.id) === 'true') {
-        inMemorySavingsCategories.add(cat.id);
-        return true;
-      }
-    } catch (err) {
-      console.warn('Failed to read savings category from localStorage', err);
-    }
-  }
   const name = cat.name.toLowerCase();
   return (
     name.includes('saving') ||
