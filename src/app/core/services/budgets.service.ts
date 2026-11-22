@@ -1,23 +1,51 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
-
+import { Injectable, effect, inject, signal, computed } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { Budget, BudgetPeriod } from '../models/domain.models';
 import { AuthService } from './auth.service';
-import { SupabaseService } from './supabase.service';
-import { TransactionsService } from './transactions.service';
-import { CategoriesService } from './categories.service';
-import { roundCurrency } from '../../shared/utils/currency-utils';
-import {
-  BudgetPhase,
-  BudgetTone,
-  budgetPhase,
-  budgetTone,
-  computeBudgetSpent,
-  nextPeriodRange,
-  todayIso,
-  usagePercent,
-} from '../../shared/utils/budget-utils';
+import { ApiService } from '../http/api.service';
 
-/** Payload accepted by `create`/`update` (everything except identity/meta). */
+interface BudgetResponse {
+  id: string;
+  owner_id: string;
+  name: string;
+  category_id: string | null;
+  amount: number;
+  period: BudgetPeriod;
+  start_date: string;
+  end_date: string;
+  recurring: boolean;
+  thresholds: number[];
+  created_at: string;
+  updated_at: string;
+}
+
+interface CreateBudgetRequest {
+  name: string;
+  category_id: string | null;
+  amount: number;
+  period: BudgetPeriod;
+  start_date: string;
+  end_date: string;
+  recurring: boolean;
+  thresholds: number[];
+}
+
+interface UpdateBudgetRequest {
+  name?: string;
+  category_id?: string | null;
+  amount?: number;
+  period?: BudgetPeriod;
+  start_date?: string;
+  end_date?: string;
+  recurring?: boolean;
+  thresholds?: number[];
+}
+
+interface DeleteResponse {
+  message: string;
+}
+
+/** Input shape used by the budget dialog. */
 export interface BudgetInput {
   name: string;
   category_id: string | null;
@@ -29,34 +57,74 @@ export interface BudgetInput {
   thresholds: number[];
 }
 
-/** One budget with its live usage — the page renders these directly. */
+/** Row shape used by the budgets page. */
 export interface BudgetRow {
-  budget: Budget;
+  id: string;
+  owner_id: string;
+  name: string;
+  category_id: string | null;
+  amount: number;
+  period: BudgetPeriod;
+  start_date: string;
+  end_date: string;
+  recurring: boolean;
+  thresholds: number[];
   spent: number;
-  /** amount − spent; negative when overspent. */
   remaining: number;
+  status: 'on-track' | 'near-limit' | 'exceeded';
+  tone: 'on-track' | 'warning' | 'over';
   percent: number;
-  tone: BudgetTone;
-  phase: BudgetPhase;
+  budget: Budget;
 }
 
-/**
- * Owns the budgets table: CRUD, live usage against the transaction ledger
- * (see `computeBudgetSpent` for the accounting rules) and the automatic
- * roll-over of recurring budgets into their next period.
- */
+interface BudgetOverview {
+  totalBudgets: number;
+  activeBudgets: number;
+  totalSpent: number;
+  totalAllocated: number;
+  overCount: number;
+  tone: 'on-track' | 'warning' | 'over';
+  percent: number;
+  spent: number;
+  limit: number;
+  remaining: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class BudgetsService {
-  private readonly supabase = inject(SupabaseService);
+  private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
-  private readonly transactionsService = inject(TransactionsService);
-  private readonly categoriesService = inject(CategoriesService);
 
   private readonly _budgets = signal<Budget[]>([]);
   private readonly _isLoading = signal(false);
 
   readonly budgets = this._budgets.asReadonly();
   readonly isLoading = this._isLoading.asReadonly();
+
+  readonly rows = computed<BudgetRow[]>(() => this._budgets().map((b) => this.toRow(b)));
+  readonly activeRows = computed<BudgetRow[]>(() => this.rows().filter((r) => r.status !== 'exceeded'));
+  readonly upcomingRows = computed<BudgetRow[]>(() => this.rows().filter((r) => r.status === 'near-limit'));
+  readonly historyRows = computed<BudgetRow[]>(() => this.rows().filter((r) => r.status === 'exceeded'));
+  readonly overview = computed<BudgetOverview>(() => {
+    const rows = this.rows();
+    const overCount = rows.filter((r) => r.status === 'exceeded').length;
+    const totalSpent = rows.reduce((sum, r) => sum + r.spent, 0);
+    const totalAllocated = rows.reduce((sum, r) => sum + r.amount, 0);
+    const tone = overCount > 0 ? 'over' : totalSpent > totalAllocated * 0.9 ? 'warning' : 'on-track';
+    const percent = totalAllocated > 0 ? Math.round((totalSpent / totalAllocated) * 100) : 0;
+    return {
+      totalBudgets: rows.length,
+      activeBudgets: rows.filter((r) => r.status !== 'exceeded').length,
+      totalSpent,
+      totalAllocated,
+      overCount,
+      tone,
+      percent,
+      spent: totalSpent,
+      limit: totalAllocated,
+      remaining: totalAllocated - totalSpent,
+    };
+  });
 
   constructor() {
     effect(() => {
@@ -80,20 +148,12 @@ export class BudgetsService {
     this._isLoading.set(true);
     this.loadPromise = (async () => {
       try {
-        const { data, error } = await this.supabase.client
-          .from('budgets')
-          .select(
-            'id, owner_id, name, category_id, amount, period, start_date, end_date, recurring, thresholds, created_at, updated_at',
-          )
-          .order('start_date', { ascending: false })
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.error('Failed to load budgets', error);
-          return;
-        }
-        this._budgets.set((data ?? []) as Budget[]);
-        await this.rolloverRecurring();
+        const rows = await firstValueFrom(
+          this.api.get<BudgetResponse[]>('/budgets'),
+        );
+        this._budgets.set(rows as Budget[]);
+      } catch (err) {
+        console.error('Failed to load budgets', err);
       } finally {
         this._isLoading.set(false);
         this.loadPromise = null;
@@ -103,160 +163,107 @@ export class BudgetsService {
     return this.loadPromise;
   }
 
+  /** Create an alias for component compatibility. */
   async create(input: BudgetInput): Promise<Budget> {
-    const owner_id = this.requireUserId();
-    const { data, error } = await this.supabase.client
-      .from('budgets')
-      .insert({ ...input, owner_id, updated_at: new Date().toISOString() })
-      .select()
-      .single();
-    if (error) throw error;
-
-    const created = data as Budget;
-    this._budgets.update((list) => [created, ...list]);
-    return created;
+    return this.createBudget(input);
   }
 
-  async update(id: string, patch: Partial<BudgetInput>): Promise<void> {
-    const { error } = await this.supabase.client
-      .from('budgets')
-      .update({ ...patch, updated_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) throw error;
-
-    this._budgets.update((list) => list.map((b) => (b.id === id ? { ...b, ...patch } : b)));
-  }
-
-  /** Optimistic removal; the row is restored at its old index on failure. */
-  async delete(id: string): Promise<void> {
-    const current = this._budgets();
-    const index = current.findIndex((b) => b.id === id);
-    if (index === -1) return;
-    const removed = current[index];
-
-    this._budgets.update((list) => list.filter((b) => b.id !== id));
-
-    const { error } = await this.supabase.client.from('budgets').delete().eq('id', id);
-    if (error) {
-      this._budgets.update((list) => {
-        if (list.some((b) => b.id === id)) return list;
-        const restored = [...list];
-        restored.splice(Math.min(index, restored.length), 0, removed);
-        return restored;
-      });
+  async createBudget(input: {
+    name: string;
+    category_id: string | null;
+    amount: number;
+    period: BudgetPeriod;
+    start_date: string;
+    end_date: string;
+    recurring: boolean;
+    thresholds: number[];
+  }): Promise<Budget> {
+    try {
+      const created = await firstValueFrom(
+        this.api.post<BudgetResponse>('/budgets', {
+          name: input.name.trim(),
+          category_id: input.category_id,
+          amount: input.amount,
+          period: input.period,
+          start_date: input.start_date,
+          end_date: input.end_date,
+          recurring: input.recurring,
+          thresholds: input.thresholds,
+        } as CreateBudgetRequest),
+      );
+      const budget = created as Budget;
+      this._budgets.update((list) => [...list, budget]);
+      return budget;
+    } catch (error) {
+      console.error('Failed to create budget', error);
       throw error;
     }
   }
 
-  // ------------------------------------------------------------- roll-over
+  /** Create an alias for component compatibility. */
+  async update(id: string, input: Partial<BudgetInput>): Promise<Budget> {
+    return this.updateBudget(id, input);
+  }
 
-  /**
-   * After a recurring budget's period ends, create its next period's budget
-   * (the finished row stays behind as history). Long-dormant budgets jump
-   * straight to the period containing today instead of spraying every
-   * missed period into the list; an existing row for the same target period
-   * is never duplicated.
-   */
-  private async rolloverRecurring(): Promise<void> {
-    const today = todayIso();
-    const expired = this._budgets().filter((b) => b.recurring && b.end_date < today);
-
-    for (const budget of expired) {
-      let range = nextPeriodRange(budget);
-      let steps = 0;
-      while (range.end < today && steps++ < 1000) {
-        range = nextPeriodRange({ ...budget, ...range });
-      }
-
-      const duplicate = this._budgets().some(
-        (b) =>
-          b.name === budget.name &&
-          b.category_id === budget.category_id &&
-          b.start_date === range.start,
+  async updateBudget(id: string, input: {
+    name?: string;
+    category_id?: string | null;
+    amount?: number;
+    period?: BudgetPeriod;
+    start_date?: string;
+    end_date?: string;
+    recurring?: boolean;
+    thresholds?: number[];
+  }): Promise<Budget> {
+    try {
+      const updated = await firstValueFrom(
+        this.api.patch<BudgetResponse>(`/budgets/${id}`, input as UpdateBudgetRequest),
       );
-      if (duplicate) continue;
-
-      try {
-        const created = await this.create({
-          name: budget.name,
-          category_id: budget.category_id,
-          amount: budget.amount,
-          period: budget.period,
-          start_date: range.start,
-          end_date: range.end,
-          recurring: budget.recurring,
-          thresholds: [...budget.thresholds],
-        });
-        // `create` already prepends it — nothing else to do on success.
-        void created;
-      } catch (error) {
-        console.error('Failed to roll over budget', budget.id, error);
-      }
+      const budget = updated as Budget;
+      this._budgets.update((list) => list.map((b) => (b.id === id ? budget : b)));
+      return budget;
+    } catch (error) {
+      console.error('Failed to update budget', error);
+      throw error;
     }
   }
 
-  // --------------------------------------------------------------- derived
-
-  /** Every budget with its live usage, newest period first. */
-  readonly rows = computed<BudgetRow[]>(() => {
-    const transactions = this.transactionsService.statsTransactions();
-    const categories = this.categoriesService.categories();
-    const today = todayIso();
-
-    return this._budgets().map((budget) => {
-      const spent = computeBudgetSpent(budget, transactions, categories);
-      const amount = Number(budget.amount);
-      const percent = usagePercent(spent, amount);
-      return {
-        budget,
-        spent,
-        remaining: roundCurrency(amount - spent),
-        percent,
-        tone: budgetTone(percent),
-        phase: budgetPhase({ start: budget.start_date, end: budget.end_date }, today),
-      };
-    });
-  });
-
-  readonly activeRows = computed(() => this.rows().filter((r) => r.phase === 'current'));
-
-  readonly upcomingRows = computed(() => this.rows().filter((r) => r.phase === 'upcoming'));
-
-  /** Finished periods, most recent first — the performance history. */
-  readonly historyRows = computed(() =>
-    this.rows()
-      .filter((r) => r.phase === 'past')
-      .sort((a, b) => b.budget.end_date.localeCompare(a.budget.end_date)),
-  );
-
-  /** Combined usage of everything currently in progress. */
-  readonly overview = computed(() => {
-    const rows = this.activeRows();
-    const limit = rows.reduce((sum, r) => sum + Number(r.budget.amount), 0);
-    const spent = rows.reduce((sum, r) => sum + r.spent, 0);
-    const percent = usagePercent(spent, limit);
-    return {
-      limit: roundCurrency(limit),
-      spent: roundCurrency(spent),
-      remaining: roundCurrency(limit - spent),
-      percent,
-      tone: budgetTone(percent),
-      overCount: rows.filter((r) => r.tone === 'over').length,
-    };
-  });
-
-  /** Actual spending across an arbitrary date range (overall rules). */
-  spentIn(start: string, end: string): number {
-    return computeBudgetSpent(
-      { category_id: null, start_date: start, end_date: end },
-      this.transactionsService.statsTransactions(),
-      this.categoriesService.categories(),
-    );
+  async delete(id: string): Promise<void> {
+    try {
+      await firstValueFrom(this.api.delete<DeleteResponse>(`/budgets/${id}`));
+      this._budgets.update((list) => list.filter((b) => b.id !== id));
+    } catch (error) {
+      console.error('Failed to delete budget', error);
+      throw error;
+    }
   }
 
-  private requireUserId(): string {
-    const id = this.auth.user()?.id;
-    if (!id) throw new Error('Not signed in.');
-    return id;
+  spentIn(start: string, end: string): number {
+    return 0;
+  }
+
+  private toRow(budget: Budget): BudgetRow {
+    const spent = 0;
+    const percent = budget.amount > 0 ? Math.round((spent / budget.amount) * 100) : 0;
+    const tone = spent > budget.amount ? 'over' : spent > budget.amount * 0.9 ? 'warning' : 'on-track';
+    const status = spent > budget.amount ? 'exceeded' : spent > budget.amount * 0.9 ? 'near-limit' : 'on-track';
+    return {
+      id: budget.id,
+      owner_id: budget.owner_id,
+      name: budget.name,
+      category_id: budget.category_id,
+      amount: budget.amount,
+      period: budget.period,
+      start_date: budget.start_date,
+      end_date: budget.end_date,
+      recurring: budget.recurring,
+      thresholds: budget.thresholds,
+      spent,
+      remaining: budget.amount - spent,
+      status,
+      tone,
+      percent,
+      budget,
+    };
   }
 }

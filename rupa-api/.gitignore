@@ -1,0 +1,51 @@
+# Environment
+.env
+.env.local
+
+# Dependencies
+/node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build output
+/dist
+/build
+/.angular/cache
+/tmp
+/out-tsc
+/bazel-out
+
+# TypeORM / migration artifacts
+/src/migrations/*{.ts,.js}  # only if you check in generated migrations; comment out to track them
+
+# IDEs & editors
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/
+*.sublime-workspace
+*.sublime-project
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Test coverage
+/coverage
+/.nyc_output
+
+# Nest
+nest-cli-debug.log*
+
+# Misc
+.tsbuildinfo

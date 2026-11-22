@@ -135,14 +135,6 @@ export class ShellComponent implements AfterViewInit {
   readonly displayName = computed(() => {
     const u = this.auth.user();
     if (!u) return '';
-    const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
-    const fromMeta =
-      (typeof meta['name'] === 'string' ? meta['name'] : '') ||
-      (typeof meta['full_name'] === 'string' ? meta['full_name'] : '');
-    if (fromMeta && fromMeta.trim()) {
-      const first = fromMeta.trim().split(/\s+/)[0];
-      return first.charAt(0).toUpperCase() + first.slice(1);
-    }
     const email = u.email ?? '';
     if (!email) return '';
     const local = email.split('@')[0];

@@ -1,7 +1,8 @@
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { BankAccount, CardType, PaymentNetwork, CardTheme } from '../models/domain.models';
 import { AuthService } from './auth.service';
-import { SupabaseService } from './supabase.service';
+import { ApiService } from '../http/api.service';
 import { TransactionsService } from './transactions.service';
 import { USER_KEYS } from '../config/storage-keys';
 
@@ -9,23 +10,76 @@ function legacyStorageKey(userId: string): string {
   return USER_KEYS.BANK_ACCOUNTS(userId);
 }
 
+interface BankAccountResponse {
+  id: string;
+  owner_id: string;
+  bank_name: string;
+  account_name: string;
+  card_type: CardType;
+  payment_network: PaymentNetwork;
+  card_number_masked: string;
+  expiry_date: string;
+  cardholder_name: string;
+  account_number_masked?: string;
+  ifsc_code?: string;
+  balance?: number;
+  credit_limit?: number;
+  theme: CardTheme;
+  is_primary?: boolean;
+  created_at: string;
+}
+
+interface CreateBankAccountRequest {
+  bank_name: string;
+  account_name: string;
+  card_type: CardType;
+  payment_network: PaymentNetwork;
+  card_number_masked: string;
+  expiry_date: string;
+  cardholder_name: string;
+  account_number_masked?: string;
+  ifsc_code?: string;
+  balance?: number;
+  credit_limit?: number;
+  theme: CardTheme;
+  is_primary?: boolean;
+}
+
+interface UpdateBankAccountRequest {
+  bank_name?: string;
+  account_name?: string;
+  card_type?: CardType;
+  payment_network?: PaymentNetwork;
+  card_number_masked?: string;
+  expiry_date?: string;
+  cardholder_name?: string;
+  account_number_masked?: string;
+  ifsc_code?: string;
+  balance?: number;
+  credit_limit?: number;
+  theme?: CardTheme;
+  is_primary?: boolean;
+}
+
+interface SetPrimaryResponse {
+  id: string;
+  owner_id: string;
+  is_primary: boolean;
+}
+
+interface DeleteResponse {
+  message: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class BankAccountsService {
-  private readonly supabase = inject(SupabaseService);
+  private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly injector = inject(Injector);
 
   private readonly _bankAccounts = signal<BankAccount[]>([]);
   private readonly _isLoading = signal(false);
 
-  /**
-   * Bumped after every local write to the card list.
-   *
-   * `load()` records it before issuing its SELECT and throws the response
-   * away if it moved on in the meantime. Without that guard a refresh that
-   * was already in flight resolves after a balance change and restores the
-   * pre-write balance.
-   */
   private writeVersion = 0;
 
   readonly bankAccounts = this._bankAccounts.asReadonly();
@@ -58,9 +112,6 @@ export class BankAccountsService {
     const versionAtStart = this.writeVersion;
     this._isLoading.set(true);
     this.loadPromise = (async () => {
-      // A card write landed while this SELECT was in flight, so the snapshot
-      // predates it. Applying it would restore the pre-write balance; drop it
-      // and let the next sync reconcile instead.
       const applySnapshot = (list: BankAccount[]): void => {
         if (versionAtStart !== this.writeVersion) return;
         this._bankAccounts.set(list);
@@ -70,55 +121,35 @@ export class BankAccountsService {
         const ownerId = this.auth.user()?.id;
         if (!ownerId) return;
 
-        const { data, error } = await this.supabase.client
-          .from('bank_accounts')
-          .select(
-            'id, owner_id, bank_name, account_name, card_type, payment_network, card_number_masked, expiry_date, cardholder_name, account_number_masked, ifsc_code, balance, credit_limit, theme, is_primary, created_at',
-          )
-          .eq('owner_id', ownerId)
-          .order('created_at', { ascending: false });
+        const rows = await firstValueFrom(
+          this.api.get<BankAccountResponse[]>('/bank-accounts'),
+        );
 
-        if (error) {
-          console.error('Failed to load bank accounts', error);
-          return;
-        }
-
-        let remoteList = (data ?? []).filter(
+        let remoteList = rows.filter(
           (c) => !c.id.startsWith('demo_card_') && !c.id.startsWith('sample_card_'),
         ) as BankAccount[];
 
         // One-time migration for cards created by older versions of the app.
-        // Existing remote rows win when the same id already exists, so a
-        // successful migration cannot overwrite newer database data.
         const legacyCards = this.getLegacyCards(ownerId);
         const cardsToMigrate = legacyCards
           .filter((card) => !remoteList.some((remote) => remote.id === card.id))
           .map((card) => ({ ...card, owner_id: ownerId }));
 
         if (cardsToMigrate.length > 0) {
-          const { error: migrationError } = await this.supabase.client
-            .from('bank_accounts')
-            .upsert(cardsToMigrate, { onConflict: 'id' });
-
-          if (migrationError) {
+          try {
+            for (const card of cardsToMigrate) {
+              await firstValueFrom(this.api.post<BankAccountResponse>('/bank-accounts', card));
+            }
+          } catch (migrationError) {
             console.error('Failed to migrate legacy bank accounts', migrationError);
             applySnapshot(remoteList);
             return;
           }
 
-          const refreshed = await this.supabase.client
-            .from('bank_accounts')
-            .select(
-              'id, owner_id, bank_name, account_name, card_type, payment_network, card_number_masked, expiry_date, cardholder_name, account_number_masked, ifsc_code, balance, credit_limit, theme, is_primary, created_at',
-            )
-            .eq('owner_id', ownerId)
-            .order('created_at', { ascending: false });
-          if (refreshed.error) {
-            console.error('Failed to reload migrated bank accounts', refreshed.error);
-            applySnapshot(remoteList);
-            return;
-          }
-          const refreshedList = (refreshed.data ?? []) as BankAccount[];
+          const refreshedRows = await firstValueFrom(
+            this.api.get<BankAccountResponse[]>('/bank-accounts'),
+          );
+          const refreshedList = refreshedRows as BankAccount[];
           const missingIds = cardsToMigrate.filter(
             (card) => !refreshedList.some((remote) => remote.id === card.id),
           );
@@ -130,9 +161,6 @@ export class BankAccountsService {
           remoteList = refreshedList;
         }
 
-        // Only clear the legacy storage after the database has accepted all
-        // legacy records. If migration failed, the data remains available for
-        // a later retry instead of being silently discarded.
         if (this.hasLegacyStorage(ownerId)) {
           this.clearLegacyCards(ownerId);
         }
@@ -192,38 +220,35 @@ export class BankAccountsService {
       updatedList = updatedList.map((c) => ({ ...c, is_primary: false }));
     }
 
-    const { error } = await this.supabase.client.from('bank_accounts').insert(newCard);
-    if (error) {
-      console.error('Failed to save new bank account in Supabase', error);
+    try {
+      const created = await firstValueFrom(
+        this.api.post<BankAccountResponse>('/bank-accounts', newCard as CreateBankAccountRequest),
+      );
+
+      if (newCard.is_primary) {
+        await firstValueFrom(
+          this.api.post<SetPrimaryResponse>(`/bank-accounts/${created.id}/set-primary`, {}),
+        );
+      }
+
+      updatedList = [created as BankAccount, ...updatedList];
+      this._bankAccounts.set(updatedList);
+      this.writeVersion += 1;
+
+      if (newCard.is_primary) {
+        try {
+          const txService = this.injector.get(TransactionsService);
+          await txService.mapUnassignedTransactionsToPrimary(created.id);
+        } catch (err) {
+          console.error('Failed to map bank transactions to new primary card', err);
+        }
+      }
+
+      return created as BankAccount;
+    } catch (error) {
+      console.error('Failed to save new bank account', error);
       throw error;
     }
-
-    if (newCard.is_primary) {
-      const { error: othersError } = await this.supabase.client
-        .from('bank_accounts')
-        .update({ is_primary: false })
-        .eq('owner_id', ownerId)
-        .neq('id', newCard.id);
-      if (othersError) {
-        console.error('Failed to update existing primary bank account', othersError);
-        throw othersError;
-      }
-    }
-
-    updatedList = [newCard, ...updatedList];
-    this._bankAccounts.set(updatedList);
-    this.writeVersion += 1;
-
-    if (newCard.is_primary) {
-      try {
-        const txService = this.injector.get(TransactionsService);
-        await txService.mapUnassignedTransactionsToPrimary(newCard.id);
-      } catch (err) {
-        console.error('Failed to map bank transactions to new primary card', err);
-      }
-    }
-
-    return newCard;
   }
 
   async update(id: string, changes: Partial<BankAccount>): Promise<BankAccount | null> {
@@ -245,43 +270,34 @@ export class BankAccountsService {
 
     const updatedCard = updatedList.find((c) => c.id === id) ?? null;
 
-    if (changes.is_primary) {
-      const targetQuery = this.supabase.client
-        .from('bank_accounts')
-        .update(changes)
-        .eq('id', id)
-        .eq('owner_id', ownerId);
-      const { error: targetError } = await targetQuery;
-      if (targetError) throw targetError;
-
-      const { error: othersError } = await this.supabase.client
-        .from('bank_accounts')
-        .update({ is_primary: false })
-        .eq('owner_id', ownerId)
-        .neq('id', id);
-      if (othersError) throw othersError;
-    } else {
-      const { error } = await this.supabase.client
-        .from('bank_accounts')
-        .update(changes)
-        .eq('id', id)
-        .eq('owner_id', ownerId);
-      if (error) throw error;
-    }
-
-    this._bankAccounts.set(updatedList);
-    this.writeVersion += 1;
-
-    if (changes.is_primary) {
-      try {
-        const txService = this.injector.get(TransactionsService);
-        await txService.mapUnassignedTransactionsToPrimary(id);
-      } catch (err) {
-        console.error('Failed to map bank transactions to primary card', err);
+    try {
+      if (changes.is_primary !== undefined) {
+        await firstValueFrom(
+          this.api.post<SetPrimaryResponse>(`/bank-accounts/${id}/set-primary`, {}),
+        );
+      } else {
+        await firstValueFrom(
+          this.api.patch<BankAccountResponse>(`/bank-accounts/${id}`, changes as UpdateBankAccountRequest),
+        );
       }
-    }
 
-    return updatedCard;
+      this._bankAccounts.set(updatedList);
+      this.writeVersion += 1;
+
+      if (changes.is_primary) {
+        try {
+          const txService = this.injector.get(TransactionsService);
+          await txService.mapUnassignedTransactionsToPrimary(id);
+        } catch (err) {
+          console.error('Failed to map bank transactions to primary card', err);
+        }
+      }
+
+      return updatedCard;
+    } catch (error) {
+      console.error('Failed to update bank account', error);
+      throw error;
+    }
   }
 
   async delete(id: string): Promise<void> {
@@ -299,27 +315,21 @@ export class BankAccountsService {
       updatedList = updatedList.map((c, idx) => (idx === 0 ? { ...c, is_primary: true } : c));
     }
 
-    const { error } = await this.supabase.client
-      .from('bank_accounts')
-      .delete()
-      .eq('id', id)
-      .eq('owner_id', ownerId);
-    if (error) {
-      console.error('Failed to delete bank account in Supabase', error);
+    try {
+      await firstValueFrom(this.api.delete<DeleteResponse>(`/bank-accounts/${id}`));
+
+      if (replacement) {
+        await firstValueFrom(
+          this.api.post<SetPrimaryResponse>(`/bank-accounts/${replacement.id}/set-primary`, {}),
+        );
+      }
+
+      this._bankAccounts.set(updatedList);
+      this.writeVersion += 1;
+    } catch (error) {
+      console.error('Failed to delete bank account', error);
       throw error;
     }
-
-    if (replacement) {
-      const { error: replacementError } = await this.supabase.client
-        .from('bank_accounts')
-        .update({ is_primary: true })
-        .eq('id', replacement.id)
-        .eq('owner_id', ownerId);
-      if (replacementError) throw replacementError;
-    }
-
-    this._bankAccounts.set(updatedList);
-    this.writeVersion += 1;
   }
 
   async setPrimary(id: string): Promise<void> {
@@ -331,28 +341,23 @@ export class BankAccountsService {
       is_primary: c.id === id,
     }));
 
-    const { error: targetError } = await this.supabase.client
-      .from('bank_accounts')
-      .update({ is_primary: true })
-      .eq('id', id)
-      .eq('owner_id', ownerId);
-    if (targetError) throw targetError;
-
-    const { error: othersError } = await this.supabase.client
-      .from('bank_accounts')
-      .update({ is_primary: false })
-      .eq('owner_id', ownerId)
-      .neq('id', id);
-    if (othersError) throw othersError;
-
-    this._bankAccounts.set(updatedList);
-    this.writeVersion += 1;
-
     try {
-      const txService = this.injector.get(TransactionsService);
-      await txService.mapUnassignedTransactionsToPrimary(id);
-    } catch (err) {
-      console.error('Failed to map bank transactions to primary account', err);
+      await firstValueFrom(
+        this.api.post<SetPrimaryResponse>(`/bank-accounts/${id}/set-primary`, {}),
+      );
+
+      this._bankAccounts.set(updatedList);
+      this.writeVersion += 1;
+
+      try {
+        const txService = this.injector.get(TransactionsService);
+        await txService.mapUnassignedTransactionsToPrimary(id);
+      } catch (err) {
+        console.error('Failed to map bank transactions to primary account', err);
+      }
+    } catch (error) {
+      console.error('Failed to set primary bank account', error);
+      throw error;
     }
   }
 

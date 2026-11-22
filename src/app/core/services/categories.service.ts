@@ -1,4 +1,5 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import {
   Category,
   CategoryKind,
@@ -6,7 +7,7 @@ import {
   markAsSavingsCategory,
 } from '../models/domain.models';
 import { AuthService } from './auth.service';
-import { SupabaseService } from './supabase.service';
+import { ApiService } from '../http/api.service';
 
 const DEFAULT_CATEGORIES: Array<{ name: string; kind: CategoryKind }> = [
   { name: 'Salary', kind: 'income' },
@@ -22,9 +23,26 @@ const DEFAULT_CATEGORIES: Array<{ name: string; kind: CategoryKind }> = [
   { name: 'General Savings', kind: 'savings' },
 ];
 
+interface CategoryResponse {
+  id: string;
+  owner_id: string;
+  name: string;
+  kind: CategoryKind;
+  created_at: string;
+}
+
+interface CreateCategoryRequest {
+  name: string;
+  kind: CategoryKind;
+}
+
+interface DeleteCategoryResponse {
+  message: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CategoriesService {
-  private readonly supabase = inject(SupabaseService);
+  private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
 
   private readonly _categories = signal<Category[]>([]);
@@ -56,17 +74,10 @@ export class CategoriesService {
     this._isLoading.set(true);
     this.loadPromise = (async () => {
       try {
-        const { data, error } = await this.supabase.client
-          .from('categories')
-          .select('id, owner_id, name, kind, created_at')
-          .order('kind', { ascending: true })
-          .order('name', { ascending: true });
-
-        if (error) {
-          console.error('Failed to load categories', error);
-          return;
-        }
-        const categories = ((data ?? []) as Category[]).map((c) => {
+        const rows = await firstValueFrom(
+          this.api.get<CategoryResponse[]>('/categories'),
+        );
+        const categories = rows.map((c) => {
           if (isSavingsCategory(c, this.requireUserId())) {
             return { ...c, kind: 'savings' as const };
           }
@@ -88,36 +99,46 @@ export class CategoriesService {
 
     const ownerId = this.requireUserId();
 
-    let result = await this.supabase.client
-      .from('categories')
-      .insert({ owner_id: ownerId, name: trimmed, kind })
-      .select()
-      .single();
+    try {
+      const created = await firstValueFrom(
+        this.api.post<CategoryResponse>(`/categories`, {
+          name: trimmed,
+          kind,
+        } as CreateCategoryRequest),
+      );
 
-    if (result.error && (kind === 'savings' || result.error.code === '23514')) {
-      // Fallback if DB check constraint on Supabase cloud hasn't been updated yet
-      result = await this.supabase.client
-        .from('categories')
-        .insert({ owner_id: ownerId, name: trimmed, kind: 'expense' })
-        .select()
-        .single();
+      const result = {
+        ...created,
+        kind, // Enforce domain model consistency for savings categories
+      };
+
+      if (kind === 'savings') {
+        markAsSavingsCategory(result.id, ownerId);
+      }
+      this._categories.update((list) => [...list, result]);
+      return result;
+    } catch (err: any) {
+      // Fallback if DB check constraint hasn't been updated yet — retry as expense
+      if (kind === 'savings') {
+        try {
+          const created = await firstValueFrom(
+            this.api.post<CategoryResponse>('/categories', {
+              name: trimmed,
+              kind: 'expense',
+            } as CreateCategoryRequest),
+          );
+          const result = { ...created, kind: 'savings' as const };
+          markAsSavingsCategory(result.id, ownerId);
+          this._categories.update((list) => [...list, result]);
+          return result;
+        } catch (err2) {
+          console.error('Failed to create category', err2);
+          throw err2;
+        }
+      }
+      console.error('Failed to create category', err);
+      throw err;
     }
-
-    if (result.error) {
-      console.error('Failed to create category', result.error);
-      throw result.error;
-    }
-
-    const created = {
-      ...(result.data as Category),
-      kind, // Enforce domain model consistency for savings categories
-    };
-
-    if (kind === 'savings') {
-      markAsSavingsCategory(created.id, ownerId);
-    }
-    this._categories.update((list) => [...list, created]);
-    return created;
   }
 
   async delete(id: string): Promise<void> {
@@ -129,8 +150,9 @@ export class CategoriesService {
     // 1. Optimistic removal for instant UI feedback
     this._categories.update((list) => list.filter((c) => c.id !== id));
 
-    const { error } = await this.supabase.client.from('categories').delete().eq('id', id);
-    if (error) {
+    try {
+      await firstValueFrom(this.api.delete<DeleteCategoryResponse>(`/categories/${id}`));
+    } catch (error) {
       console.error('Failed to delete category', error);
       // Revert on failure at the exact original index to preserve list order
       this._categories.update((list) => {

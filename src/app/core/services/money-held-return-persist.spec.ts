@@ -6,7 +6,7 @@ import { AuthService } from './auth.service';
 import { BankAccountsService } from './bank-accounts.service';
 import { MoneyHeldService } from './money-held.service';
 import { PeopleService } from './people.service';
-import { SupabaseService } from './supabase.service';
+import { ApiService } from '../http/api.service';
 
 /**
  * Regression tests for "a Money Held return disappears and the card balance
@@ -43,42 +43,21 @@ type Row = Record<string, any>;
 
 interface FakeDb {
   tables: Record<string, Row[]>;
-  /**
-   * Per-table gates. `select` delays the response *after* the row snapshot has
-   * been taken (so the payload is stale), `insert` delays the write itself.
-   */
   gates: Record<string, { select?: Promise<void>; insert?: Promise<void> }>;
-  /** Simulates a write that reached the database but lost its response. */
   failInsertOnce?: boolean;
 }
 
-function createFakeSupabase(db: FakeDb) {
+function createFakeApi(db: FakeDb) {
   const rowsOf = (table: string): Row[] => db.tables[table] ?? (db.tables[table] = []);
 
-  const client = {
-    from(table: string) {
+  const api: any = {
+    get: jasmine.createSpy('get').and.callFake((url: string) => {
+      const table = url.replace('/money-held/', '');
       const q: any = {
-        op: 'select' as 'select' | 'insert' | 'update' | 'delete',
-        insertPayload: null as Row | null,
-        patch: null as Row | null,
         filters: [] as Array<{ col: string; value: any; negate: boolean }>,
 
         select: () => q,
         order: () => q,
-        insert(payload: Row) {
-          q.op = 'insert';
-          q.insertPayload = payload;
-          return q;
-        },
-        update(patch: Row) {
-          q.op = 'update';
-          q.patch = patch;
-          return q;
-        },
-        delete: () => {
-          q.op = 'delete';
-          return q;
-        },
         eq(col: string, value: any) {
           q.filters.push({ col, value, negate: false });
           return q;
@@ -87,14 +66,10 @@ function createFakeSupabase(db: FakeDb) {
           q.filters.push({ col, value, negate: true });
           return q;
         },
-
-        // A query is "sent" when awaited — that is when PostgREST would
-        // evaluate it, so the snapshot is taken here.
         then: (onOk: any, onErr: any) =>
           Promise.resolve()
             .then(() => run())
             .then(onOk, onErr),
-        single: () => Promise.resolve().then(() => (q.op === 'insert' ? run() : singleRow())),
       };
 
       function matches(row: Row): boolean {
@@ -104,48 +79,7 @@ function createFakeSupabase(db: FakeDb) {
         });
       }
 
-      function applyInsert(): { data: Row | null; error: any } {
-        const payload = { ...q.insertPayload };
-        const existing = rowsOf(table).find((row) => row['id'] === payload['id']);
-        if (existing) {
-          return { data: null, error: { code: '23505', message: 'duplicate key value' } };
-        }
-        rowsOf(table).push(payload);
-        if (db.failInsertOnce) {
-          db.failInsertOnce = false;
-          return { data: null, error: { message: 'TypeError: Failed to fetch' } };
-        }
-        return { data: { ...payload }, error: null };
-      }
-
-      function singleRow(): { data: Row | null; error: any } {
-        const matched = rowsOf(table).filter(matches);
-        if (matched.length === 0) {
-          return { data: null, error: { code: 'PGRST116', message: 'No rows found' } };
-        }
-        return { data: { ...matched[0] }, error: null };
-      }
-
       function run(): { data: any; error: any } | Promise<{ data: any; error: any }> {
-        if (q.op === 'insert') {
-          const gate = db.gates[table]?.insert;
-          return gate ? gate.then(applyInsert) : applyInsert();
-        }
-
-        if (q.op === 'update') {
-          rowsOf(table)
-            .filter(matches)
-            .forEach((row) => Object.assign(row, q.patch));
-          return { data: null, error: null };
-        }
-
-        if (q.op === 'delete') {
-          db.tables[table] = rowsOf(table).filter((row) => !matches(row));
-          return { data: null, error: null };
-        }
-
-        // select: snapshot first, then wait — this is what makes the response
-        // stale relative to a write that lands meanwhile.
         const snapshot = rowsOf(table).filter(matches).map((row) => ({ ...row }));
         const gate = db.gates[table]?.select;
         if (gate) {
@@ -155,10 +89,30 @@ function createFakeSupabase(db: FakeDb) {
       }
 
       return q;
-    },
+    }),
+    post: jasmine.createSpy('post').and.callFake((url: string, payload: any) => {
+      const table = url.replace('/money-held/', '');
+      const rows = rowsOf(table);
+      const existing = rows.find((row) => row['id'] === payload['id']);
+      if (existing) {
+        return Promise.resolve({ data: null, error: { code: '23505', message: 'duplicate key value' } });
+      }
+      rows.push(payload);
+      if (db.failInsertOnce) {
+        db.failInsertOnce = false;
+        return Promise.reject({ message: 'TypeError: Failed to fetch' });
+      }
+      return Promise.resolve({ data: { ...payload } });
+    }),
+    delete: jasmine.createSpy('delete').and.callFake((url: string) => {
+      const id = url.split('/').pop();
+      const table = 'transactions';
+      db.tables[table] = rowsOf(table).filter((row) => row.id !== id);
+      return Promise.resolve({ data: null, error: null });
+    }),
   };
 
-  return { client };
+  return api;
 }
 
 const HELD_PERSON: MoneyHeldPerson = {
@@ -201,7 +155,7 @@ describe('money-held returns persist correctly', () => {
         { id: 'card-1', balance: 1000, bank_name: 'HDFC', is_primary: true },
       ]);
 
-      const fake = createFakeSupabase(db);
+      const fake = createFakeApi(db);
 
       TestBed.configureTestingModule({
         providers: [
@@ -210,7 +164,7 @@ describe('money-held returns persist correctly', () => {
             provide: AuthService,
             useValue: { isAuthenticated: signal(true), user: signal({ id: 'u1' }) },
           },
-          { provide: SupabaseService, useValue: fake },
+          { provide: ApiService, useValue: fake },
           {
             provide: PeopleService,
             useValue: { people: signal([{ id: 'person-1', name: 'Aisha' }]) },
@@ -321,7 +275,7 @@ describe('money-held returns persist correctly', () => {
       ];
       localStorage.removeItem('rupa:u1:bank_accounts');
 
-      const fake = createFakeSupabase(db);
+      const fake = createFakeApi(db);
 
       TestBed.configureTestingModule({
         providers: [
@@ -330,7 +284,7 @@ describe('money-held returns persist correctly', () => {
             provide: AuthService,
             useValue: { isAuthenticated: signal(true), user: signal({ id: 'u1' }) },
           },
-          { provide: SupabaseService, useValue: fake },
+          { provide: ApiService, useValue: fake },
         ],
       });
 

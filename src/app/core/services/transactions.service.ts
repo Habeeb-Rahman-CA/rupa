@@ -1,4 +1,5 @@
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import {
   Transaction,
   StatsTransaction,
@@ -7,7 +8,7 @@ import {
   isSavingsCategory,
 } from '../models/domain.models';
 import { AuthService } from './auth.service';
-import { SupabaseService } from './supabase.service';
+import { ApiService } from '../http/api.service';
 import { CategoriesService } from './categories.service';
 import { DebtsService } from './debts.service';
 import { BankAccountsService } from './bank-accounts.service';
@@ -33,9 +34,53 @@ export interface MonthlyStats {
 
 const emptyStats: MonthlyStats = { spent: 0, received: 0, saved: 0 };
 
+interface TransactionResponse {
+  id: string;
+  owner_id: string;
+  occurred_on: string;
+  amount: number;
+  direction: TxDirection;
+  category_id: string | null;
+  notes: string | null;
+  source: string;
+  source_ref_id: string | null;
+  payment_mode?: PaymentMode;
+  bank_account_id?: string | null;
+  created_at: string;
+}
+
+interface CreateTransactionRequest {
+  amount: number;
+  direction: TxDirection;
+  occurred_on: string;
+  category_id: string | null;
+  notes: string | null;
+  source: string;
+  source_ref_id: string | null;
+  payment_mode: PaymentMode;
+  bank_account_id: string | null;
+}
+
+interface OpeningBalanceResponse {
+  balance: number;
+}
+
+interface DeleteResponse {
+  message: string;
+}
+
+interface AssignRequest {
+  account_id: string;
+  transaction_ids: string[];
+}
+
+interface CategorizeRequest {
+  category_id: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class TransactionsService {
-  private readonly supabase = inject(SupabaseService);
+  private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly categoriesService = inject(CategoriesService);
   private readonly injector = inject(Injector);
@@ -54,13 +99,6 @@ export class TransactionsService {
   readonly isLoading = this._isLoading.asReadonly();
   readonly hasMore = this._hasMore.asReadonly();
 
-  /**
-   * Every transaction, narrow columns only — no pagination.
-   *
-   * `_transactions` above is the paginated *display* list; reading totals from
-   * it made figures change as the user scrolled. All aggregates read this
-   * instead.
-   */
   readonly statsTransactions = this._stats.asReadonly();
 
   readonly monthly = computed<MonthlyStats>(() => {
@@ -147,8 +185,6 @@ export class TransactionsService {
   }
 
   async mapUnassignedTransactionsToPrimary(bankAccountId: string): Promise<void> {
-    // Both datasets are checked: the stats load and the display load resolve
-    // independently, so either may be populated first.
     const unassignedIds = new Set<string>();
     const isUnassigned = (t: Transaction | StatsTransaction): boolean =>
       t.payment_mode === 'bank' && !t.bank_account_id;
@@ -156,9 +192,6 @@ export class TransactionsService {
     for (const t of this._stats()) if (isUnassigned(t)) unassignedIds.add(t.id);
     if (unassignedIds.size === 0) return;
 
-    // Only bank-mode transactions are eligible for migration. Older cash
-    // transactions have no bank_account_id by design and must not be silently
-    // reassigned to a newly-created primary account.
     const claimPrimary = <T extends Transaction | StatsTransaction>(t: T): T =>
       isUnassigned(t) ? { ...t, bank_account_id: bankAccountId } : t;
 
@@ -166,13 +199,12 @@ export class TransactionsService {
     this._stats.update((list) => list.map(claimPrimary));
 
     try {
-      const { error: mapErr } = await this.supabase.client.rpc('assign_transactions_to_account', {
-        p_account_id: bankAccountId,
-        p_transaction_ids: [...unassignedIds],
-      });
-      if (mapErr) {
-        console.error('Failed to map bank transactions to the primary account', mapErr);
-      }
+      await firstValueFrom(
+        this.api.post('/transactions/assign', {
+          account_id: bankAccountId,
+          transaction_ids: [...unassignedIds],
+        } as AssignRequest),
+      );
     } catch {
       console.error('Failed to map bank transactions to the primary account');
     }
@@ -222,41 +254,33 @@ export class TransactionsService {
     const ownerId = this.auth.user()?.id;
     if (!ownerId) return;
 
-    let query = this.supabase.client
-      .from('transactions')
-      .select('*', { count: 'exact' })
-      .eq('owner_id', ownerId)
-      .order('occurred_on', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(limit + 1);
+    const params: Record<string, string> = { limit: String(limit) };
+    if (cursor) params['cursor'] = cursor;
 
-    if (cursor) {
-      query = query.lte('occurred_on', cursor);
-    }
+    try {
+      const rows = await firstValueFrom(
+        this.api.get<TransactionResponse[]>('/transactions', { params }),
+      ) as Transaction[];
 
-    const { data, error, count } = await query;
-    if (error) {
+      const hasMore = rows.length > limit;
+      const page = hasMore ? rows.slice(0, limit) : rows;
+
+      // Filter out duplicates at the cursor boundary (same occurred_on as cursor)
+      const loadedIds = new Set(this._transactions().map((t) => t.id));
+      const newPage = cursor ? page.filter((t) => !loadedIds.has(t.id)) : page;
+
+      if (cursor) {
+        this._transactions.update((list) => [...list, ...newPage]);
+      } else {
+        this._transactions.set(newPage);
+      }
+
+      this._hasMore.set(hasMore);
+      const last = newPage[newPage.length - 1];
+      this._lastCursor.set(last ? last.occurred_on : null);
+    } catch (error) {
       console.error('Failed to load transactions', error);
-      return;
     }
-
-    const rows = (data ?? []) as Transaction[];
-    const hasMore = rows.length > limit;
-    const page = hasMore ? rows.slice(0, limit) : rows;
-
-    // Filter out duplicates at the cursor boundary (same occurred_on as cursor)
-    const loadedIds = new Set(this._transactions().map((t) => t.id));
-    const newPage = cursor ? page.filter((t) => !loadedIds.has(t.id)) : page;
-
-    if (cursor) {
-      this._transactions.update((list) => [...list, ...newPage]);
-    } else {
-      this._transactions.set(newPage);
-    }
-
-    this._hasMore.set(hasMore);
-    const last = newPage[newPage.length - 1];
-    this._lastCursor.set(last ? last.occurred_on : null);
   }
 
   async loadMoreTransactions(): Promise<void> {
@@ -267,9 +291,6 @@ export class TransactionsService {
 
   /**
    * Loads every transaction (narrow columns) for aggregate math.
-   *
-   * Paged explicitly because PostgREST applies a default row cap — an
-   * unbounded select would silently truncate and put us back to wrong totals.
    */
   async loadStats(): Promise<void> {
     const ownerId = this.auth.user()?.id;
@@ -282,47 +303,32 @@ export class TransactionsService {
     const all: StatsTransaction[] = [];
 
     for (let from = 0; ; from += pageSize) {
-      const { data, error } = await this.supabase.client
-        .from('transactions')
-        .select(
-          'id, occurred_on, amount, direction, category_id, notes, source, payment_mode, bank_account_id',
-        )
-        .eq('owner_id', ownerId)
-        .order('occurred_on', { ascending: false })
-        .order('created_at', { ascending: false })
-        .range(from, from + pageSize - 1);
-
-      if (error) {
-        // Never publish a partial dataset — a truncated total is worse than
-        // a stale one. Matches loadTransactions(), which also keeps prior data.
+      try {
+        const rows = await firstValueFrom(
+          this.api.get<StatsTransaction[]>('/transactions/stats', {
+            params: { range_start: String(from), range_size: String(pageSize) },
+          }),
+        ) as StatsTransaction[];
+        all.push(...rows);
+        if (rows.length < pageSize) break;
+      } catch (error) {
         console.error('Failed to load transaction stats', error);
         return;
       }
-
-      const rows = (data ?? []) as StatsTransaction[];
-      all.push(...rows);
-      if (rows.length < pageSize) break;
     }
 
     this._stats.set(all);
   }
 
   async loadBalance(): Promise<void> {
-    let { data, error } = await this.supabase.client
-      .from('account_balance')
-      .select('balance')
-      .maybeSingle();
-    if (error && await this.auth.refreshOnClockSkew(error)) {
-      ({ data, error } = await this.supabase.client
-        .from('account_balance')
-        .select('balance')
-        .maybeSingle());
-    }
-    if (error) {
+    try {
+      const resp = await firstValueFrom(
+        this.api.get<OpeningBalanceResponse>('/transactions/balance'),
+      );
+      this._balance.set(Number(resp.balance ?? 0));
+    } catch (error) {
       console.error('Failed to load balance', error);
-      return;
     }
-    this._balance.set(Number(data?.balance ?? 0));
   }
 
   async create(input: CreateTransactionInput): Promise<Transaction> {
@@ -352,36 +358,31 @@ export class TransactionsService {
 
     const occurredOn = input.occurred_on ?? todayIso();
 
-    const { data, error } = await this.supabase.client.rpc(
-      'create_transaction_with_balance_update',
-      {
-        p_owner_id: ownerId,
-        p_amount: input.amount,
-        p_direction: input.direction,
-        p_occurred_on: occurredOn,
-        p_category_id: input.category_id ?? null,
-        p_notes: input.notes?.trim() || null,
-        p_source: input.source ?? ('manual' as const),
-        p_source_ref_id: input.source_ref_id ?? null,
-        p_payment_mode: mode,
-        p_bank_account_id: targetBankAccountId,
-      },
-    );
+    const request: CreateTransactionRequest = {
+      amount: input.amount,
+      direction: input.direction,
+      occurred_on: occurredOn,
+      category_id: input.category_id ?? null,
+      notes: input.notes?.trim() || null,
+      source: input.source ?? 'manual',
+      source_ref_id: input.source_ref_id ?? null,
+      payment_mode: mode,
+      bank_account_id: targetBankAccountId,
+    };
 
-    if (error) {
+    try {
+      const created = await firstValueFrom(
+        this.api.post<TransactionResponse>('/transactions', request),
+      ) as Transaction;
+
+      this._transactions.update((list) => [created, ...list]);
+      this._stats.update((list) => [created, ...list]);
+      this.applyToTotals(created, +1);
+      return created;
+    } catch (error) {
       console.error('Failed to create transaction', error);
       throw error;
     }
-
-    const created = (data as Transaction[])?.[0];
-    if (!created) {
-      throw new Error('Transaction was not returned after creation.');
-    }
-
-    this._transactions.update((list) => [created, ...list]);
-    this._stats.update((list) => [created, ...list]);
-    this.applyToTotals(created, +1);
-    return created;
   }
 
   async delete(id: string): Promise<void> {
@@ -401,54 +402,7 @@ export class TransactionsService {
     this.applyToTotals(removed, -1);
 
     try {
-      // Clean up debt_payments referencing this transaction if any
-      const { data: debtPayments } = await this.supabase.client
-        .from('debt_payments')
-        .select('id, debt_id, amount')
-        .eq('transaction_id', id);
-
-      if (debtPayments && debtPayments.length > 0) {
-        for (const dp of debtPayments) {
-          await this.supabase.client.from('debt_payments').delete().eq('id', dp.id);
-          // Restore debt balance based on ground-truth principal minus remaining payments
-          const { data: debt } = await this.supabase.client
-            .from('debts')
-            .select('principal')
-            .eq('id', dp.debt_id)
-            .maybeSingle();
-
-          if (debt) {
-            const { data: remainingPayments } = await this.supabase.client
-              .from('debt_payments')
-              .select('amount')
-              .eq('debt_id', dp.debt_id);
-
-            const totalPaid = (remainingPayments ?? []).reduce(
-              (sum, p) => sum + Number(p.amount),
-              0,
-            );
-            const restoredOutstanding = Math.max(
-              0,
-              Math.round((Number(debt.principal) - totalPaid + Number.EPSILON) * 100) / 100,
-            );
-            const patch: Record<string, unknown> = { outstanding: restoredOutstanding };
-            if (restoredOutstanding > 0) {
-              patch['closed_on'] = null;
-            }
-
-            await this.supabase.client.from('debts').update(patch).eq('id', dp.debt_id);
-          }
-        }
-      }
-
-      // Atomic delete: reverts bank balance and removes the transaction row
-      // in the same database transaction.
-      const { error: delErr } = await this.supabase.client.rpc(
-        'delete_transaction_with_balance_update',
-        { p_transaction_id: id },
-      );
-
-      if (delErr) throw delErr;
+      await firstValueFrom(this.api.delete<DeleteResponse>(`/transactions/${id}`));
 
       // Refresh DebtsService if present
       try {
@@ -472,18 +426,21 @@ export class TransactionsService {
       return;
     }
 
-    const { data, error } = await this.supabase.client
-      .from('transactions')
-      .select('amount, direction')
-      .eq('owner_id', ownerId)
-      .or('source.eq.opening,notes.eq.Opening balance')
-      .order('created_at', { ascending: false });
+    try {
+      const rows = await firstValueFrom(
+        this.api.get<{ amount: number; direction: TxDirection }[]>(
+          '/transactions/opening-balance',
+        ),
+      );
 
-    if (!error && data && data.length > 0) {
-      const primary = data[0];
-      const amt = Number(primary.amount);
-      this._openingBalance.set(primary.direction === 'in' ? amt : -amt);
-    } else {
+      if (rows.length > 0) {
+        const primary = rows[0];
+        const amt = Number(primary.amount);
+        this._openingBalance.set(primary.direction === 'in' ? amt : -amt);
+      } else {
+        this._openingBalance.set(null);
+      }
+    } catch {
       this._openingBalance.set(null);
     }
   }
@@ -492,57 +449,34 @@ export class TransactionsService {
     const ownerId = this.auth.user()?.id;
     if (!ownerId) throw new Error('Not signed in.');
 
-    // Query all matching opening balance transactions without .maybeSingle() to prevent PGRST116 exceptions
-    const { data: matches, error: findErr } = await this.supabase.client
-      .from('transactions')
-      .select('id')
-      .eq('owner_id', ownerId)
-      .or('source.eq.opening,notes.eq.Opening balance')
-      .order('created_at', { ascending: false });
-
-    if (findErr) throw findErr;
-
     const direction: TxDirection = amount >= 0 ? 'in' : 'out';
     const absAmount = Math.abs(amount);
-    const existingList = matches ?? [];
 
-    if (existingList.length > 0) {
-      const primaryId = existingList[0].id;
-
-      // Clean up any extra duplicate opening balance records if user rapidly clicked or previous duplicates existed
-      if (existingList.length > 1) {
-        const extraIds = existingList.slice(1).map((r) => r.id);
-        await this.supabase.client.from('transactions').delete().in('id', extraIds);
-      }
-
-      if (absAmount === 0 && amount === 0) {
-        await this.supabase.client.from('transactions').delete().eq('id', primaryId);
-      } else {
-        const { error: updErr } = await this.supabase.client
-          .from('transactions')
-          .update({
-            amount: absAmount,
-            direction,
-            occurred_on: todayIso(),
-            source: 'opening',
-            notes: 'Opening balance',
-          })
-          .eq('id', primaryId);
-        if (updErr) throw updErr;
-      }
-    } else if (absAmount > 0) {
-      const { error: insErr } = await this.supabase.client.from('transactions').insert({
-        owner_id: ownerId,
+    try {
+      await firstValueFrom(this.api.post('/transactions/opening-balance', {
         amount: absAmount,
-        direction,
         occurred_on: todayIso(),
-        notes: 'Opening balance',
-        source: 'opening',
-      });
-      if (insErr) throw insErr;
-    }
+      }));
 
-    await this.refresh();
+      await this.refresh();
+    } catch (error) {
+      console.error('Failed to set opening balance', error);
+      throw error;
+    }
+  }
+
+  async categorize(id: string, categoryId: string | null): Promise<Transaction> {
+    try {
+      const created = await firstValueFrom(
+        this.api.patch<TransactionResponse>(`/transactions/${id}/categorize`, {
+          category_id: categoryId,
+        } as CategorizeRequest),
+      );
+      return created as Transaction;
+    } catch (error) {
+      console.error('Failed to categorize transaction', error);
+      throw error;
+    }
   }
 
   private applyToTotals(tx: Transaction, sign: 1 | -1): void {
@@ -550,5 +484,3 @@ export class TransactionsService {
     this._balance.update((b) => (tx.direction === 'in' ? b + amt : b - amt));
   }
 }
-
-// -------- helpers -----------------------------------------------------------

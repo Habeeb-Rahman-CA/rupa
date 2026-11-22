@@ -1,4 +1,5 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 
 import {
   MoneyHeldDirection,
@@ -7,7 +8,7 @@ import {
   PaymentMode,
 } from '../models/domain.models';
 import { AuthService } from './auth.service';
-import { SupabaseService } from './supabase.service';
+import { ApiService } from '../http/api.service';
 import { PeopleService } from './people.service';
 import { BankAccountsService } from './bank-accounts.service';
 import { roundCurrency } from '../../shared/utils/currency-utils';
@@ -29,8 +30,14 @@ export interface RecordMoneyHeldInput {
   notes?: string | null;
 }
 
-/** The exact row shape sent to `money_held_transactions`. */
-interface MoneyHeldInsertPayload {
+interface MoneyHeldPersonResponse {
+  id: string;
+  owner_id: string;
+  person_id: string;
+  created_at: string;
+}
+
+interface MoneyHeldTransactionResponse {
   id: string;
   owner_id: string;
   held_person_id: string;
@@ -40,6 +47,16 @@ interface MoneyHeldInsertPayload {
   payment_mode: PaymentMode;
   bank_account_id: string | null;
   notes: string | null;
+  created_at: string;
+}
+
+interface MoneyHeldBalanceResponse {
+  id: string;
+  personId: string;
+  name: string;
+  received: number;
+  returned: number;
+  outstanding: number;
 }
 
 export interface MoneyHeldBalance {
@@ -52,9 +69,24 @@ export interface MoneyHeldBalance {
   records: MoneyHeldTransaction[];
 }
 
+interface RecordRequest {
+  id?: string;
+  held_person_id: string;
+  direction: MoneyHeldDirection;
+  amount: number;
+  occurred_on: string;
+  payment_mode: PaymentMode;
+  bank_account_id: string | null;
+  notes: string | null;
+}
+
+interface DeleteResponse {
+  message: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class MoneyHeldService {
-  private readonly supabase = inject(SupabaseService);
+  private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly peopleService = inject(PeopleService);
   private readonly bankAccountsService = inject(BankAccountsService);
@@ -132,38 +164,20 @@ export class MoneyHeldService {
     this._isLoading.set(true);
     this.loadPromise = (async () => {
       try {
-        const peopleResult = await this.supabase.client
-          .from('money_held_people')
-          .select('id, owner_id, person_id, created_at')
-          .order('created_at', { ascending: true });
-
-        if (peopleResult.error) {
-          if (this.handleMissingSchema(peopleResult.error)) return;
-          console.error('Failed to load money-held people', peopleResult.error);
-          return;
-        }
-
-        const transactionResult = await this.supabase.client
-          .from('money_held_transactions')
-          .select(
-            'id, owner_id, held_person_id, direction, amount, occurred_on, payment_mode, bank_account_id, notes, created_at',
-          )
-          .order('occurred_on', { ascending: false })
-          .order('created_at', { ascending: false });
-
-        if (transactionResult.error) {
-          if (this.handleMissingSchema(transactionResult.error)) return;
-          console.error('Failed to load money-held transactions', transactionResult.error);
-          return;
-        }
+        const [peopleRows, transactionRows] = await Promise.all([
+          firstValueFrom(this.api.get<MoneyHeldPersonResponse[]>('/money-held/people')),
+          firstValueFrom(this.api.get<MoneyHeldTransactionResponse[]>('/money-held/transactions')),
+        ]);
 
         // A record was written while these SELECTs were in flight, so this
         // snapshot predates it. Applying it would make the saved record
         // disappear; drop it and let the next sync reconcile instead.
         if (versionAtStart !== this.writeVersion) return;
 
-        this._heldPeople.set((peopleResult.data ?? []) as MoneyHeldPerson[]);
-        this._transactions.set((transactionResult.data ?? []) as MoneyHeldTransaction[]);
+        this._heldPeople.set(peopleRows as MoneyHeldPerson[]);
+        this._transactions.set(transactionRows as MoneyHeldTransaction[]);
+      } catch (err) {
+        console.error('Failed to load money-held data', err);
       } finally {
         this._isLoading.set(false);
         this.loadPromise = null;
@@ -179,20 +193,20 @@ export class MoneyHeldService {
     if (existing) return existing;
 
     const ownerId = this.requireUserId();
-    const { data, error } = await this.supabase.client
-      .from('money_held_people')
-      .insert({ owner_id: ownerId, person_id: personId })
-      .select()
-      .single();
-    if (error) {
+    try {
+      const created = await firstValueFrom(
+        this.api.post<MoneyHeldPersonResponse>('/money-held/people', {
+          person_id: personId,
+        }),
+      );
+      const result = created as MoneyHeldPerson;
+      this._heldPeople.update((list) => [...list, result]);
+      this.writeVersion += 1;
+      return result;
+    } catch (error) {
       console.error('Failed to add money-held person', error);
       throw error;
     }
-
-    const created = data as MoneyHeldPerson;
-    this._heldPeople.update((list) => [...list, created]);
-    this.writeVersion += 1;
-    return created;
   }
 
   balanceFor(heldPersonId: string): number {
@@ -212,9 +226,8 @@ export class MoneyHeldService {
     }
 
     const ownerId = this.requireUserId();
-    const payload: MoneyHeldInsertPayload = {
+    const payload: RecordRequest = {
       id: input.id ?? newRecordId(),
-      owner_id: ownerId,
       held_person_id: input.held_person_id,
       direction: input.direction,
       amount: input.amount,
@@ -235,28 +248,27 @@ export class MoneyHeldService {
    * half-finished attempt therefore neither duplicates the record nor applies
    * the balance twice.
    */
-  private async insertAndAdjust(payload: MoneyHeldInsertPayload): Promise<MoneyHeldTransaction> {
+  private async insertAndAdjust(payload: RecordRequest): Promise<MoneyHeldTransaction> {
     let created: MoneyHeldTransaction;
 
-    const { data, error } = await this.supabase.client
-      .from('money_held_transactions')
-      .insert({ ...payload })
-      .select()
-      .single();
-
-    if (error) {
-      if (!isDuplicateKey(error)) {
+    try {
+      const response = await firstValueFrom(
+        this.api.post<MoneyHeldTransactionResponse>('/money-held/transactions', payload),
+      );
+      created = response as MoneyHeldTransaction;
+    } catch (error: any) {
+      // Check if this is a duplicate key error (row already exists)
+      if (error?.status === 409 || error?.message?.toLowerCase().includes('duplicate')) {
+        const existing = await this.fetchTransaction(String(payload.id));
+        if (!existing) {
+          console.error('Failed to record money held', error);
+          throw error;
+        }
+        created = existing;
+      } else {
         console.error('Failed to record money held', error);
         throw error;
       }
-      const existing = await this.fetchTransaction(payload.id);
-      if (!existing) {
-        console.error('Failed to record money held', error);
-        throw error;
-      }
-      created = existing;
-    } else {
-      created = data as MoneyHeldTransaction;
     }
 
     this._transactions.update((list) => {
@@ -273,15 +285,15 @@ export class MoneyHeldService {
   }
 
   private async fetchTransaction(id: string): Promise<MoneyHeldTransaction | null> {
-    const { data, error } = await this.supabase.client
-      .from('money_held_transactions')
-      .select(
-        'id, owner_id, held_person_id, direction, amount, occurred_on, payment_mode, bank_account_id, notes, created_at',
-      )
-      .eq('id', id)
-      .single();
-    if (error) return null;
-    return data as MoneyHeldTransaction;
+    try {
+      const rows = await firstValueFrom(
+        this.api.get<MoneyHeldTransactionResponse[]>(`/money-held/transactions`),
+      );
+      const match = rows.find((r) => r.id === id);
+      return match ?? null;
+    } catch {
+      return null;
+    }
   }
 
   async delete(record: MoneyHeldTransaction): Promise<void> {
@@ -309,11 +321,9 @@ export class MoneyHeldService {
       throw err;
     }
 
-    const { error } = await this.supabase.client
-      .from('money_held_transactions')
-      .delete()
-      .eq('id', record.id);
-    if (error) {
+    try {
+      await firstValueFrom(this.api.delete<DeleteResponse>(`/money-held/transactions/${record.id}`));
+    } catch (error) {
       this._transactions.update((list) => [record, ...list]);
       this.writeVersion += 1;
       try {
@@ -340,9 +350,7 @@ export class MoneyHeldService {
       });
     } catch (error) {
       console.error('Failed to update bank account balance for money held', error);
-      // Swallowing this would leave the ledger and the card balance diverging
-      // with no way for the caller to notice. The caller may retry safely.
-      throw new Error('Couldn’t update the card balance — please try again.');
+      throw new Error("Couldn't update the card balance — please try again.");
     }
   }
 
@@ -354,21 +362,8 @@ export class MoneyHeldService {
 
   private ensureAvailable(): void {
     if (!this._isAvailable()) {
-      throw new Error('Money Held setup is unavailable. Apply database migration 0008 first.');
+      throw new Error('Money Held setup is unavailable.');
     }
-  }
-
-  private handleMissingSchema(error: { code?: string; message?: string }): boolean {
-    const message = error.message?.toLowerCase() ?? '';
-    if (
-      error.code !== 'PGRST205' &&
-      error.code !== '42P01' &&
-      !message.includes('could not find the table')
-    ) {
-      return false;
-    }
-    this._isAvailable.set(false);
-    return true;
   }
 }
 
@@ -378,11 +373,6 @@ function sumByDirection(records: MoneyHeldTransaction[], direction: MoneyHeldDir
       .filter((record) => record.direction === direction)
       .reduce((sum, record) => sum + Number(record.amount), 0),
   );
-}
-
-/** Postgres unique-violation: this exact row id already exists. */
-function isDuplicateKey(error: { code?: string; message?: string }): boolean {
-  return error.code === '23505' || (error.message ?? '').toLowerCase().includes('duplicate key');
 }
 
 /**

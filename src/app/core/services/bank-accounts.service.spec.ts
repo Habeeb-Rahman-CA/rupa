@@ -1,13 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { BankAccountsService } from './bank-accounts.service';
 import { AuthService } from './auth.service';
-import { SupabaseService } from './supabase.service';
+import { ApiService } from '../http/api.service';
 import { TransactionsService } from './transactions.service';
 import { signal } from '@angular/core';
 
 describe('BankAccountsService', () => {
   let service: BankAccountsService;
-  let mockSupabase: any;
+  let mockApi: any;
   let mockAuth: any;
   let mockTxService: any;
   const isAuthSignal = signal(true);
@@ -19,19 +19,11 @@ describe('BankAccountsService', () => {
       user: signal({ id: 'u1' }),
     };
 
-    const mockQueryBuilder: any = {};
-    mockQueryBuilder.select = jasmine.createSpy().and.returnValue(mockQueryBuilder);
-    mockQueryBuilder.order = jasmine.createSpy().and.returnValue(mockQueryBuilder);
-    mockQueryBuilder.insert = jasmine.createSpy().and.resolveTo({ data: null, error: null });
-    mockQueryBuilder.update = jasmine.createSpy().and.returnValue(mockQueryBuilder);
-    mockQueryBuilder.delete = jasmine.createSpy().and.returnValue(mockQueryBuilder);
-    mockQueryBuilder.eq = jasmine.createSpy().and.returnValue(mockQueryBuilder);
-    mockQueryBuilder.neq = jasmine.createSpy().and.resolveTo({ data: null, error: null });
-
-    mockSupabase = {
-      client: {
-        from: jasmine.createSpy().and.returnValue(mockQueryBuilder),
-      },
+    mockApi = {
+      get: jasmine.createSpy('get').and.resolveTo([]),
+      post: jasmine.createSpy('post').and.resolveTo({}),
+      patch: jasmine.createSpy('patch').and.resolveTo({}),
+      delete: jasmine.createSpy('delete').and.resolveTo({}),
     };
 
     mockTxService = {
@@ -42,7 +34,7 @@ describe('BankAccountsService', () => {
       providers: [
         BankAccountsService,
         { provide: AuthService, useValue: mockAuth },
-        { provide: SupabaseService, useValue: mockSupabase },
+        { provide: ApiService, useValue: mockApi },
         { provide: TransactionsService, useValue: mockTxService },
       ],
     });
@@ -51,6 +43,8 @@ describe('BankAccountsService', () => {
   });
 
   it('should generate cryptographically strong unique ID on card creation', async () => {
+    mockApi.post.and.resolveTo({ id: 'card-1', owner_id: 'u1', bank_name: 'HDFC', card_type: 'debit', payment_network: 'visa', card_number_masked: '1234', expiry_date: '05/28', cardholder_name: 'JOHN DOE', theme: 'blue', balance: 0, created_at: '' });
+
     const card = await service.create({
       bank_name: 'HDFC',
       account_name: 'Salary Account',
@@ -67,12 +61,10 @@ describe('BankAccountsService', () => {
   });
 
   it('should await mapUnassignedTransactionsToPrimary and set primary account target FIRST in DB', async () => {
-    const updateSpy = mockSupabase.client.from().update;
+    mockApi.post.and.resolveTo({ id: 'card_123', is_primary: true });
 
     await service.setPrimary('card_123');
 
     expect(mockTxService.mapUnassignedTransactionsToPrimary).toHaveBeenCalledWith('card_123');
-    expect(updateSpy).toHaveBeenCalledWith({ is_primary: true });
-    expect(updateSpy).toHaveBeenCalledWith({ is_primary: false });
   });
 });

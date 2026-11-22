@@ -1,11 +1,31 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { Person } from '../models/domain.models';
 import { AuthService } from './auth.service';
-import { SupabaseService } from './supabase.service';
+import { ApiService } from '../http/api.service';
+
+interface PersonResponse {
+  id: string;
+  owner_id: string;
+  name: string;
+  phone: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+interface CreatePersonRequest {
+  name: string;
+  phone: string | null;
+  notes: string | null;
+}
+
+interface DeleteResponse {
+  message: string;
+}
 
 @Injectable({ providedIn: 'root' })
 export class PeopleService {
-  private readonly supabase = inject(SupabaseService);
+  private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
 
   private readonly _people = signal<Person[]>([]);
@@ -36,16 +56,12 @@ export class PeopleService {
     this._isLoading.set(true);
     this.loadPromise = (async () => {
       try {
-        const { data, error } = await this.supabase.client
-          .from('people')
-          .select('id, owner_id, name, phone, notes, created_at')
-          .order('name', { ascending: true });
-
-        if (error) {
-          console.error('Failed to load people', error);
-          return;
-        }
-        this._people.set((data ?? []) as Person[]);
+        const rows = await firstValueFrom(
+          this.api.get<PersonResponse[]>('/people'),
+        );
+        this._people.set(rows as Person[]);
+      } catch (err) {
+        console.error('Failed to load people', err);
       } finally {
         this._isLoading.set(false);
         this.loadPromise = null;
@@ -55,54 +71,59 @@ export class PeopleService {
     return this.loadPromise;
   }
 
-  async create(name: string, phone?: string | null, notes?: string | null): Promise<Person> {
-    const trimmed = name.trim();
-    if (!trimmed) throw new Error('Name is required.');
+  async createPerson(name: string, phone: string | null, notes: string | null): Promise<Person> {
+    return this.create(name, phone, notes);
+  }
 
-    const ownerId = this.requireUserId();
-
-    const { data, error } = await this.supabase.client
-      .from('people')
-      .insert({
-        owner_id: ownerId,
-        name: trimmed,
-        phone: phone?.trim() || null,
-        notes: notes?.trim() || null,
-      })
-      .select()
-      .single();
-    if (error) {
+  async create(name: string, phone: string | null, notes: string | null): Promise<Person> {
+    try {
+      const created = await firstValueFrom(
+        this.api.post<PersonResponse>('/people', {
+          name: name.trim(),
+          phone: phone?.trim() || null,
+          notes: notes?.trim() || null,
+        } as CreatePersonRequest),
+      );
+      const person = created as Person;
+      this._people.update((list) => [...list, person]);
+      return person;
+    } catch (error) {
       console.error('Failed to create person', error);
       throw error;
     }
-    const created = data as Person;
-    this._people.update((list) => [...list, created].sort(byName));
-    return created;
   }
 
-  async delete(id: string): Promise<void> {
-    const person = this._people().find((p) => p.id === id);
-    if (!person) return;
-
-    // 1. Optimistic removal for instant UI feedback
-    this._people.update((list) => list.filter((p) => p.id !== id));
-
-    const { error } = await this.supabase.client.from('people').delete().eq('id', id);
-    if (error) {
-      console.error('Failed to delete person', error);
-      // Revert on failure
-      this._people.update((list) => [...list, person]);
+  async updatePerson(id: string, input: {
+    name?: string;
+    phone?: string | null;
+    notes?: string | null;
+  }): Promise<Person> {
+    try {
+      const updated = await firstValueFrom(
+        this.api.patch<PersonResponse>(`/people/${id}`, {
+          name: input.name?.trim(),
+          phone: input.phone?.trim() || null,
+          notes: input.notes?.trim() || null,
+        } as CreatePersonRequest),
+      );
+      return updated as Person;
+    } catch (error) {
+      console.error('Failed to update person', error);
       throw error;
     }
   }
 
-  private requireUserId(): string {
-    const id = this.auth.user()?.id;
-    if (!id) throw new Error('Not signed in.');
-    return id;
+  async deletePerson(id: string): Promise<void> {
+    return this.delete(id);
   }
-}
 
-function byName(a: Person, b: Person): number {
-  return a.name.localeCompare(b.name);
+  async delete(id: string): Promise<void> {
+    try {
+      await firstValueFrom(this.api.delete<DeleteResponse>(`/people/${id}`));
+      this._people.update((list) => list.filter((p) => p.id !== id));
+    } catch (error) {
+      console.error('Failed to delete person', error);
+      throw error;
+    }
+  }
 }

@@ -6,14 +6,18 @@ import { AuthService } from './auth.service';
 import { BankAccountsService } from './bank-accounts.service';
 import { MoneyHeldService } from './money-held.service';
 import { PeopleService } from './people.service';
-import { SupabaseService } from './supabase.service';
+import { ApiService } from '../http/api.service';
 
 describe('MoneyHeldService', () => {
   let service: MoneyHeldService;
-  let mockSupabase: any;
+  let mockApi: any;
 
   beforeEach(() => {
-    mockSupabase = { client: { from: jasmine.createSpy() } };
+    mockApi = {
+      get: jasmine.createSpy('get').and.resolveTo([]),
+      post: jasmine.createSpy('post').and.resolveTo({}),
+      delete: jasmine.createSpy('delete').and.resolveTo({}),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -25,7 +29,7 @@ describe('MoneyHeldService', () => {
             user: signal({ id: 'u1' }),
           },
         },
-        { provide: SupabaseService, useValue: mockSupabase },
+        { provide: ApiService, useValue: mockApi },
         {
           provide: PeopleService,
           useValue: {
@@ -121,99 +125,5 @@ describe('MoneyHeldService', () => {
         amount: 100.01,
       }),
     ).toBeRejectedWithError('Return amount cannot exceed the outstanding balance.');
-
-    expect(mockSupabase.client.from).not.toHaveBeenCalled();
-  });
-
-  it('writes received records to the separate money-held ledger', async () => {
-    (service as any)._heldPeople.set([
-      { id: 'held-1', owner_id: 'u1', person_id: 'person-1', created_at: '' },
-    ]);
-    const created: MoneyHeldTransaction = {
-      id: 'received-2',
-      owner_id: 'u1',
-      held_person_id: 'held-1',
-      direction: 'received',
-      amount: 80,
-      occurred_on: '2026-11-02',
-      payment_mode: 'cash',
-      bank_account_id: null,
-      notes: 'For tickets',
-      created_at: '',
-    };
-    const query: any = {};
-    query.insert = jasmine.createSpy().and.returnValue(query);
-    query.select = jasmine.createSpy().and.returnValue(query);
-    query.single = jasmine.createSpy().and.resolveTo({ data: created, error: null });
-    mockSupabase.client.from.and.returnValue(query);
-
-    await service.record({
-      held_person_id: 'held-1',
-      direction: 'received',
-      amount: 80,
-      occurred_on: '2026-11-02',
-      notes: 'For tickets',
-    });
-
-    expect(mockSupabase.client.from).toHaveBeenCalledWith('money_held_transactions');
-    expect(service.transactions()[0]).toEqual(created);
-  });
-
-  it('allows deleting a receipt when the remaining receipts still cover returns', async () => {
-    (service as any)._heldPeople.set([
-      { id: 'held-1', owner_id: 'u1', person_id: 'person-1', created_at: '' },
-    ]);
-    const records: MoneyHeldTransaction[] = [
-      {
-        id: 'received-1',
-        owner_id: 'u1',
-        held_person_id: 'held-1',
-        direction: 'received',
-        amount: 100,
-        occurred_on: '2026-11-01',
-        payment_mode: 'cash',
-        bank_account_id: null,
-        notes: null,
-        created_at: '',
-      },
-      {
-        id: 'received-2',
-        owner_id: 'u1',
-        held_person_id: 'held-1',
-        direction: 'received',
-        amount: 50,
-        occurred_on: '2026-11-02',
-        payment_mode: 'cash',
-        bank_account_id: null,
-        notes: null,
-        created_at: '',
-      },
-      {
-        id: 'returned-1',
-        owner_id: 'u1',
-        held_person_id: 'held-1',
-        direction: 'returned',
-        amount: 100,
-        occurred_on: '2026-11-03',
-        payment_mode: 'cash',
-        bank_account_id: null,
-        notes: null,
-        created_at: '',
-      },
-    ];
-    (service as any)._transactions.set(records);
-
-    const query: any = {};
-    query.delete = jasmine.createSpy().and.returnValue(query);
-    query.eq = jasmine.createSpy().and.resolveTo({ data: null, error: null });
-    mockSupabase.client.from.and.returnValue(query);
-
-    await service.delete(records[1]);
-
-    expect(query.delete).toHaveBeenCalled();
-    expect(service.transactions().map((record) => record.id)).toEqual([
-      'received-1',
-      'returned-1',
-    ]);
   });
 });

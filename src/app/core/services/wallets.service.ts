@@ -1,66 +1,92 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
-
-import { BankAccountsService } from './bank-accounts.service';
+import { Injectable, effect, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+import { Wallet, WalletTransaction, WalletTransactionKind, PaymentMode } from '../models/domain.models';
 import { AuthService } from './auth.service';
-import { CategoriesService } from './categories.service';
-import { SupabaseService } from './supabase.service';
-import { TransactionsService } from './transactions.service';
-import {
-  CardTheme,
-  PaymentMode,
-  Wallet,
-  WalletTransaction,
-  WalletTransactionKind,
-} from '../models/domain.models';
-import { roundCurrency } from '../../shared/utils/currency-utils';
-import {
-  WALLET_SPENDING_CATEGORY_NAME,
-  isWalletSpendingCategory,
-} from '../../shared/utils/category-utils';
+import { ApiService } from '../http/api.service';
 import { todayIso } from '../../shared/utils/budget-utils';
+import { roundCurrency } from '../../shared/utils/currency-utils';
 
-export interface CreateWalletInput {
+interface WalletResponse {
+  id: string;
+  owner_id: string;
   name: string;
-  theme?: CardTheme;
+  theme: string;
+  initial_balance: number;
+  balance: number;
+  minimum_balance: number;
+  created_at: string;
+}
+
+interface CreateWalletRequest {
+  name: string;
+  theme: string;
+  initial_balance?: number;
+  balance?: number;
+  minimum_balance?: number;
+}
+
+interface UpdateWalletRequest {
+  name?: string;
+  theme?: string;
+  balance?: number;
   initial_balance?: number;
   minimum_balance?: number;
 }
 
-export interface UpdateWalletInput {
-  name?: string;
-  theme?: CardTheme;
-  minimum_balance?: number;
-}
-
-export interface WalletTransactionInput {
+interface WalletTransactionResponse {
+  id: string;
+  owner_id: string;
   wallet_id: string;
   kind: WalletTransactionKind;
   amount: number;
-  idempotency_key?: string;
-  occurred_on?: string;
-  funding_mode?: PaymentMode | null;
-  bank_account_id?: string | null;
-  notes?: string | null;
+  occurred_on: string;
+  category_id: string | null;
+  funding_mode: PaymentMode | null;
+  bank_account_id: string | null;
+  notes: string | null;
+  debit_transaction_id: string;
+  credit_transaction_id: string | null;
+  created_at: string;
+}
+
+interface CreateWalletTransactionRequest {
+  kind: WalletTransactionKind;
+  amount: number;
+  occurred_on: string;
+  category_id: string | null;
+  funding_mode: PaymentMode | null;
+  bank_account_id: string | null;
+  notes: string | null;
+}
+
+interface DeleteResponse {
+  message: string;
+}
+
+/** Input shape used by the wallet transaction sheet. */
+export interface WalletTransactionInput {
+  kind: WalletTransactionKind;
+  amount: number;
+  occurred_on: string;
+  category_id: string | null;
+  funding_mode: PaymentMode | null;
+  bank_account_id: string | null;
+  notes: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
 export class WalletsService {
-  private readonly supabase = inject(SupabaseService);
+  private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
-  private readonly bankAccountsService = inject(BankAccountsService);
-  private readonly transactionsService = inject(TransactionsService);
-  private readonly categoriesService = inject(CategoriesService);
 
   private readonly _wallets = signal<Wallet[]>([]);
-  private readonly _transactions = signal<WalletTransaction[]>([]);
+  private readonly _walletTransactions = new Map<string, WalletTransaction[]>();
   private readonly _isLoading = signal(false);
   private readonly _isAvailable = signal(true);
 
   readonly wallets = this._wallets.asReadonly();
-  readonly transactions = this._transactions.asReadonly();
   readonly isLoading = this._isLoading.asReadonly();
   readonly isAvailable = this._isAvailable.asReadonly();
-  readonly walletCount = computed(() => this._wallets().length);
 
   constructor() {
     effect(() => {
@@ -68,8 +94,7 @@ export class WalletsService {
         void this.load();
       } else {
         this._wallets.set([]);
-        this._transactions.set([]);
-        this._isAvailable.set(true);
+        this._walletTransactions.clear();
       }
     });
   }
@@ -79,44 +104,31 @@ export class WalletsService {
   async load(): Promise<void> {
     if (!this.auth.isAuthenticated()) {
       this._wallets.set([]);
-      this._transactions.set([]);
+      this._walletTransactions.clear();
       return;
     }
-    if (!this._isAvailable()) return;
     if (this.loadPromise) return this.loadPromise;
 
     this._isLoading.set(true);
     this.loadPromise = (async () => {
       try {
-        const [walletResult, transactionResult] = await Promise.all([
-          this.supabase.client
-            .from('wallets')
-            .select(
-              'id, owner_id, name, theme, initial_balance, balance, minimum_balance, created_at',
-            )
-            .order('created_at', { ascending: false }),
-          this.supabase.client
-            .from('wallet_transactions')
-            .select(
-              'id, owner_id, wallet_id, kind, amount, occurred_on, category_id, funding_mode, bank_account_id, notes, debit_transaction_id, credit_transaction_id, created_at',
-            )
-            .order('occurred_on', { ascending: false })
-            .order('created_at', { ascending: false }),
+        const [walletRows] = await Promise.all([
+          firstValueFrom(this.api.get<WalletResponse[]>('/wallets')),
         ]);
-
-        if (walletResult.error || transactionResult.error) {
-          const error = walletResult.error ?? transactionResult.error;
-          if (error && this.handleMissingSchema(error)) return;
-          console.error('Failed to load wallets', error);
-          return;
+        this._wallets.set(walletRows as Wallet[]);
+        // Load transactions for each wallet
+        for (const wallet of this._wallets()) {
+          try {
+            const txs = await firstValueFrom(
+              this.api.get<WalletTransactionResponse[]>(`/wallets/${wallet.id}/transactions`),
+            );
+            this._walletTransactions.set(wallet.id, txs as WalletTransaction[]);
+          } catch {
+            this._walletTransactions.set(wallet.id, []);
+          }
         }
-
-        this._wallets.set((walletResult.data ?? []).map((row) => this.normalizeWallet(row)));
-        this._transactions.set(
-          (transactionResult.data ?? []).map((row) => this.normalizeTransaction(row)),
-        );
-      } catch (error) {
-        console.error('Failed to load wallets', error);
+      } catch (err) {
+        console.error('Failed to load wallets', err);
       } finally {
         this._isLoading.set(false);
         this.loadPromise = null;
@@ -126,314 +138,221 @@ export class WalletsService {
     return this.loadPromise;
   }
 
-  async create(input: CreateWalletInput): Promise<Wallet> {
-    this.ensureAvailable();
-    const ownerId = this.requireOwnerId();
-    const name = input.name.trim();
-    const initialBalance = roundCurrency(Number(input.initial_balance ?? 0));
-    const minimumBalance = roundCurrency(Number(input.minimum_balance ?? 0));
-
-    if (!name) throw new Error('Wallet name is required.');
-    if (!Number.isFinite(initialBalance) || initialBalance < 0) {
-      throw new Error('Initial balance cannot be negative.');
-    }
-    if (!Number.isFinite(minimumBalance) || minimumBalance < 0) {
-      throw new Error('Minimum balance cannot be negative.');
-    }
-
-    const { data, error } = await this.supabase.client
-      .from('wallets')
-      .insert({
-        owner_id: ownerId,
-        name,
-        theme: input.theme ?? 'dark',
-        initial_balance: initialBalance,
-        balance: initialBalance,
-        minimum_balance: minimumBalance,
-      })
-      .select()
-      .single();
-    if (error) throw error;
-
-    const wallet = this.normalizeWallet(data);
-    this._wallets.update((list) => [wallet, ...list]);
-    return wallet;
+  /** Create an alias for component compatibility. */
+  async create(input: {
+    name: string;
+    theme: string;
+    initial_balance?: number;
+    balance?: number;
+    minimum_balance?: number;
+  }): Promise<Wallet> {
+    return this.createWallet(input);
   }
 
-  async update(id: string, input: UpdateWalletInput): Promise<Wallet> {
-    this.ensureAvailable();
-    const current = this._wallets().find((wallet) => wallet.id === id);
-    if (!current) throw new Error('Wallet not found.');
-
-    const changes: Record<string, unknown> = {};
-    if (input.name !== undefined) {
-      const name = input.name.trim();
-      if (!name) throw new Error('Wallet name is required.');
-      changes['name'] = name;
-    }
-    if (input.theme !== undefined) {
-      changes['theme'] = isWalletTheme(input.theme) ? input.theme : 'dark';
-    }
-    if (input.minimum_balance !== undefined) {
-      const minimumBalance = roundCurrency(Number(input.minimum_balance));
-      if (!Number.isFinite(minimumBalance) || minimumBalance < 0) {
-        throw new Error('Minimum balance cannot be negative.');
-      }
-      changes['minimum_balance'] = minimumBalance;
-    }
-    if (Object.keys(changes).length === 0) return current;
-
-    const { data, error } = await this.supabase.client
-      .from('wallets')
-      .update(changes)
-      .eq('id', id)
-      .eq('owner_id', this.requireOwnerId())
-      .select()
-      .single();
-    if (error) throw error;
-
-    const wallet = this.normalizeWallet(data);
-    this._wallets.update((list) => list.map((item) => (item.id === id ? wallet : item)));
-    return wallet;
-  }
-
-  async createTransaction(input: WalletTransactionInput): Promise<WalletTransaction> {
-    this.ensureAvailable();
-    this.validateInput(input);
-    const idempotencyKey = input.idempotency_key ?? generateUuid();
-
-    const { data, error } = await this.supabase.client.rpc('create_wallet_transaction', {
-      p_request_id: idempotencyKey,
-      p_wallet_id: input.wallet_id,
-      p_kind: input.kind,
-      p_amount: roundCurrency(input.amount),
-      p_occurred_on: input.occurred_on ?? todayIso(),
-      p_category_id: input.kind === 'spend' ? await this.walletSpendingCategoryId() : null,
-      p_funding_mode: input.kind === 'recharge' ? (input.funding_mode ?? null) : null,
-      p_bank_account_id:
-        input.kind === 'recharge' && input.funding_mode === 'bank'
-          ? (input.bank_account_id ?? null)
-          : null,
-      p_notes: input.notes?.trim() || null,
-    });
-    if (error) throw error;
-
-    const created = this.firstTransaction(data);
-    if (!created) throw new Error('The wallet transaction was not returned after saving.');
-    this._transactions.update((list) => [created, ...list]);
-    await this.refreshDependents();
-    return created;
-  }
-
-  async updateTransaction(id: string, input: WalletTransactionInput): Promise<WalletTransaction> {
-    this.ensureAvailable();
-    const current = this._transactions().find((transaction) => transaction.id === id);
-    if (!current) throw new Error('Wallet transaction not found.');
-    this.validateInput(input, current);
-
-    const { data, error } = await this.supabase.client.rpc('update_wallet_transaction', {
-      p_wallet_transaction_id: id,
-      p_kind: input.kind,
-      p_amount: roundCurrency(input.amount),
-      p_occurred_on: input.occurred_on ?? todayIso(),
-      p_category_id: input.kind === 'spend' ? await this.walletSpendingCategoryId() : null,
-      p_funding_mode: input.kind === 'recharge' ? (input.funding_mode ?? null) : null,
-      p_bank_account_id:
-        input.kind === 'recharge' && input.funding_mode === 'bank'
-          ? (input.bank_account_id ?? null)
-          : null,
-      p_notes: input.notes?.trim() || null,
-    });
-    if (error) throw error;
-
-    const updated = this.firstTransaction(data);
-    if (!updated) throw new Error('The wallet transaction was not returned after updating.');
-    this._transactions.update((list) => list.map((item) => (item.id === id ? updated : item)));
-    await this.refreshDependents();
-    return updated;
-  }
-
-  async deleteTransaction(transaction: WalletTransaction): Promise<void> {
-    this.ensureAvailable();
-    const { error } = await this.supabase.client.rpc('delete_wallet_transaction', {
-      p_wallet_transaction_id: transaction.id,
-    });
-    if (error) throw error;
-
-    this._transactions.update((list) => list.filter((item) => item.id !== transaction.id));
-    await this.refreshDependents();
-  }
-
-  transactionsFor(walletId: string): WalletTransaction[] {
-    return this._transactions().filter((transaction) => transaction.wallet_id === walletId);
-  }
-
-  /**
-   * Wallet spending is grouped under the system category "Wallet spending"
-   * (the sheet shows it pre-selected), so resolve its real id — creating it
-   * on first use — instead of saving an uncategorized spend. Recharges never
-   * carry a category (the database forbids it).
-   */
-  private async walletSpendingCategoryId(): Promise<string | null> {
-    const findId = (): string | null =>
-      this.categoriesService.categories().find((c) => isWalletSpendingCategory(c))?.id ?? null;
-
-    await this.categoriesService.load().catch(() => undefined);
-    const existing = findId();
-    if (existing) return existing;
+  async createWallet(input: {
+    name: string;
+    theme: string;
+    initial_balance?: number;
+    balance?: number;
+    minimum_balance?: number;
+  }): Promise<Wallet> {
+    const ownerId = this.auth.user()?.id;
+    if (!ownerId) throw new Error('Not signed in.');
 
     try {
-      const created = await this.categoriesService.create(WALLET_SPENDING_CATEGORY_NAME, 'expense');
-      return created?.id ?? findId();
-    } catch (err) {
-      console.error('Could not ensure the Wallet spending category', err);
-      // The category may already exist (e.g. created from another tab) —
-      // re-read the list and use it before giving up.
-      await this.categoriesService.load().catch(() => undefined);
-      return findId();
+      const created = await firstValueFrom(
+        this.api.post<WalletResponse>('/wallets', {
+          name: input.name.trim(),
+          theme: input.theme || 'blue',
+          initial_balance: input.initial_balance ?? 0,
+          balance: input.balance ?? 0,
+          minimum_balance: input.minimum_balance ?? 0,
+        } as CreateWalletRequest),
+      );
+      const wallet = created as Wallet;
+      this._wallets.update((list) => [...list, wallet]);
+      return wallet;
+    } catch (error) {
+      console.error('Failed to create wallet', error);
+      throw error;
     }
   }
 
-  private validateInput(input: WalletTransactionInput, current?: WalletTransaction): void {
-    if (!input.wallet_id) throw new Error('Wallet is required.');
-    if (!(roundCurrency(Number(input.amount)) > 0)) {
-      throw new Error('Wallet transaction amount must be greater than zero.');
-    }
-    if (current && current.wallet_id !== input.wallet_id) {
-      throw new Error('Wallet cannot be changed after saving.');
-    }
-    if (current && current.kind !== input.kind) {
-      throw new Error('Transaction type cannot be changed after saving.');
-    }
+  /** Create an alias for component compatibility. */
+  async update(id: string, input: {
+    name?: string;
+    theme?: string;
+    balance?: number;
+    initial_balance?: number;
+    minimum_balance?: number;
+  }): Promise<Wallet> {
+    return this.updateWallet(id, input);
+  }
 
-    const wallet = this._wallets().find((item) => item.id === input.wallet_id);
-    if (!wallet) throw new Error('Wallet not found.');
+  async updateWallet(id: string, input: {
+    name?: string;
+    theme?: string;
+    balance?: number;
+    initial_balance?: number;
+    minimum_balance?: number;
+  }): Promise<Wallet> {
+    try {
+      const updated = await firstValueFrom(
+        this.api.patch<WalletResponse>(`/wallets/${id}`, input as UpdateWalletRequest),
+      );
+      const wallet = updated as Wallet;
+      this._wallets.update((list) => list.map((w) => (w.id === id ? wallet : w)));
+      return wallet;
+    } catch (error) {
+      console.error('Failed to update wallet', error);
+      throw error;
+    }
+  }
 
-    if (input.kind === 'spend') {
-      const restoredAmount = current?.kind === 'spend' ? Number(current.amount) : 0;
-      if (Number(wallet.balance) + restoredAmount + 0.000001 < Number(input.amount)) {
-        throw new Error('Insufficient balance in the wallet.');
+  /** Create an alias for component compatibility. */
+  async delete(id: string): Promise<void> {
+    return this.deleteWallet(id);
+  }
+
+  async deleteWallet(id: string): Promise<void> {
+    try {
+      await firstValueFrom(this.api.delete<DeleteResponse>(`/wallets/${id}`));
+      this._wallets.update((list) => list.filter((w) => w.id !== id));
+      this._walletTransactions.delete(id);
+    } catch (error) {
+      console.error('Failed to delete wallet', error);
+      throw error;
+    }
+  }
+
+  /** List transactions for a specific wallet. */
+  transactionsFor(walletId: string): WalletTransaction[] {
+    return this._walletTransactions.get(walletId) ?? [];
+  }
+
+  async listWalletTransactions(walletId: string): Promise<WalletTransaction[]> {
+    try {
+      const rows = await firstValueFrom(
+        this.api.get<WalletTransactionResponse[]>(`/wallets/${walletId}/transactions`),
+      );
+      const txs = rows as WalletTransaction[];
+      this._walletTransactions.set(walletId, txs);
+      return txs;
+    } catch (error) {
+      console.error('Failed to load wallet transactions', error);
+      return [];
+    }
+  }
+
+  /** Create an alias for component compatibility. */
+  async createTransaction(walletId: string, input: WalletTransactionInput): Promise<WalletTransaction> {
+    return this.createWalletTransaction(walletId, input);
+  }
+
+  async createWalletTransaction(walletId: string, input: {
+    kind: WalletTransactionKind;
+    amount: number;
+    occurred_on: string;
+    category_id: string | null;
+    funding_mode: PaymentMode | null;
+    bank_account_id: string | null;
+    notes: string | null;
+  }): Promise<WalletTransaction> {
+    try {
+      const created = await firstValueFrom(
+        this.api.post<WalletTransactionResponse>(
+          `/wallets/${walletId}/transactions`,
+          {
+            kind: input.kind,
+            amount: input.amount,
+            occurred_on: input.occurred_on,
+            category_id: input.category_id,
+            funding_mode: input.funding_mode,
+            bank_account_id: input.bank_account_id,
+            notes: input.notes?.trim() || null,
+          } as CreateWalletTransactionRequest,
+        ),
+      );
+      const tx = created as WalletTransaction;
+      // Update the transactions map for this wallet
+      const existing = this._walletTransactions.get(walletId) ?? [];
+      this._walletTransactions.set(walletId, [tx, ...existing]);
+      return tx;
+    } catch (error) {
+      console.error('Failed to create wallet transaction', error);
+      throw error;
+    }
+  }
+
+  /** Create an alias for component compatibility. */
+  async updateTransaction(transactionId: string, input: WalletTransactionInput): Promise<WalletTransaction> {
+    return this.updateWalletTransaction(transactionId, input);
+  }
+
+  async updateWalletTransaction(transactionId: string, input: {
+    kind: WalletTransactionKind;
+    amount: number;
+    occurred_on: string;
+    category_id: string | null;
+    funding_mode: PaymentMode | null;
+    bank_account_id: string | null;
+    notes: string | null;
+  }): Promise<WalletTransaction> {
+    try {
+      const updated = await firstValueFrom(
+        this.api.patch<WalletTransactionResponse>(
+          `/wallets/transactions/${transactionId}`,
+          {
+            kind: input.kind,
+            amount: input.amount,
+            occurred_on: input.occurred_on,
+            category_id: input.category_id,
+            funding_mode: input.funding_mode,
+            bank_account_id: input.bank_account_id,
+            notes: input.notes?.trim() || null,
+          } as CreateWalletTransactionRequest,
+        ),
+      );
+      const tx = updated as WalletTransaction;
+      // Update in the transactions map
+      for (const [walletId, list] of this._walletTransactions) {
+        const idx = list.findIndex((t) => t.id === transactionId);
+        if (idx !== -1) {
+          const next = [...list];
+          next[idx] = tx;
+          this._walletTransactions.set(walletId, next);
+          break;
+        }
       }
-      return;
+      return tx;
+    } catch (error) {
+      console.error('Failed to update wallet transaction', error);
+      throw error;
     }
+  }
 
-    if (!input.funding_mode) throw new Error('Choose cash or a bank account for the recharge.');
-    if (input.funding_mode === 'cash' && input.bank_account_id) {
-      throw new Error('Cash recharges cannot include a bank account.');
-    }
-    if (input.funding_mode === 'bank') {
-      if (!input.bank_account_id) throw new Error('Choose a bank account for the recharge.');
-      const account = this.bankAccountsService
-        .bankAccounts()
-        .find((item) => item.id === input.bank_account_id);
-      const restoredAmount =
-        current?.kind === 'recharge' && current.bank_account_id === input.bank_account_id
-          ? Number(current.amount)
-          : 0;
-      if (
-        !account ||
-        Number(account.balance ?? 0) + restoredAmount + 0.000001 < Number(input.amount)
-      ) {
-        throw new Error('Insufficient balance in the selected bank account.');
+  /** Create an alias for component compatibility. */
+  async deleteTransaction(transaction: WalletTransaction): Promise<void> {
+    return this.deleteWalletTransaction(transaction.id);
+  }
+
+  async deleteWalletTransaction(transactionId: string): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.api.delete<DeleteResponse>(`/wallets/transactions/${transactionId}`),
+      );
+      for (const [walletId, list] of this._walletTransactions) {
+        const idx = list.findIndex((t) => t.id === transactionId);
+        if (idx !== -1) {
+          const next = [...list];
+          next.splice(idx, 1);
+          this._walletTransactions.set(walletId, next);
+          break;
+        }
       }
+    } catch (error) {
+      console.error('Failed to delete wallet transaction', error);
+      throw error;
     }
   }
-
-  private async refreshDependents(): Promise<void> {
-    await Promise.all([
-      this.load(),
-      this.bankAccountsService.load(),
-      this.transactionsService.refresh(),
-    ]);
-  }
-
-  private ensureAvailable(): void {
-    if (!this._isAvailable()) {
-      throw new Error('Wallets setup is unavailable. Apply database migration 0011 first.');
-    }
-  }
-
-  private requireOwnerId(): string {
-    const id = this.auth.user()?.id;
-    if (!id) throw new Error('Not signed in.');
-    return id;
-  }
-
-  private handleMissingSchema(error: { code?: string; message?: string }): boolean {
-    const message = error.message?.toLowerCase() ?? '';
-    if (
-      error.code !== 'PGRST205' &&
-      error.code !== '42P01' &&
-      !message.includes('could not find the table')
-    ) {
-      return false;
-    }
-    this._isAvailable.set(false);
-    return true;
-  }
-
-  private firstTransaction(data: unknown): WalletTransaction | null {
-    if (!data) return null;
-    const row = Array.isArray(data) ? data[0] : data;
-    return row && typeof row === 'object'
-      ? this.normalizeTransaction(row as Record<string, unknown>)
-      : null;
-  }
-
-  private normalizeWallet(row: Record<string, unknown>): Wallet {
-    return {
-      id: String(row['id']),
-      owner_id: String(row['owner_id']),
-      name: String(row['name']),
-      theme: isWalletTheme(row['theme']) ? row['theme'] : 'dark',
-      initial_balance: Number(row['initial_balance'] ?? 0),
-      balance: Number(row['balance'] ?? 0),
-      minimum_balance: Number(row['minimum_balance'] ?? 0),
-      created_at: String(row['created_at']),
-    };
-  }
-
-  private normalizeTransaction(row: Record<string, unknown>): WalletTransaction {
-    return {
-      id: String(row['id']),
-      owner_id: String(row['owner_id']),
-      wallet_id: String(row['wallet_id']),
-      kind: row['kind'] === 'spend' ? 'spend' : 'recharge',
-      amount: Number(row['amount']),
-      occurred_on: String(row['occurred_on']),
-      category_id: typeof row['category_id'] === 'string' ? row['category_id'] : null,
-      funding_mode:
-        row['funding_mode'] === 'bank' || row['funding_mode'] === 'cash'
-          ? row['funding_mode']
-          : null,
-      bank_account_id: typeof row['bank_account_id'] === 'string' ? row['bank_account_id'] : null,
-      notes: typeof row['notes'] === 'string' ? row['notes'] : null,
-      debit_transaction_id: String(row['debit_transaction_id']),
-      credit_transaction_id:
-        typeof row['credit_transaction_id'] === 'string' ? row['credit_transaction_id'] : null,
-      created_at: String(row['created_at']),
-    };
-  }
-}
-
-function isWalletTheme(value: unknown): value is CardTheme {
-  return (
-    value === 'blue' ||
-    value === 'purple' ||
-    value === 'dark' ||
-    value === 'emerald' ||
-    value === 'sunset' ||
-    value === 'gold' ||
-    value === 'rose'
-  );
-}
-
-function generateUuid(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  const hex = `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`
-    .padEnd(32, '0')
-    .slice(0, 32);
-  return `${hex.slice(0, 8)}-4${hex.slice(9, 12)}-8${hex.slice(13, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }

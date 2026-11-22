@@ -1,13 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { CategoriesService } from './categories.service';
 import { AuthService } from './auth.service';
-import { SupabaseService } from './supabase.service';
+import { ApiService } from '../http/api.service';
 import { signal } from '@angular/core';
 import { Category } from '../models/domain.models';
 
 describe('CategoriesService', () => {
   let service: CategoriesService;
-  let mockSupabase: any;
+  let mockApi: any;
   let mockAuth: any;
   const isAuthSignal = signal(true);
 
@@ -25,23 +25,17 @@ describe('CategoriesService', () => {
       user: signal({ id: 'u1' }),
     };
 
-    const mockQueryBuilder: any = {};
-    mockQueryBuilder.select = jasmine.createSpy().and.returnValue(mockQueryBuilder);
-    mockQueryBuilder.order = jasmine.createSpy().and.returnValue(mockQueryBuilder);
-    mockQueryBuilder.delete = jasmine.createSpy().and.returnValue(mockQueryBuilder);
-    mockQueryBuilder.eq = jasmine.createSpy().and.resolveTo({ error: new Error('Delete failed') });
-
-    mockSupabase = {
-      client: {
-        from: jasmine.createSpy().and.returnValue(mockQueryBuilder),
-      },
+    mockApi = {
+      get: jasmine.createSpy('get').and.resolveTo([]),
+      post: jasmine.createSpy('post').and.resolveTo({}),
+      delete: jasmine.createSpy('delete').and.rejectWith(new Error('Delete failed')),
     };
 
     TestBed.configureTestingModule({
       providers: [
         CategoriesService,
         { provide: AuthService, useValue: mockAuth },
-        { provide: SupabaseService, useValue: mockSupabase },
+        { provide: ApiService, useValue: mockApi },
       ],
     });
 

@@ -1,14 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 import { TransactionsService } from './transactions.service';
 import { AuthService } from './auth.service';
-import { SupabaseService } from './supabase.service';
+import { ApiService } from '../http/api.service';
 import { CategoriesService } from './categories.service';
 import { BankAccountsService } from './bank-accounts.service';
 import { signal } from '@angular/core';
 
 describe('TransactionsService', () => {
   let service: TransactionsService;
-  let mockSupabase: any;
+  let mockApi: any;
   let mockAuth: any;
   let mockBankAccountsService: any;
   const isAuthSignal = signal(true);
@@ -26,29 +26,18 @@ describe('TransactionsService', () => {
       update: jasmine.createSpy().and.resolveTo({ id: 'bank_1', balance: 600 }),
     };
 
-    const mockQueryBuilder: any = {};
-    mockQueryBuilder.select = jasmine.createSpy().and.returnValue(mockQueryBuilder);
-    mockQueryBuilder.insert = jasmine.createSpy().and.returnValue(mockQueryBuilder);
-    mockQueryBuilder.update = jasmine.createSpy().and.returnValue(mockQueryBuilder);
-    mockQueryBuilder.delete = jasmine.createSpy().and.returnValue(mockQueryBuilder);
-    mockQueryBuilder.eq = jasmine.createSpy().and.returnValue(mockQueryBuilder);
-    mockQueryBuilder.maybeSingle = jasmine.createSpy().and.resolveTo({ data: null, error: null });
-    mockQueryBuilder.single = jasmine.createSpy().and.resolveTo({ data: { id: 'tx_1', amount: 100, direction: 'in' }, error: null });
-    mockQueryBuilder.order = jasmine.createSpy().and.returnValue(mockQueryBuilder);
-    mockQueryBuilder.range = jasmine.createSpy().and.returnValue(mockQueryBuilder);
-    mockQueryBuilder.limit = jasmine.createSpy().and.resolveTo({ data: [], error: null });
-
-    mockSupabase = {
-      client: {
-        from: jasmine.createSpy().and.returnValue(mockQueryBuilder),
-      },
+    mockApi = {
+      get: jasmine.createSpy('get').and.resolveTo([]),
+      post: jasmine.createSpy('post').and.resolveTo({ id: 'tx_1', amount: 100, direction: 'in' }),
+      delete: jasmine.createSpy('delete').and.resolveTo({}),
+      patch: jasmine.createSpy('patch').and.resolveTo({}),
     };
 
     TestBed.configureTestingModule({
       providers: [
         TransactionsService,
         { provide: AuthService, useValue: mockAuth },
-        { provide: SupabaseService, useValue: mockSupabase },
+        { provide: ApiService, useValue: mockApi },
         { provide: CategoriesService, useValue: { categories: signal([]) } },
         { provide: BankAccountsService, useValue: mockBankAccountsService },
       ],
@@ -58,24 +47,15 @@ describe('TransactionsService', () => {
   });
 
   it('should identify opening balance by source: opening', async () => {
-    mockSupabase.client.from.and.returnValue({
-      select: () => ({
-        eq: () => ({
-          or: () => ({
-            order: () => Promise.resolve({
-              data: [{ amount: 250, direction: 'in' }],
-              error: null,
-            }),
-          }),
-        }),
-      }),
-    });
+    mockApi.get.and.resolveTo([{ amount: 250, direction: 'in' }]);
 
     await service.loadOpeningBalance();
     expect(service.openingBalance()).toBe(250);
   });
 
   it('should await bank accounts update on transaction creation', async () => {
+    mockApi.post.and.resolveTo({ id: 'tx-new', amount: 100, direction: 'in', bank_account_id: 'bank_1' });
+
     await service.create({
       amount: 100,
       direction: 'in',

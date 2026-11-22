@@ -1,9 +1,6 @@
 export const environment = {
   production: true,
-  supabase: {
-    url: 'https://kulwhzrhmpcdgwgamjzx.supabase.co',
-    anonKey: 'sb_publishable_uHLSkc60rj86J-27EqoVpg_Ic1jPzpw',
-  },
+  apiUrl: 'http://localhost:3000/api',
   /** VAPID public key — safe in the client. The private key lives only in the
    *  push-notifications Edge Function secret (see .env / SETUP.md). */
   vapidPublicKey:
