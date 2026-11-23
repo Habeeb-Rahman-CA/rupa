@@ -117,7 +117,7 @@ export class ShellComponent implements AfterViewInit {
     { path: '/categories', label: 'Categories', icon: 'tags' },
     { path: '/people', label: 'People', icon: 'users' },
     { path: '/settings', label: 'Settings', icon: 'settings' },
-    { path: '/settings/app-lock', label: 'App Lock', icon: 'lock' },
+    { path: '/settings', label: 'App Lock', icon: 'lock' },
   ];
 
   readonly appVersion = APP_VERSION;

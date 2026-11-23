@@ -231,4 +231,21 @@ export class AuthService {
       redirectTo: `${window.location.origin}/login`,
     });
   }
+
+  /**
+   * Update the signed-in user's profile: display name (stored in user_metadata.name)
+   * and an avatar colour hint (stored in user_metadata.avatar_color).
+   */
+  async updateProfile(params: {
+    displayName: string;
+    avatarColor: string;
+  }): Promise<{ error: unknown }> {
+    const { error } = await this.supabase.client.auth.updateUser({
+      data: {
+        name: params.displayName,
+        avatar_color: params.avatarColor,
+      },
+    });
+    return { error };
+  }
 }

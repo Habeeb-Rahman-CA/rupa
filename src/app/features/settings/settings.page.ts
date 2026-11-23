@@ -1,12 +1,20 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, computed } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDialog } from '@angular/material/dialog';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { LucideAngularModule } from 'lucide-angular';
 
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { PushCategory, PushService, PushStatus } from '../../core/services/push.service';
 import { ThemeService } from '../../core/services/theme.service';
+import { AuthService } from '../../core/services/auth.service';
+import { ProfileDialogComponent } from './profile-dialog.component';
+import { MpinService } from '../../core/services/mpin.service';
+import { MpinDialogComponent, MpinDialogMode } from './mpin-dialog.component';
+import { ResetDataDialogComponent } from './reset-data-dialog.component';
+import { getAvatarColor, getInitial } from '../../shared/utils/avatar-utils';
 
 const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
   unsupported: {
@@ -39,19 +47,43 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
     MatButtonModule,
     MatSlideToggleModule,
     MatProgressSpinnerModule,
+    MatButtonToggleModule,
     LucideAngularModule,
     PageHeaderComponent,
   ],
   template: `
-    <app-page-header title="Settings" subtitle="App preferences and notifications" />
+    <app-page-header title="User Settings" subtitle="Profile, notifications and app lock" />
+
+    <!-- ------------------------------ Profile ------------------- -->
+    <section class="app-card settings-card profile-card" aria-label="Profile">
+      <div class="profile-head">
+        <div class="avatar-wrapper">
+          <div class="avatar-circle" [style.background]="avatarColor()">
+            {{ initials() }}
+          </div>
+        </div>
+        <div class="profile-info">
+          <h2 class="profile-name">{{ displayName() }}</h2>
+          <p class="profile-email">{{ userEmail() }}</p>
+        </div>
+      </div>
+      <button
+        mat-icon-button
+        color="primary"
+        type="button"
+        class="edit-card-btn"
+        (click)="openProfileDialog()"
+        aria-label="Edit profile"
+      >
+        <lucide-icon name="pencil" size="16" />
+      </button>
+    </section>
 
     <!-- ------------------------------ Push notifications ------------------- -->
     <section class="app-card settings-card" aria-label="Push notifications">
       <div class="section-heading">
-        <div class="heading-icon"><lucide-icon name="bell" /></div>
         <div class="heading-text">
           <h2>Push notifications</h2>
-          <p>Renewal reminders and low-balance alerts, delivered even when the app is closed.</p>
         </div>
         <span class="status-chip" [attr.data-status]="push.status()">
           {{ statusMeta().label }}
@@ -189,11 +221,179 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
         </li>
       </ul>
     </section>
+
+    <!-- ------------------------------ App lock ------------------- -->
+    <section class="app-card settings-card lock-card" aria-label="App lock">
+      <div class="section-heading">
+        <div class="heading-text">
+          <h2>App lock (MPIN)</h2>
+        </div>
+        <span class="status-chip" [attr.data-status]="mpin.isConfigured() ? 'active' : 'off'">
+          {{ mpin.isConfigured() ? 'On' : 'Off' }}
+        </span>
+      </div>
+
+      @if (mpin.isConfigured()) {
+        <p class="status-hint">
+          Locked on launch and after {{ autoLockLabel() }} in the background.
+        </p>
+
+        <div class="auto-lock">
+          <span class="auto-lock-label">Auto-lock after</span>
+          <mat-button-toggle-group
+            [value]="mpin.autoLockSeconds()"
+            (change)="setAutoLock($event.value)"
+            aria-label="Auto-lock timeout"
+          >
+            <mat-button-toggle [value]="0">Immediately</mat-button-toggle>
+            <mat-button-toggle [value]="60">1 minute</mat-button-toggle>
+            <mat-button-toggle [value]="300">5 minutes</mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+
+        <div class="primary-actions">
+          <button mat-stroked-button type="button" class="pill-btn" (click)="openMpin('change')">
+            <lucide-icon name="key-round" /> Change MPIN
+          </button>
+          <button
+            mat-stroked-button
+            type="button"
+            class="pill-btn danger-btn"
+            (click)="openMpin('disable')"
+          >
+            <lucide-icon name="lock-open" /> Turn off
+          </button>
+        </div>
+      } @else {
+        <p class="status-hint">
+          Off by default. Set it up to require a PIN every time the app opens.
+        </p>
+
+        <div class="primary-actions">
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            class="pill-btn"
+            (click)="openMpin('setup')"
+          >
+            <lucide-icon name="lock" /> Set up App Lock
+          </button>
+        </div>
+      }
+
+      <ul class="notes">
+        <li>
+          <lucide-icon name="shield" />
+          <span>Forgot your PIN? Reset it from the lock screen while you're signed in.</span>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ------------------------------ Reset user data ------------------- -->
+    <section class="app-card settings-card reset-card" aria-label="Reset user data">
+      <div class="section-heading">
+        <div class="heading-text">
+          <h2>Reset user data</h2>
+        </div>
+        <span class="status-chip" data-status="denied">Danger</span>
+      </div>
+
+      <p class="status-hint">
+        Start over by deleting selected data like transactions, debts, cards, wallets and more. You
+        choose what goes, confirm with your account password, and your sign-in stays the same.
+        Deletion can’t be undone.
+      </p>
+
+      <div class="primary-actions">
+        <button
+          mat-flat-button
+          type="button"
+          class="pill-btn danger-fill"
+          (click)="openResetDialog()"
+        >
+          <lucide-icon name="trash-2" /> Reset data
+        </button>
+      </div>
+    </section>
   `,
   styles: [
     `
       .settings-card {
         padding: 16px;
+        margin: 0 0 16px;
+      }
+
+      .profile-card {
+        padding: 16px;
+        margin: 0 0 16px;
+        position: relative;
+      }
+
+      .profile-head {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .avatar-wrapper {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 56px;
+        height: 56px;
+        flex: 0 0 auto;
+      }
+      .avatar-circle {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 22px;
+        font-weight: 700;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      }
+      .edit-card-btn {
+        position: absolute;
+        bottom: 16px;
+        right: 16px;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        border-radius: 50%;
+        background: var(--app-ink) !important;
+        color: var(--app-ink-inverse) !important;
+        border: none;
+        display: grid;
+        place-items: center;
+      }
+      .edit-card-btn lucide-icon {
+        width: 16px;
+        height: 16px;
+        color: var(--app-ink-inverse) !important;
+      }
+      .profile-info {
+        min-width: 0;
+      }
+      .profile-name {
+        margin: 0;
+        color: var(--app-ink);
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      .profile-email {
+        margin: 2px 0 0;
+        color: var(--app-ink-muted);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+      .profile-hint {
+        margin: 10px 0 0;
+        color: var(--app-ink-muted);
+        font-size: 12.5px;
+        line-height: 1.45;
       }
 
       .section-heading {
@@ -322,32 +522,39 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
         margin-top: 1px;
       }
 
-      .theme-toggle {
-        flex: 0 0 auto;
-        width: 40px;
-        height: 40px;
-        padding: 0;
-      }
-      .theme-toggle lucide-icon {
-        width: 20px;
-        height: 20px;
-        color: var(--app-ink-muted);
+      .lock-card {
+        padding: 16px;
       }
 
-      .theme-chip {
-        flex: 0 0 auto;
-        padding: 3px 9px;
-        border-radius: 999px;
-        background: var(--app-input-bg);
-        color: var(--app-ink-muted);
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
+      .lock-card .section-heading .heading-icon {
+        background: rgba(99, 102, 241, 0.12);
+        color: #3f4bb8;
       }
-      .theme-chip[data-theme='dark'] {
-        background: var(--app-positive-soft);
-        color: var(--app-positive);
+
+      .danger-btn {
+        color: var(--app-negative, #dc2626) !important;
+      }
+
+      /* Filled destructive pill — same pattern as ConfirmDialogComponent's
+         .destructive-btn (mat-flat-button + negative background). */
+      .danger-fill {
+        background: var(--app-negative, #dc2626) !important;
+        color: #fff !important;
+      }
+
+      .auto-lock {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .auto-lock-label {
+        color: var(--app-ink);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .auto-lock mat-button-toggle-group {
+        align-self: flex-start;
       }
     `,
   ],
@@ -355,6 +562,31 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
 export class SettingsPage {
   readonly push = inject(PushService);
   readonly theme = inject(ThemeService);
+  readonly auth = inject(AuthService);
+  readonly mpin = inject(MpinService);
+  private readonly dialog = inject(MatDialog);
+  private readonly destroyRef = inject(DestroyRef);
+
+  readonly user = this.auth.user;
+  readonly userEmail = computed(() => this.user()?.email ?? '');
+  readonly meta = computed(() => (this.user()?.user_metadata ?? {}) as Record<string, unknown>);
+  readonly displayName = computed(() => {
+    const meta = this.meta();
+    const nameRaw = meta['name'];
+    const fullRaw = meta['full_name'];
+    const name =
+      (typeof nameRaw === 'string' ? nameRaw : '') || (typeof fullRaw === 'string' ? fullRaw : '');
+    if (name && name.trim()) return name.trim();
+    const email = this.userEmail();
+    if (!email) return '—';
+    return email.split('@')[0];
+  });
+  readonly avatarColor = computed(() => {
+    const color =
+      typeof this.meta()['avatar_color'] === 'string' ? this.meta()['avatar_color'] : '';
+    return color || getAvatarColor(this.displayName());
+  });
+  readonly initials = computed(() => getInitial(this.displayName()));
 
   statusMeta() {
     return STATUS_META[this.push.status()];
@@ -362,5 +594,41 @@ export class SettingsPage {
 
   setCategory(category: PushCategory, enabled: boolean): void {
     void this.push.setCategory(category, enabled);
+  }
+
+  openProfileDialog(): void {
+    this.dialog.open(ProfileDialogComponent, {
+      data: {
+        name: this.displayName(),
+        email: this.userEmail(),
+        avatarColor: this.avatarColor(),
+      },
+    });
+  }
+
+  openMpin(mode: MpinDialogMode): void {
+    this.dialog.open(MpinDialogComponent, {
+      data: { mode },
+      disableClose: true,
+    });
+  }
+
+  openResetDialog(): void {
+    this.dialog.open(ResetDataDialogComponent, { disableClose: true });
+  }
+
+  setAutoLock(seconds: number): void {
+    this.mpin.setAutoLock(seconds);
+  }
+
+  autoLockLabel(): string {
+    switch (this.mpin.autoLockSeconds()) {
+      case 0:
+        return 'immediately';
+      case 300:
+        return '5 minutes';
+      default:
+        return '1 minute';
+    }
   }
 }

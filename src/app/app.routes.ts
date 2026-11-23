@@ -96,8 +96,8 @@ export const routes: Routes = [
       },
       {
         path: 'settings/app-lock',
-        loadComponent: () =>
-          import('./features/settings/app-lock.page').then((m) => m.AppLockPage),
+        redirectTo: 'settings',
+        pathMatch: 'full',
       },
       {
         path: 'reports',
