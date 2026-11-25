@@ -23,10 +23,11 @@ export interface ExtractOptions {
 }
 
 /**
- * Built-in AI provider fallbacks, used only when the matching
- * `app_settings` column is NULL — the runtime values come from Supabase
- * (ai_base_url / ai_model / ai_api_key / ai_headers, migration 0023), so
- * changing provider or model never requires a code change.
+ * Built-in AI provider fallbacks, used only when the matching column on the
+ * shared `app_settings` row (owner_id IS NULL, migration 0028) is NULL — the
+ * runtime values come from that row (ai_base_url / ai_model / ai_api_key /
+ * ai_headers, migration 0023), identical for every user, so changing provider
+ * or model is a row update — no code change.
  *
  * Any OpenAI-compatible provider works: the app always POSTs to
  * `{base_url}/chat/completions` with `Authorization: Bearer <key>`.
@@ -66,7 +67,7 @@ export class BillScannerService {
   /**
    * Scans a bill image (File or Blob) using the configured AI provider via
    * its OpenAI-compatible chat completions endpoint. Provider endpoint, model
-   * and extra headers are read from Supabase `app_settings` (see
+   * and extra headers come from the shared `app_settings` row (see
    * `AppSettingsService`); per-call `options` override them for tests.
    */
   async extractBill(
@@ -89,7 +90,7 @@ export class BillScannerService {
 
     const apiKey = options.apiKey || this.getApiKey();
     if (!apiKey) {
-      throw new Error('AI API key is missing. Please set your key first.');
+      throw new Error('Bill scanning is not configured for this app.');
     }
 
     // When categories are supplied and no custom prompt was given, use the

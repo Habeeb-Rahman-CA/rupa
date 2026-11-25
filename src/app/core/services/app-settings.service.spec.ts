@@ -5,7 +5,6 @@ import { AppSettingsService } from './app-settings.service';
 import { AiKeyVaultService } from './ai-key-vault.service';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
-import { DEVICE_KEYS, USER_KEYS } from '../../core/config/storage-keys';
 
 interface QueryCall {
   table: string;
@@ -52,7 +51,7 @@ describe('AppSettingsService', () => {
       return Promise.resolve(next ?? { data: null, error: null });
     };
     const ops = [
-      'select', 'eq', 'in', 'insert', 'upsert', 'delete',
+      'select', 'eq', 'is', 'in', 'insert', 'upsert', 'delete',
       'update', 'lt', 'gt', 'gte', 'maybeSingle', 'single',
     ];
     for (const op of ops) {
@@ -66,16 +65,7 @@ describe('AppSettingsService', () => {
     return q;
   }
 
-  /** The payload of the n-th `upsert` call (default: the first). */
-  function upsertPayload(index = 0): Record<string, unknown> {
-    const calls = queryCalls.filter((c) => c.op === 'upsert');
-    return calls[index]?.args[0] as Record<string, unknown>;
-  }
-
   beforeEach(() => {
-    localStorage.removeItem(DEVICE_KEYS.LEGACY_OPENROUTER_API_KEY);
-    localStorage.removeItem(USER_KEYS.OPENROUTER_API_KEY('u1'));
-
     queryCalls = [];
     tableResults = {};
     const mockSupabase = {
@@ -101,22 +91,35 @@ describe('AppSettingsService', () => {
     service = TestBed.inject(AppSettingsService);
   });
 
-  afterEach(() => {
-    localStorage.removeItem(DEVICE_KEYS.LEGACY_OPENROUTER_API_KEY);
-    localStorage.removeItem(USER_KEYS.OPENROUTER_API_KEY('u1'));
+  // ------------------------------------------------------------ global row
+
+  it('reads config from the global row (owner_id IS NULL), never per-user', async () => {
+    tableResults['app_settings'] = [
+      { data: { ai_api_key: 'sk-global', stt_api_key: 'stt-global' }, error: null },
+    ];
+
+    await service.loadRemoteSettings();
+
+    const isCalls = queryCalls.filter((c) => c.op === 'is');
+    expect(isCalls).toHaveSize(1);
+    expect(isCalls[0].args).toEqual(['owner_id', null]);
+    // No per-user lookup any more.
+    expect(queryCalls.filter((c) => c.op === 'eq')).toHaveSize(0);
+
+    expect(service.aiApiKey()).toBe('sk-global');
+    expect(service.sttApiKey()).toBe('stt-global');
   });
 
-  // ------------------------------------------------------------ load / decrypt
-
-  it('decrypts the stored key into memory and never exposes ciphertext', async () => {
-    const ciphertext = await mockVault.encrypt('sk-decrypted');
+  it('applies AI and STT provider config from the same row', async () => {
     tableResults['app_settings'] = [
       {
         data: {
-          ai_api_key: ciphertext,
-          ai_base_url: 'https://api.example.com/v1',
+          ai_base_url: 'https://ai.example/v1',
           ai_model: 'my-model',
-          ai_headers: null,
+          ai_headers: { 'x-custom': '1' },
+          stt_provider: 'whisper',
+          stt_model: 'whisper-1',
+          stt_base_url: 'https://stt.example/v1',
         },
         error: null,
       },
@@ -124,56 +127,62 @@ describe('AppSettingsService', () => {
 
     await service.loadRemoteSettings();
 
-    expect(service.aiApiKey()).toBe('sk-decrypted');
-    expect(service.aiBaseUrl()).toBe('https://api.example.com/v1');
+    expect(service.aiBaseUrl()).toBe('https://ai.example/v1');
     expect(service.aiModel()).toBe('my-model');
-    // Already ciphertext — no rewrite upsert should happen.
-    expect(queryCalls.filter((c) => c.op === 'upsert')).toHaveSize(0);
+    expect(service.aiHeaders()).toEqual({ 'x-custom': '1' });
+    expect(service.sttProvider()).toBe('whisper');
+    expect(service.sttModel()).toBe('whisper-1');
+    expect(service.sttBaseUrl()).toBe('https://stt.example/v1');
   });
 
-  it('re-encrypts a plain-text key found at rest (self-heal)', async () => {
+  // ------------------------------------------------------ key handling
+
+  it('decrypts ciphertext written by this device and never exposes it', async () => {
+    const ciphertext = await mockVault.encrypt('sk-decrypted');
+    tableResults['app_settings'] = [{ data: { ai_api_key: ciphertext }, error: null }];
+
+    await service.loadRemoteSettings();
+
+    expect(service.aiApiKey()).toBe('sk-decrypted');
+    // Read-only: nothing is ever written back.
+    expect(queryCalls.filter((c) => c.op === 'upsert')).toHaveSize(0);
+    expect(queryCalls.filter((c) => c.op === 'insert')).toHaveSize(0);
+  });
+
+  it('uses a plain-text key on the global row as-is (no rewrite)', async () => {
     tableResults['app_settings'] = [{ data: { ai_api_key: 'sk-plain-at-rest' }, error: null }];
 
     await service.loadRemoteSettings();
 
-    // In memory: plaintext, usable for scanning.
     expect(service.aiApiKey()).toBe('sk-plain-at-rest');
-    // At rest: rewritten as ciphertext, never the raw key.
-    const payload = upsertPayload();
-    expect(payload['ai_api_key']).toBe(`${MOCK_ENC}${btoa('sk-plain-at-rest')}`);
-    expect(payload['ai_api_key']).not.toBe('sk-plain-at-rest');
+    expect(queryCalls.filter((c) => c.op === 'upsert')).toHaveSize(0);
   });
 
-  it('leaves the key empty when decryption fails (device key lost)', async () => {
+  it('leaves keys empty when decryption fails (foreign-device ciphertext)', async () => {
     spyOn(console, 'error');
-    tableResults['app_settings'] = [{ data: { ai_api_key: `${ENC_PREFIX}unreadable` }, error: null }];
+    tableResults['app_settings'] = [
+      { data: { ai_api_key: `${ENC_PREFIX}unreadable`, stt_api_key: `${ENC_PREFIX}unreadable` }, error: null },
+    ];
 
     await service.loadRemoteSettings();
 
     expect(service.aiApiKey()).toBe('');
+    expect(service.sttApiKey()).toBe('');
   });
 
-  // -------------------------------------------------------------- save (encrypt)
+  // -------------------------------------------------------------- failure
 
-  it('encrypts the key before upserting it', async () => {
-    await service.saveAiApiKey('  sk-to-store  ');
+  it('keeps config empty when the query fails', async () => {
+    spyOn(console, 'error');
+    tableResults['app_settings'] = [{ data: null, error: { message: 'boom' } }];
 
-    const payload = upsertPayload();
-    expect(payload['owner_id']).toBe('u1');
-    expect(payload['ai_api_key']).toBe(`${MOCK_ENC}${btoa('sk-to-store')}`);
-    expect(payload['ai_api_key']).not.toContain('sk-to-store');
-    // Plaintext lives only in memory.
-    expect(service.aiApiKey()).toBe('sk-to-store');
-  });
+    await service.loadRemoteSettings();
 
-  it('stores null (not an empty ciphertext) when clearing the key', async () => {
-    await service.saveAiApiKey('   ');
-
-    expect(upsertPayload()['ai_api_key']).toBeNull();
     expect(service.aiApiKey()).toBe('');
+    expect(service.sttApiKey()).toBe('');
   });
 
-  it('rejects when not signed in', async () => {
+  it('queries nothing when signed out', async () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
@@ -185,41 +194,8 @@ describe('AppSettingsService', () => {
     });
     const signedOut = TestBed.inject(AppSettingsService);
 
-    await expectAsync(signedOut.saveAiApiKey('sk-x')).toBeRejected();
-  });
+    await signedOut.loadRemoteSettings();
 
-  // ------------------------------------------------------- legacy localStorage
-
-  it('migrates a legacy localStorage key as ciphertext and clears it', async () => {
-    localStorage.setItem(USER_KEYS.OPENROUTER_API_KEY('u1'), 'sk-legacy-local');
-    // 1st select: no DB key. Upsert: ack. 2nd select: verification reads back
-    // exactly what was written.
-    const written = await mockVault.encrypt('sk-legacy-local');
-    tableResults['app_settings'] = [
-      { data: null, error: null },
-      { data: { ai_api_key: written }, error: null },
-    ];
-
-    await service.loadRemoteSettings();
-
-    expect(upsertPayload()['ai_api_key']).toBe(written);
-    expect(upsertPayload()['ai_api_key']).not.toContain('sk-legacy-local');
-    expect(service.aiApiKey()).toBe('sk-legacy-local');
-    expect(localStorage.getItem(USER_KEYS.OPENROUTER_API_KEY('u1'))).toBeNull();
-    expect(localStorage.getItem(DEVICE_KEYS.LEGACY_OPENROUTER_API_KEY)).toBeNull();
-  });
-
-  it('keeps the legacy key in localStorage when verification fails', async () => {
-    spyOn(console, 'error');
-    localStorage.setItem(USER_KEYS.OPENROUTER_API_KEY('u1'), 'sk-legacy-local');
-    tableResults['app_settings'] = [
-      { data: null, error: null },
-      { data: { ai_api_key: 'someone-elses-value' }, error: null },
-    ];
-
-    await service.loadRemoteSettings();
-
-    expect(localStorage.getItem(USER_KEYS.OPENROUTER_API_KEY('u1'))).toBe('sk-legacy-local');
-    expect(service.aiApiKey()).toBe('');
+    expect(queryCalls).toHaveSize(0);
   });
 });
