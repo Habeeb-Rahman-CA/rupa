@@ -29,13 +29,18 @@ export interface AppSettings {
   ai_model?: string | null;
   /** Extra request headers merged over the defaults (migration 0023). */
   ai_headers?: Record<string, string> | null;
-  /** Speech-to-text provider: 'elevenlabs' | 'whisper' | 'openai' | null. */
+  /**
+   * Speech-to-text provider config — lives on the GLOBAL `app_settings` row
+   * (owner_id IS NULL, migration 0028) shared by every user, not on the
+   * per-user row. Supplied by the app; there is no per-user UI for it.
+   * 'elevenlabs' | 'whisper' | 'openai' | null (null → elevenlabs).
+   */
   stt_provider?: string | null;
   /** STT provider model id, e.g. 'scribe_v3', 'whisper-1'. */
   stt_model?: string | null;
   /** STT base url, without trailing path; overrides the provider default. */
   stt_base_url?: string | null;
-  /** STT provider key (device-encrypted ciphertext at rest). */
+  /** STT provider key, plain text (see migration 0028). */
   stt_api_key?: string | null;
 }
 
@@ -91,11 +96,20 @@ export class AppSettingsService {
 
     const { data, error } = await this.supabase.client
       .from('app_settings')
-      .select(
-        'ai_api_key, ai_base_url, ai_model, ai_headers, stt_provider, stt_model, stt_base_url, stt_api_key',
-      )
+      .select('ai_api_key, ai_base_url, ai_model, ai_headers')
       .eq('owner_id', user.id)
       .maybeSingle();
+
+    // STT provider config is app-provided and shared: read the single global
+    // row (owner_id IS NULL, migration 0028) rather than the user's own row.
+    const { data: sttRow, error: sttError } = await this.supabase.client
+      .from('app_settings')
+      .select('stt_provider, stt_model, stt_base_url, stt_api_key')
+      .is('owner_id', null)
+      .maybeSingle();
+    if (sttError) {
+      console.error('Failed to load global STT config from Supabase', sttError);
+    }
 
     if (error) {
       console.error('Failed to load app settings from Supabase', error);
@@ -122,7 +136,10 @@ export class AppSettingsService {
     }
 
     // Provider config applies even when no key is stored yet.
-    await this.applyAiConfig(data ?? null, plaintextKey, user.id);
+    await this.applyAiConfig(data ?? null, plaintextKey);
+
+    // Shared STT config from the global row applies to every user.
+    await this.applySttConfig(sttRow ?? null);
 
     if (storedKey) {
       this.clearLegacyKey(user.id);
@@ -232,112 +249,49 @@ export class AppSettingsService {
   }
 
   /**
-   * Re-encrypt a plain-text STT key found at rest so the column only ever holds
-   * ciphertext going forward.
+   * Push the per-user AI provider config into the signals. `plaintextKey` is
+   * the decrypted key (decryption happens in `loadRemoteSettings`) — the raw
+   * column value is ciphertext and must never be exposed through `aiApiKey`.
    */
-  private async rewriteEncryptedSttKey(ownerId: string, plaintext: string): Promise<void> {
-    try {
-      const ciphertext = await this.vault.encrypt(plaintext);
-      const { error } = await this.supabase.client
-        .from('app_settings')
-        .upsert(
-          { owner_id: ownerId, stt_api_key: ciphertext, updated_at: new Date().toISOString() },
-          { onConflict: 'owner_id' },
-        );
-      if (error) {
-        console.error('Failed to re-encrypt stored STT key', error);
-      }
-    } catch (e) {
-      console.error('Failed to re-encrypt stored STT key', e);
-    }
-  }
-
-  /**
-   * Persists the STT API key (encrypted) plus optional provider config, then
-   * updates the in-memory signals. NULL/empty clears the stored key.
-   */
-  async saveSttConfig({
-    provider,
-    model,
-    baseUrl,
-    apiKey,
-  }: {
-    provider?: string | null;
-    model?: string | null;
-    baseUrl?: string | null;
-    apiKey?: string | null;
-  }): Promise<void> {
-    const user = this.auth.user();
-    if (!user) throw new Error('Not signed in.');
-
-    let stored: string | null = null;
-    if (apiKey && apiKey.trim()) {
-      try {
-        stored = await this.vault.encrypt(apiKey.trim());
-      } catch (e) {
-        console.error('Failed to encrypt STT API key', e);
-        throw e;
-      }
-    }
-
-    const { error } = await this.supabase.client
-      .from('app_settings')
-      .upsert(
-        {
-          owner_id: user.id,
-          stt_provider: provider ?? null,
-          stt_model: model ?? null,
-          stt_base_url: baseUrl ?? null,
-          stt_api_key: stored,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'owner_id' },
-      );
-    if (error) {
-      throw error;
-    }
-
-    this._sttProvider.set(provider?.trim() || null);
-    this._sttModel.set(model?.trim() || null);
-    this._sttBaseUrl.set(baseUrl?.trim() || null);
-    this._sttApiKey.set(apiKey?.trim() || '');
-  }
-
-  /**
-   * Push provider config into the signals. `plaintextKey` is the decrypted
-   * key (decryption happens in `loadRemoteSettings`) — the raw column value
-   * is ciphertext and must never be exposed through `aiApiKey`.
-   */
-  private async applyAiConfig(
-    data: AppSettings | null,
-    plaintextKey: string,
-    ownerId: string,
-  ): Promise<void> {
+  private applyAiConfig(data: AppSettings | null, plaintextKey: string): void {
     this._aiApiKey.set(plaintextKey);
     this._aiBaseUrl.set(data?.ai_base_url?.trim() || null);
     this._aiModel.set(data?.ai_model?.trim() || null);
 
     const headers = data?.ai_headers;
     this._aiHeaders.set(headers && typeof headers === 'object' ? headers : null);
+  }
 
-    this._sttProvider.set(data?.stt_provider?.trim() || null);
-    this._sttModel.set(data?.stt_model?.trim() || null);
-    this._sttBaseUrl.set(data?.stt_base_url?.trim() || null);
-    // stt_api_key is ciphertext at rest; decrypt into memory.
-    const storedSttKey = data?.stt_api_key ?? '';
-    let plaintextSttKey = '';
-    if (storedSttKey) {
+  /**
+   * Push the SHARED STT provider config (the global `app_settings` row with
+   * owner_id IS NULL, migration 0028) into the signals. It is supplied by the
+   * app and identical for every user — there is no per-user value or UI.
+   *
+   * The key is plain text in the database (the device-bound vault cannot
+   * decrypt ciphertext written from another device); `decrypt()` passes
+   * plaintext through unchanged, so a value that does happen to be `enc:v1:…`
+   * ciphertext still works when this device created it.
+   */
+  private async applySttConfig(
+    row: Pick<AppSettings, 'stt_provider' | 'stt_model' | 'stt_base_url' | 'stt_api_key'> | null,
+  ): Promise<void> {
+    this._sttProvider.set(row?.stt_provider?.trim() || null);
+    this._sttModel.set(row?.stt_model?.trim() || null);
+    this._sttBaseUrl.set(row?.stt_base_url?.trim() || null);
+
+    const stored = row?.stt_api_key?.trim() ?? '';
+    let plaintext = '';
+    if (stored) {
       try {
-        plaintextSttKey = await this.vault.decrypt(storedSttKey);
-        if (!this.vault.isEncrypted(storedSttKey)) {
-          await this.rewriteEncryptedSttKey(ownerId, plaintextSttKey);
-        }
+        plaintext = await this.vault.decrypt(stored);
       } catch (e) {
-        console.error('Failed to decrypt stored STT key', e);
-        plaintextSttKey = '';
+        // Ciphertext from a different device (device-bound vault) — unusable
+        // here; leave the key unavailable rather than crash.
+        console.error('Failed to read global STT key', e);
+        plaintext = '';
       }
     }
-    this._sttApiKey.set(plaintextSttKey);
+    this._sttApiKey.set(plaintext);
   }
 
   private reset(): void {

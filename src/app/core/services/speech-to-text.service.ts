@@ -66,7 +66,7 @@ function resolveProviderKind(name: string | null): SttProviderKind {
   if (raw === 'whisper' || raw === 'openai') return 'openai';
   if (raw === 'elevenlabs' || raw === 'eleven_labs' || raw === 'eleven') return 'elevenlabs';
   throw new Error(
-    `Unsupported STT provider "${name}". Set it in Settings → AI voice input to one of: elevenlabs, whisper, openai.`,
+    `Unsupported STT provider "${name}" — expected elevenlabs, whisper or openai.`,
   );
 }
 
@@ -82,13 +82,15 @@ function normalizeLanguage(code?: string): string | undefined {
 }
 
 /**
- * Speech-to-text client that resolves its configuration from `app_settings`
- * (stt_provider / stt_model / stt_base_url / stt_api_key) first and only
- * falls back to the per-provider built-in defaults above — so switching
- * provider, model or endpoint is a database row update, no code change.
+ * Speech-to-text client that resolves its configuration from the SHARED
+ * `app_settings` row (owner_id IS NULL, migration 0028): stt_provider /
+ * stt_model / stt_base_url / stt_api_key are supplied by the app and
+ * identical for every user — there is no per-user Settings UI for them.
+ * Built-in per-provider defaults below apply only when a column is empty,
+ * so switching provider, model or endpoint is one row update, no code change.
  *
- * The API key is required; everything else has a working default, so the
- * feature works out of the box once a key is supplied.
+ * The API key must be present on that row; everything else has a working
+ * default, so voice input works out of the box once the app configures it.
  */
 @Injectable({ providedIn: 'root' })
 export class SpeechToTextService {
@@ -109,9 +111,7 @@ export class SpeechToTextService {
 
     const apiKey = this.settings.sttApiKey();
     if (!apiKey) {
-      throw new Error(
-        'STT API key is missing. Add your provider key in Settings → AI voice input.',
-      );
+      throw new Error('Voice transcription is not configured for this app.');
     }
 
     const kind = resolveProviderKind(this.settings.sttProvider());

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, computed, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, computed } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -9,9 +9,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { PageHeaderComponent } from '../../shared/components/page-header.component';
 import { PushCategory, PushService, PushStatus } from '../../core/services/push.service';
 import { ThemeService } from '../../core/services/theme.service';
-import { AppSettingsService } from '../../core/services/app-settings.service';
 import { AuthService } from '../../core/services/auth.service';
-import { TextFieldComponent } from '../../shared/components/text-field.component';
 import { ProfileDialogComponent } from './profile-dialog.component';
 import { MpinService } from '../../core/services/mpin.service';
 import { MpinDialogComponent, MpinDialogMode } from './mpin-dialog.component';
@@ -52,7 +50,6 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
     MatButtonToggleModule,
     LucideAngularModule,
     PageHeaderComponent,
-    TextFieldComponent,
   ],
   template: `
     <app-page-header title="User Settings" subtitle="Profile, notifications and app lock" />
@@ -319,70 +316,6 @@ const STATUS_META: Record<PushStatus, { label: string; hint: string }> = {
         </button>
       </div>
     </section>
-
-    <!-- ------------------------------ AI voice input ------------------- -->
-    <section class="app-card settings-card voice-card" aria-label="AI voice input">
-      <div class="section-heading">
-        <div class="heading-text">
-          <h2>AI voice input</h2>
-        </div>
-        <span class="status-chip"
-          >{{ settings.sttProvider() || 'elevenlabs' }}</span
-        >
-      </div>
-
-      <p class="status-hint">
-        Record phrases like “add 500rs expense for food, 250 for travel” and
-        review each entry before saving. Change the STT provider or model here;
-        it applies to voice input without redeploying the app.
-      </p>
-
-      <div class="voice-config">
-        <app-text-field
-          label="Provider"
-          placeholder="elevenlabs, whisper or openai"
-          [value]="sttProviderInput()"
-          (valueChange)="sttProviderInput.set($any($event))"
-        />
-        <app-text-field
-          label="Model"
-          placeholder="e.g. scribe_v3 or whisper-1"
-          [value]="sttModelInput()"
-          (valueChange)="sttModelInput.set($any($event))"
-        />
-        <app-text-field
-          label="Base URL (optional — overrides the provider default)"
-          placeholder="e.g. https://api.openai.com/v1"
-          [value]="sttBaseUrlInput()"
-          (valueChange)="sttBaseUrlInput.set($any($event))"
-        />
-        <app-text-field
-          label="API key"
-          type="password"
-          placeholder="Enter your STT provider key"
-          [value]="sttApiKeyInput()"
-          (valueChange)="sttApiKeyInput.set($any($event))"
-        />
-      </div>
-
-      <div class="primary-actions">
-        <button
-          mat-flat-button
-          color="primary"
-          type="button"
-          class="pill-btn"
-          [disabled]="settingsBusy()"
-          (click)="saveSttConfig()"
-        >
-          @if (settingsBusy()) {
-            <mat-spinner diameter="16" class="btn-spinner" />
-          } @else {
-            <lucide-icon name="save" />
-          }
-          Save voice config
-        </button>
-      </div>
-    </section>
   `,
   styles: [
     `
@@ -631,7 +564,6 @@ export class SettingsPage {
   readonly theme = inject(ThemeService);
   readonly auth = inject(AuthService);
   readonly mpin = inject(MpinService);
-  readonly settings = inject(AppSettingsService);
   private readonly dialog = inject(MatDialog);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -655,12 +587,6 @@ export class SettingsPage {
     return color || getAvatarColor(this.displayName());
   });
   readonly initials = computed(() => getInitial(this.displayName()));
-
-  readonly sttProviderInput = signal(this.settings.sttProvider() ?? '');
-  readonly sttModelInput = signal(this.settings.sttModel() ?? '');
-  readonly sttBaseUrlInput = signal(this.settings.sttBaseUrl() ?? '');
-  readonly sttApiKeyInput = signal(this.settings.sttApiKey() ?? '');
-  readonly settingsBusy = signal(false);
 
   statusMeta() {
     return STATUS_META[this.push.status()];
@@ -703,29 +629,6 @@ export class SettingsPage {
         return '5 minutes';
       default:
         return '1 minute';
-    }
-  }
-
-  async saveSttConfig(): Promise<void> {
-    this.settingsBusy.set(true);
-    try {
-      await this.settings.saveSttConfig({
-        provider: this.sttProviderInput().trim() || null,
-        model: this.sttModelInput().trim() || null,
-        baseUrl: this.sttBaseUrlInput().trim() || null,
-        apiKey: this.sttApiKeyInput().trim() || null,
-      });
-      // Reflect stored values back into the inputs.
-      this.sttProviderInput.set(this.settings.sttProvider() ?? '');
-      this.sttModelInput.set(this.settings.sttModel() ?? '');
-      this.sttBaseUrlInput.set(this.settings.sttBaseUrl() ?? '');
-    } catch (e: unknown) {
-      const err = e instanceof Error ? e.message : String(e);
-      // Use a simple alert since no snack service injected here; keep visible.
-      // eslint-disable-next-line no-alert
-      alert('Failed to save voice config: ' + err);
-    } finally {
-      this.settingsBusy.set(false);
     }
   }
 }
