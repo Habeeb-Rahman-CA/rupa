@@ -1,5 +1,8 @@
 export const environment = {
   production: true,
+  /** Speech-to-text (voice input) is released as beta — usable but not complete.
+   *  Set to false to hide the voice button entirely. */
+  sttBeta: true,
   supabase: {
     url: 'https://kulwhzrhmpcdgwgamjzx.supabase.co',
     anonKey: 'sb_publishable_uHLSkc60rj86J-27EqoVpg_Ic1jPzpw',

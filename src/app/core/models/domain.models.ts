@@ -7,7 +7,8 @@ export type TxDirection = 'in' | 'out';export type TxSource =
   | 'transfer'
   | 'wallet_recharge'
   | 'wallet_spend'
-  | 'subscription';
+  | 'subscription'
+  | 'voice';
 export type CategoryKind = 'income' | 'expense' | 'savings';
 export type DebtDirection = 'i_owe' | 'they_owe';
 

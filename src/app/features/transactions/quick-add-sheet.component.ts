@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
 import {
   MAT_BOTTOM_SHEET_DATA,
   MatBottomSheet,
@@ -15,10 +16,12 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatChipsModule } from '@angular/material/chips';
-import { LucideAngularModule } from 'lucide-angular';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
+
+import { LucideAngularModule } from 'lucide-angular';
 
 import { CategoriesService } from '../../core/services/categories.service';
 import { TransactionsService } from '../../core/services/transactions.service';
@@ -26,6 +29,11 @@ import { BankAccountsService } from '../../core/services/bank-accounts.service';
 import { BillScannerService, ExtractionResult } from '../../core/services/bill-scanner.service';
 import { AiConsentService } from '../../core/services/ai-consent.service';
 import { openAiConsent } from '../../shared/components/ai-consent-dialog.component';
+import { AudioCaptureService } from '../../core/services/audio-capture.service';
+import { SpeechToTextService } from '../../core/services/speech-to-text.service';
+import { VoiceExpenseParserService } from '../../core/services/voice-expense-parser.service';
+import { VoicePreviewComponent, VoicePreviewData } from './voice-preview.component';
+import { VoiceEntry } from '../../core/services/voice-expense-parser.service';
 import {
   Category,
   CategoryKind,
@@ -39,6 +47,7 @@ import { SelectFieldComponent, SelectOption } from '../../shared/components/sele
 import { SheetDragCloseDirective } from '../../shared/directives/sheet-drag-close.directive';
 import { SetOpeningBalanceSheetComponent } from '../dashboard/set-opening-balance-sheet.component';
 import { errorText } from '../../shared/utils/error-utils';
+import { environment } from '../../../environments/environment';
 
 const NEW_CATEGORY = '__new__';
 
@@ -152,6 +161,35 @@ export interface QuickAddSheetData {
           </div>
           <span class="scan-progress-label">{{ scanProgress() }}%</span>
         </div>
+      }
+
+      @if (sttBeta) {
+      <div class="voice-bar">
+        <button
+          type="button"
+          class="voice-btn"
+          [class.recording]="recordingVoice()"
+          [disabled]="submitting() || scanningBill()"
+          (click)="onVoiceRecord()"
+          [title]="recordingVoice() ? 'Stop recording' : 'Voice input'"
+        >
+          <lucide-icon
+            [name]="recordingVoice() ? 'stop-circle' : 'mic'"
+            class="voice-btn-icon"
+            [class.pulse]="recordingVoice()"
+          />
+          <span>{{ recordingVoice() ? 'Listening…' : 'Voice input' }}</span>
+          @if (!recordingVoice()) {
+            <span class="voice-beta-badge">Beta</span>
+          }
+        </button>
+        @if (recordingVoice()) {
+          <span class="voice-hint">Speak your entries, then tap to stop</span>
+        }
+        @if (voiceRawText()) {
+          <p class="voice-heard">Heard: {{ voiceRawText() }}</p>
+        }
+      </div>
       }
 
       <app-text-field
@@ -417,6 +455,84 @@ export interface QuickAddSheetData {
         animation: ai-blink 1.2s ease-in-out infinite;
       }
 
+      .voice-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        background: var(--app-surface);
+        border: 1px solid var(--app-hairline);
+        border-radius: var(--app-radius-lg);
+        box-shadow: var(--app-shadow-sm);
+        margin-top: 8px;
+      }
+      .voice-btn {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 7px 14px;
+        border: 1px solid var(--app-hairline);
+        border-radius: 10px;
+        background: transparent;
+        color: var(--app-ink-muted);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .voice-btn:not([disabled]):hover {
+        background: var(--app-accent-soft);
+        color: var(--app-accent);
+        border-color: var(--app-accent);
+      }
+      .voice-btn.recording {
+        background: var(--app-negative);
+        border-color: var(--app-negative);
+        color: #fff;
+      }
+      .voice-btn.recording:hover {
+        background: var(--app-negative);
+        border-color: var(--app-negative);
+      }
+      .voice-btn[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .voice-beta-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-left: 6px;
+        padding: 1px 7px;
+        border: 1px solid var(--app-accent);
+        border-radius: 10px;
+        background: var(--app-accent-soft);
+        color: var(--app-accent);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        opacity: 0.9;
+      }
+      .voice-btn-icon {
+        width: 16px;
+        height: 16px;
+      }
+      .voice-btn-icon.pulse {
+        animation: ai-pulse 2s ease-in-out infinite;
+        color: #fff !important;
+      }
+      .voice-hint {
+        font-size: 12px;
+        color: var(--app-ink-muted);
+        flex: 1 1 auto;
+      }
+      .voice-heard {
+        margin: 6px 14px 0;
+        font-size: 12.5px;
+        color: var(--app-accent);
+        font-weight: 600;
+      }
+
       @keyframes ai-pulse {
         0%, 100% { opacity: 1; transform: scale(1); }
         50% { opacity: 0.6; transform: scale(1.1); }
@@ -448,6 +564,9 @@ export class QuickAddSheetComponent {
   private readonly billScanner = inject(BillScannerService);
   private readonly dialog = inject(MatDialog);
   private readonly aiConsent = inject(AiConsentService);
+  private readonly audioCapture = inject(AudioCaptureService);
+  private readonly speechToText = inject(SpeechToTextService);
+  private readonly voiceParser = inject(VoiceExpenseParserService);
 
   readonly txKind = signal<CategoryKind>(this.sheetData?.defaultKind ?? 'expense');
   readonly submitting = signal(false);
@@ -457,6 +576,9 @@ export class QuickAddSheetComponent {
   readonly newCategoryName = signal('');
   readonly notes = signal('');
   readonly scanProgress = signal(0);
+  readonly recordingVoice = signal(false);
+  readonly voiceRawText = signal('');
+  readonly sttBeta = environment.sttBeta;
 
   readonly paymentMode = signal<PaymentMode>('bank');
   readonly selectedBankAccountId = signal<string | null>(null);
@@ -719,6 +841,151 @@ export class QuickAddSheetComponent {
       this.scanningBill.set(false);
       input.value = '';
     }
+  }
+
+  async onVoiceRecord(): Promise<void> {
+    if (this.recordingVoice()) {
+      this.recordingVoice.set(false);
+      try {
+        const result = await this.audioCapture.stopRecording();
+        await this.processVoiceAudio(result.blob);
+      } catch (err: unknown) {
+        this.snack.open(errorText(err, 'Failed to record audio.'), 'Dismiss', {
+          duration: 4000,
+        });
+      }
+      return;
+    }
+
+    // Consent gate: audio is sent to an external STT provider.
+    if (!this.aiConsent.granted()) {
+      const allowed = await openAiConsent(this.dialog);
+      if (!allowed) {
+        this.aiConsent.deny();
+        this.snack.open(
+          'No problem — enter the details manually.',
+          undefined,
+          { duration: 3000 },
+        );
+        return;
+      }
+      this.aiConsent.grant();
+    }
+
+    this.recordingVoice.set(true);
+    this.voiceRawText.set('');
+    try {
+      await this.audioCapture.startRecording();
+    } catch (err: unknown) {
+      this.recordingVoice.set(false);
+      this.snack.open(errorText(err, 'Voice input unavailable.'), 'Dismiss', {
+        duration: 4000,
+      });
+    }
+  }
+
+  private async processVoiceAudio(blob: Blob): Promise<void> {
+    let transcript: string;
+    try {
+      transcript = await this.speechToText.transcribe(blob, { languageCode: 'en' });
+    } catch (err: unknown) {
+      this.snack.open(errorText(err, 'Could not transcribe audio.'), 'Dismiss', {
+        duration: 4000,
+      });
+      return;
+    }
+
+    if (!transcript || !transcript.trim()) {
+      this.snack.open(
+        'No speech detected. Please try again or enter manually.',
+        undefined,
+        { duration: 4000 },
+      );
+      return;
+    }
+
+    this.voiceRawText.set(transcript);
+
+    let entries;
+    try {
+      entries = (await this.voiceParser.parse(transcript, this.relevantCategories())).entries;
+    } catch (err: unknown) {
+      this.snack.open(errorText(err, 'Failed to parse voice entries.'), 'Dismiss', {
+        duration: 4000,
+      });
+      return;
+    }
+
+    if (entries.length === 0) {
+      this.snack.open(
+        'No entries could be parsed from what you said.',
+        undefined,
+        { duration: 4000 },
+      );
+      return;
+    }
+
+    const ref = this.dialog.open<VoicePreviewComponent, VoicePreviewData, VoiceEntry[]>(
+      VoicePreviewComponent,
+      {
+        data: { rawText: transcript, entries, categories: this.relevantCategories() },
+      },
+    );
+
+    const confirmed = await firstValueFrom(ref.afterClosed());
+    if (!confirmed || confirmed.length === 0) return;
+
+    await this.saveVoiceEntries(confirmed);
+  }
+
+  private async saveVoiceEntries(entries: VoiceEntry[]): Promise<void> {
+    const errors: string[] = [];
+    for (const entry of entries) {
+      try {
+        let categoryId: string | null = null;
+        if (entry.category) {
+          const match = this.relevantCategories().find(
+            (c) => c.name.toLowerCase() === entry.category!.toLowerCase(),
+          );
+          if (!match) {
+            const created = await this.categoriesService.create(
+              entry.category,
+              entry.direction === 'in' ? 'income' : 'expense',
+            );
+            if (created?.id) categoryId = created.id;
+          } else {
+            categoryId = match.id;
+          }
+        }
+
+        await this.transactionsService.create({
+          amount: entry.amount,
+          direction: entry.direction,
+          category_id: categoryId,
+          notes: entry.notes,
+          payment_mode: 'cash',
+          bank_account_id: null,
+          source: 'voice',
+        });
+      } catch (err: unknown) {
+        errors.push(errorText(err, 'Failed to save an entry.'));
+      }
+    }
+
+    this.recordingVoice.set(false);
+    this.voiceRawText.set('');
+
+    if (errors.length > 0) {
+      this.snack.open(errors.join('; '), 'Dismiss', { duration: 5000 });
+      return;
+    }
+
+    this.snack.open(
+      `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} added.`,
+      undefined,
+      { duration: 2500 },
+    );
+    this.ref.dismiss({ saved: true });
   }
 
   close(): void {
