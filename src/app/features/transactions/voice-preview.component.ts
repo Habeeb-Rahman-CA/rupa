@@ -88,6 +88,7 @@ const DIRECTION_OPTIONS: SelectOption<'in' | 'out'>[] = [
               </div>
 
               <app-text-field
+                class="f-amount"
                 label="Amount"
                 type="number"
                 inputmode="decimal"
@@ -99,6 +100,7 @@ const DIRECTION_OPTIONS: SelectOption<'in' | 'out'>[] = [
               <span class="entry-currency">₹</span>
 
               <app-select-field
+                class="f-type"
                 label="Type"
                 [options]="directionOptions()"
                 [value]="selectedDirection(i)"
@@ -106,27 +108,33 @@ const DIRECTION_OPTIONS: SelectOption<'in' | 'out'>[] = [
               />
 
               <app-select-field
+                class="f-category"
                 label="Category"
                 [options]="categoryOptions()"
                 [value]="selectedCategory(i)"
                 (valueChange)="setCategory(i, $event)"
               />
 
-              <app-text-field
-                label="Note (optional)"
-                [placeholder]="'e.g. Rashif bill share'"
-                [value]="entry.notes ?? ''"
-                (valueChange)="setNotes(i, $event)"
-              />
-
-              <button
-                type="button"
-                class="remove-btn"
-                title="Remove entry"
-                (click)="removeEntry(i)"
-              >
-                <lucide-icon name="trash-2" />
-              </button>
+              <!-- Note + remove share their own full-width line so the
+                   delete button stays pinned to the right edge instead of
+                   being orphaned on a line of its own. -->
+              <div class="entry-footer">
+                <app-text-field
+                  class="f-note"
+                  label="Note (optional)"
+                  [placeholder]="'e.g. Rashif bill share'"
+                  [value]="entry.notes ?? ''"
+                  (valueChange)="setNotes(i, $event)"
+                />
+                <button
+                  type="button"
+                  class="remove-btn"
+                  title="Remove entry"
+                  (click)="removeEntry(i)"
+                >
+                  <lucide-icon name="trash-2" />
+                </button>
+              </div>
             </div>
           }
 
@@ -167,7 +175,6 @@ const DIRECTION_OPTIONS: SelectOption<'in' | 'out'>[] = [
   styles: [
     `
       .preview-container {
-        min-width: 320px;
         max-width: 460px;
         padding: 0;
         background: var(--app-surface);
@@ -215,11 +222,11 @@ const DIRECTION_OPTIONS: SelectOption<'in' | 'out'>[] = [
         display: flex;
         flex-direction: column;
         gap: 14px;
-        min-width: 300px;
         padding: 16px !important;
       }
       .entry-row {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: 9px;
         padding: 10px 0;
@@ -228,6 +235,34 @@ const DIRECTION_OPTIONS: SelectOption<'in' | 'out'>[] = [
       }
       .entry-row:last-child {
         border-bottom: none;
+      }
+      /* Wrapped layout for narrow (PWA) screens: amount + type share the
+         first line, category joins when there is room (otherwise it takes
+         its own line), and note + remove always get the last full line.
+         min-width: 0 lets the fields shrink below their content so the row
+         never overflows horizontally. */
+      .f-amount {
+        flex: 1 1 100px;
+        min-width: 0;
+      }
+      .f-type {
+        flex: 1 1 100px;
+        min-width: 0;
+      }
+      .f-category {
+        flex: 1 1 120px;
+        min-width: 0;
+      }
+      .entry-footer {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        flex: 1 1 100%;
+        min-width: 0;
+      }
+      .f-note {
+        flex: 1 1 auto;
+        min-width: 0;
       }
       .entry-handle {
         display: grid;
@@ -298,8 +333,10 @@ const DIRECTION_OPTIONS: SelectOption<'in' | 'out'>[] = [
         font-weight: 600;
         color: var(--app-ink);
         display: flex;
+        flex-wrap: wrap;
         justify-content: space-between;
         align-items: baseline;
+        gap: 4px 8px;
       }
       .entries-total {
         font-size: 11px;
@@ -333,13 +370,81 @@ const DIRECTION_OPTIONS: SelectOption<'in' | 'out'>[] = [
       .preview-actions {
         padding: 12px 16px;
         gap: 8px;
+        flex-wrap: wrap;
       }
       .preview-actions button {
         border-radius: 999px;
+        /* Share the row equally, or stack full-width when even two
+           buttons cannot sit side by side on a narrow screen. */
+        flex: 1 1 130px;
       }
       .btn-spinner {
         display: inline-block;
         margin-right: 8px;
+      }
+      /* Finger-sized targets on touch devices (the PWA case). */
+      @media (pointer: coarse) {
+        .remove-btn {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+        }
+        .add-entry-btn {
+          min-height: 44px;
+          padding: 10px 16px;
+        }
+        .preview-actions button {
+          min-height: 44px;
+        }
+      }
+      /* Mobile (PWA): full-width dialog, stacked fields on narrow screens. */
+      @media (max-width: 640px) {
+        .preview-container {
+          max-width: 100%;
+          width: 100%;
+        }
+        .preview-header {
+          padding: 12px 16px;
+        }
+        .preview-content {
+          padding: 12px !important;
+        }
+        .f-amount,
+        .f-type,
+        .f-category {
+          flex: 1 1 100%;
+          width: 100%;
+        }
+        .entry-footer {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 8px;
+        }
+        .f-note {
+          width: 100%;
+        }
+        .remove-btn {
+          align-self: flex-end;
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+        }
+        .add-entry-btn {
+          width: 100%;
+          justify-content: center;
+          min-height: 48px;
+        }
+        .preview-actions {
+          flex-direction: column;
+          gap: 8px;
+        }
+        .preview-actions button {
+          flex: 1 1 100%;
+          min-height: 48px;
+        }
+        .entries-total {
+          white-space: normal;
+        }
       }
     `,
   ],
