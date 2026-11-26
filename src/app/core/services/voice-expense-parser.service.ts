@@ -153,6 +153,21 @@ export class VoiceExpenseParserService {
 
     const lower = utterance.toLowerCase();
     const direction = IN_KEYWORDS.some((k) => lower.includes(k)) ? 'in' : 'out';
-    return [{ amount, direction, category: null, notes: null }];
+    const category = this.matchCategoryFromText(lower, categories);
+    return [{ amount, direction, category, notes: null }];
+  }
+
+  /**
+   * Scans the (lowercased) utterance for any configured category name and
+   * returns the first (longest-first) case-insensitive match, mirroring the
+   * bill-scanner/QuickAddSheet category mapping so a spoken word like
+   * "groceries" resolves to the existing "Groceries" category instead of null.
+   */
+  private matchCategoryFromText(textLower: string, categories: Category[]): string | null {
+    const sorted = [...categories].sort((a, b) => b.name.length - a.name.length);
+    for (const c of sorted) {
+      if (textLower.includes(c.name.toLowerCase())) return c.name;
+    }
+    return null;
   }
 }
