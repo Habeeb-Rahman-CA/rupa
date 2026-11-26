@@ -20,6 +20,7 @@ import { SelectFieldComponent, SelectOption } from '../../shared/components/sele
 import { SignedMoneyPipe } from '../../shared/pipes/signed-money.pipe';
 import { Category } from '../../core/models/domain.models';
 import { VoiceEntry } from '../../core/services/voice-expense-parser.service';
+import { matchCategoryName } from '../../shared/utils/category-utils';
 
 export interface VoicePreviewData {
   rawText: string;
@@ -456,7 +457,11 @@ export class VoicePreviewComponent {
   readonly data = inject<VoicePreviewData>(MAT_DIALOG_DATA);
 
   readonly rawText = signal(this.data.rawText);
-  readonly entries = signal<VoiceEntry[]>([...this.data.entries]);
+  // Parsed entries carry a category *name* (or null). Resolve it once here the
+  // way the bill scanner matches a suggestion: exact, then whole-word against
+  // the user's categories — so a spoken "food" lands on "Food & Dining" and
+  // the select below shows a selection instead of staying blank.
+  readonly entries = signal<VoiceEntry[]>(this.normalizeCategories(this.data.entries));
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
 
@@ -464,14 +469,37 @@ export class VoicePreviewComponent {
 
   readonly directionOptions = () => DIRECTION_OPTIONS;
 
-  readonly categoryOptions = computed<SelectOption[]>(() => [
-    { value: '', label: 'Uncategorized', icon: 'tag' },
-    ...this.data.categories.map((c) => ({
-      value: c.id,
+  /**
+   * Options are keyed by category *name* — the same identity VoiceEntry uses
+   * (and the same one saveVoiceEntries matches on). Suggestions that match no
+   * existing category are appended as "+ name" so the row still shows what the
+   * model heard instead of a blank select; confirming creates them, exactly
+   * like the bill scanner's "+ New category" pre-fill.
+   */
+  readonly categoryOptions = computed<SelectOption[]>(() => {
+    const known = this.data.categories.map((c) => ({
+      value: c.name,
       label: c.name,
       icon: 'tag',
-    })),
-  ]);
+    }));
+    const knownKeys = new Set(known.map((o) => o.value.toLowerCase()));
+
+    const unmatched: string[] = [];
+    for (const entry of this.entries()) {
+      const name = entry.category?.trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (!knownKeys.has(key) && !unmatched.some((u) => u.toLowerCase() === key)) {
+        unmatched.push(name);
+      }
+    }
+
+    return [
+      { value: '', label: 'Uncategorized', icon: 'tag' },
+      ...known,
+      ...unmatched.map((name) => ({ value: name, label: `+ ${name}`, icon: 'tag' })),
+    ];
+  });
 
   entryIdx = (_entry: VoiceEntry, index: number) => index;
 
@@ -501,9 +529,33 @@ export class VoicePreviewComponent {
 
   selectedCategory(index: number): string | null {
     const entry = this.entries()[index];
-    if (!entry?.category) return null;
-    const opt = this.categoryOptions().find((o) => o.label === entry.category);
-    return opt ? opt.label : entry.category;
+    const name = entry?.category?.trim();
+    if (!name) return null;
+    // The select matches on option *value* (now the category name), so return
+    // that canonical value rather than a label — this lookup used to compare a
+    // name against id-keyed options and always fell through, which is why a
+    // mapped category still rendered as blank.
+    const opt = this.categoryOptions().find(
+      (o) => o.value !== '' && o.value.toLowerCase() === name.toLowerCase(),
+    );
+    return opt ? opt.value : name;
+  }
+
+  /** Exact-then-whole-word resolution of every entry's suggested category. */
+  private normalizeCategories(entries: VoiceEntry[]): VoiceEntry[] {
+    return entries.map((entry) => ({
+      ...entry,
+      category: this.resolveCategory(entry.category),
+    }));
+  }
+
+  private resolveCategory(suggested: string | null): string | null {
+    const name = suggested?.trim();
+    if (!name) return null;
+    // Unmatched suggestions are kept verbatim so they show up as a "+ name"
+    // option; saving then creates them, like the bill scanner's new-category
+    // pre-fill.
+    return matchCategoryName(name, this.data.categories) ?? name;
   }
 
   setCategory(index: number, value: string | null): void {

@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { AppSettingsService } from './app-settings.service';
 import { DEFAULT_AI_BASE_URL, DEFAULT_AI_MODEL } from './bill-scanner.service';
 import { Category } from '../../core/models/domain.models';
+import { matchCategoryName } from '../../shared/utils/category-utils';
 
 export interface VoiceEntry {
   amount: number;
@@ -81,7 +82,8 @@ export class VoiceExpenseParserService {
     return (
       'You parse voice expense notes into a JSON array of entries. Each entry: ' +
       '{amount (number), direction ("in" for income/received/salary/payback, "out" for expense/spent/paid), ' +
-      'category (best match from the list below or null), notes (optional string)}. ' +
+      'category (the closest match from the list below — match on meaning too, e.g. "dining" or "groceries" → "Food" — ' +
+      'use null only when nothing is remotely close), notes (optional string)}. ' +
       'Output ONLY a JSON array, e.g. ' +
       '[{"amount":500,"direction":"out","category":"Food","notes":null},{"amount":100,"direction":"in","category":null,"notes":"rashif bill share"}]. ' +
       `Categories: ${categoryList}. No other text.`
@@ -133,12 +135,18 @@ export class VoiceExpenseParserService {
     return 'out';
   }
 
+  /**
+   * Maps the model's suggested label onto one of the user's categories the
+   * same way the bill scanner does: exact (case-insensitive) first, then a
+   * whole-word match, so "food" resolves to "Food". An unmatched suggestion is
+   * kept as-is instead of being dropped — the preview shows it as a "+ new
+   * category" option and saving creates it, mirroring QuickAddSheet's pre-fill.
+   */
   private matchCategory(suggested: any, categories: Category[]): string | null {
-    if (!suggested) return null;
+    if (suggested === null || suggested === undefined) return null;
     const name = String(suggested).trim();
     if (!name) return null;
-    const match = categories.find((c) => c.name.toLowerCase() === name.toLowerCase());
-    return match ? match.name : null;
+    return matchCategoryName(name, categories) ?? name;
   }
 
   /**

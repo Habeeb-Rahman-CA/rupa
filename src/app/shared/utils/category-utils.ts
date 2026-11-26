@@ -45,6 +45,47 @@ export const tileColor = getCategoryColor;
  */
 export const WALLET_SPENDING_CATEGORY_NAME = 'Wallet spending';
 
+/**
+ * Resolves an AI/speech-suggested category label to the canonical name of one
+ * of the user's categories. Matching mirrors the bill scanner's category
+ * mapping: an exact case-insensitive comparison first, then a whole-word
+ * comparison (with light plural folding) so "food" finds "Food & Dining" and
+ * "dining out" finds "Dining", while short keys like "in" never latch onto
+ * unrelated names ("Dining"). Returns null when nothing matches.
+ */
+export function matchCategoryName(
+  suggested: string | null | undefined,
+  categories: ReadonlyArray<{ name: string }>,
+): string | null {
+  const name = (suggested ?? '').trim();
+  if (!name) return null;
+  const key = name.toLowerCase();
+
+  const exact = categories.find((c) => c.name.toLowerCase() === key);
+  if (exact) return exact.name;
+
+  const words = (value: string): string[] =>
+    value
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean)
+      .map((w) => {
+        if (/^[a-z]{6,}ies$/.test(w)) return `${w.slice(0, -3)}y`;
+        if (w.length >= 5 && w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1);
+        return w;
+      });
+
+  const said = words(name);
+  if (said.length === 0) return null;
+
+  const partial = categories.find((c) => {
+    const own = words(c.name);
+    if (own.length === 0) return false;
+    return own.some((w) => said.includes(w)) || said.some((w) => own.includes(w));
+  });
+  return partial ? partial.name : null;
+}
+
 export function isWalletSpendingCategory(
   category: { name: string } | null | undefined,
 ): boolean {
