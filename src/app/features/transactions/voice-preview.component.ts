@@ -33,6 +33,11 @@ const DIRECTION_OPTIONS: SelectOption<'in' | 'out'>[] = [
   { value: 'in', label: 'Income', icon: 'plus' },
 ];
 
+/**
+ * Dialog follows the app's standard dialog recipe (budget/profile/interest):
+ * icon-tile header with hairline divider, 16px padded content column, global
+ * `.form-grid` for field alignment, and pill actions right-aligned below.
+ */
 @Component({
   selector: 'app-voice-preview',
   standalone: true,
@@ -48,24 +53,23 @@ const DIRECTION_OPTIONS: SelectOption<'in' | 'out'>[] = [
     SignedMoneyPipe,
   ],
   template: `
-    <div class="preview-container">
-      <header class="preview-header">
-        <div class="header-icon">
-          <lucide-icon name="mic" />
-        </div>
+    <div class="dialog-container">
+      <header class="dialog-header">
         <div class="header-text">
           <h2 mat-dialog-title>Voice entries</h2>
-          <p class="preview-subtitle">Review each entry before saving</p>
+          <p class="dialog-subtitle">Review each entry before saving</p>
         </div>
       </header>
 
-      <mat-dialog-content class="preview-content">
+      <mat-dialog-content class="dialog-content">
+        <div class="field-group">
           <app-text-field
             label="Transcribed text"
             placeholder="Edit what was heard if needed"
             [value]="rawText()"
             (valueChange)="rawText.set($any($event))"
           />
+        </div>
 
         @if (error(); as err) {
           <div class="error-notice" role="alert">
@@ -74,88 +78,80 @@ const DIRECTION_OPTIONS: SelectOption<'in' | 'out'>[] = [
           </div>
         }
 
-        <div class="entries-list">
-          <h3 class="entries-title">
-            Entries ({{ entries().length }})
+        <div class="entries-block">
+          <div class="entries-head">
+            <span class="micro-label">Entries</span>
             <span class="entries-total">
               {{ totalOut() | signedMoney:'out' }} spent • {{ totalIn() | signedMoney:'in' }} income
             </span>
-          </h3>
+          </div>
+
+          @if (entries().length === 0) {
+            <p class="empty-hint">No entries parsed yet. Try speaking again.</p>
+          }
 
           @for (entry of entries(); track entryIdx(entry, $index); let i = $index) {
-            <div class="entry-row">
-              <div class="entry-handle">
-                <lucide-icon name="grip-vertical" />
-              </div>
-
-              <app-text-field
-                class="f-amount"
-                label="Amount"
-                type="number"
-                inputmode="decimal"
-                [min]="0"
-                [step]="0.01"
-                [value]="entryAmount(i)"
-                (valueChange)="setAmount(i, $event)"
-              />
-              <span class="entry-currency">₹</span>
-
-              <app-select-field
-                class="f-type"
-                label="Type"
-                [options]="directionOptions()"
-                [value]="selectedDirection(i)"
-                (valueChange)="setDirection(i, $event)"
-              />
-
-              <app-select-field
-                class="f-category"
-                label="Category"
-                [options]="categoryOptions()"
-                [value]="selectedCategory(i)"
-                (valueChange)="setCategory(i, $event)"
-              />
-
-              <!-- Note + remove share their own full-width line so the
-                   delete button stays pinned to the right edge instead of
-                   being orphaned on a line of its own. -->
-              <div class="entry-footer">
-                <app-text-field
-                  class="f-note"
-                  label="Note (optional)"
-                  [placeholder]="'e.g. Rashif bill share'"
-                  [value]="entry.notes ?? ''"
-                  (valueChange)="setNotes(i, $event)"
-                />
+            <div class="entry-card">
+              <div class="entry-head">
+                <span class="micro-label">Entry {{ i + 1 }}</span>
                 <button
                   type="button"
                   class="remove-btn"
                   title="Remove entry"
+                  [attr.aria-label]="'Remove entry ' + (i + 1)"
                   (click)="removeEntry(i)"
                 >
                   <lucide-icon name="trash-2" />
                 </button>
               </div>
+
+              <div class="form-grid">
+                <app-text-field
+                  label="Amount"
+                  type="number"
+                  inputmode="decimal"
+                  [min]="0"
+                  [step]="0.01"
+                  [value]="entryAmount(i)"
+                  (valueChange)="setAmount(i, $event)"
+                  ><span prefix>₹</span></app-text-field
+                >
+
+                <app-select-field
+                  label="Type"
+                  [options]="directionOptions()"
+                  [value]="selectedDirection(i)"
+                  (valueChange)="setDirection(i, $event)"
+                />
+
+                <app-select-field
+                  class="full"
+                  label="Category"
+                  [options]="categoryOptions()"
+                  [value]="selectedCategory(i)"
+                  (valueChange)="setCategory(i, $event)"
+                />
+
+                <app-text-field
+                  class="full"
+                  label="Note (optional)"
+                  placeholder="e.g. Rashif bill share"
+                  [value]="entry.notes ?? ''"
+                  (valueChange)="setNotes(i, $event)"
+                />
+              </div>
             </div>
           }
 
-          <button
-            type="button"
-            class="add-entry-btn"
-            (click)="addEntry()"
-          >
+          <button type="button" class="add-entry-btn" (click)="addEntry()">
             <lucide-icon name="plus" />
             <span>Add entry</span>
           </button>
-
-          @if (entries().length === 0) {
-            <p class="empty-hint">No entries parsed yet. Try speaking again.</p>
-          }
         </div>
       </mat-dialog-content>
 
-      <mat-dialog-actions align="end" class="preview-actions">
-        <button mat-button type="button" (click)="close()">Cancel</button>
+      <mat-dialog-actions align="end" class="dialog-actions">
+        <button mat-button type="button" class="cancel-btn" (click)="close()">Cancel</button>
         <button
           mat-flat-button
           color="primary"
@@ -175,18 +171,21 @@ const DIRECTION_OPTIONS: SelectOption<'in' | 'out'>[] = [
   `,
   styles: [
     `
-      .preview-container {
-        max-width: 460px;
-        padding: 0;
+      .dialog-container {
+        padding: 4px;
+        min-width: min(340px, 100%);
+        max-width: 480px;
         background: var(--app-surface);
         color: var(--app-ink);
         font-family: inherit;
       }
-      .preview-header {
+
+      /* Header — the app's standard dialog header (icon tile + title row). */
+      .dialog-header {
         display: flex;
         align-items: center;
         gap: 11px;
-        padding: 14px 16px;
+        padding: 4px 16px 14px;
         border-bottom: 1px solid var(--app-hairline);
       }
       .header-icon {
@@ -208,149 +207,120 @@ const DIRECTION_OPTIONS: SelectOption<'in' | 'out'>[] = [
       }
       h2 {
         margin: 0 !important;
+        padding: 0 !important;
         font-size: 18px !important;
         font-weight: 700 !important;
         line-height: 1.2 !important;
         color: var(--app-ink) !important;
       }
-      .preview-subtitle {
+      .dialog-subtitle {
         margin: 4px 0 0;
         color: var(--app-ink-muted);
         font-size: 12px;
         line-height: 1.35;
       }
-      .preview-content {
+
+      .dialog-content {
         display: flex;
         flex-direction: column;
-        gap: 14px;
+        gap: 16px;
         padding: 16px !important;
       }
-      .entry-row {
+
+      /* Entries list — one card per parsed row; fields align on the same
+         global 2-column grid every other form dialog uses. */
+      .entries-block {
         display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .entries-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
         flex-wrap: wrap;
-        align-items: center;
-        gap: 9px;
-        padding: 10px 0;
-        border-bottom: 1px solid var(--app-hairline);
-        min-width: 0;
+        gap: 4px 8px;
       }
-      .entry-row:last-child {
-        border-bottom: none;
+      .entries-total {
+        color: var(--app-ink-muted);
+        font-size: 11.5px;
+        font-weight: 500;
       }
-      /* Wrapped layout for narrow (PWA) screens: amount + type share the
-         first line, category joins when there is room (otherwise it takes
-         its own line), and note + remove always get the last full line.
-         min-width: 0 lets the fields shrink below their content so the row
-         never overflows horizontally. */
-      .f-amount {
-        flex: 1 1 100px;
-        min-width: 0;
+      .entry-card {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px;
+        border: 1px solid var(--app-hairline);
+        border-radius: var(--app-radius-md);
+        background: var(--app-surface);
       }
-      .f-type {
-        flex: 1 1 100px;
-        min-width: 0;
-      }
-      .f-category {
-        flex: 1 1 120px;
-        min-width: 0;
-      }
-      .entry-footer {
+      .entry-head {
         display: flex;
         align-items: center;
-        gap: 9px;
-        flex: 1 1 100%;
-        min-width: 0;
-      }
-      .f-note {
-        flex: 1 1 auto;
-        min-width: 0;
-      }
-      .entry-handle {
-        display: grid;
-        place-items: center;
-        width: 24px;
-        flex: 0 0 auto;
-        color: var(--app-ink-muted);
-      }
-      .entry-handle lucide-icon {
-        width: 14px;
-        height: 14px;
-      }
-      .entry-currency {
-        flex: 0 0 auto;
-        color: var(--app-ink-muted);
-        font-size: 13px;
-        font-weight: 600;
-        margin-top: 2px;
+        justify-content: space-between;
+        gap: 8px;
+        min-height: 28px;
       }
       .remove-btn {
         display: grid;
         place-items: center;
-        width: 32px;
-        height: 32px;
+        width: 30px;
+        height: 30px;
         flex: 0 0 auto;
         border: none;
         background: transparent;
-        color: var(--app-negative);
+        color: var(--app-ink-muted);
         cursor: pointer;
         border-radius: 8px;
+        transition:
+          background 0.15s ease,
+          color 0.15s ease;
       }
       .remove-btn:hover {
         background: var(--app-negative-soft);
+        color: var(--app-negative);
       }
       .remove-btn lucide-icon {
-        width: 16px;
-        height: 16px;
+        width: 15px;
+        height: 15px;
       }
-      .add-entry-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-        border: 1px dashed var(--app-hairline);
-        border-radius: 10px;
-        background: transparent;
-        color: var(--app-accent);
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        padding: 8px 12px;
-        margin-top: 6px;
-      }
-      .add-entry-btn:hover {
-        background: var(--app-accent-soft);
-      }
-      .add-entry-btn lucide-icon {
-        width: 14px;
-        height: 14px;
-      }
-      .entries-list {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-      .entries-title {
-        margin: 0 0 6px;
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--app-ink);
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: space-between;
-        align-items: baseline;
-        gap: 4px 8px;
-      }
-      .entries-total {
-        font-size: 11px;
-        font-weight: 500;
-        color: var(--app-ink-muted);
-        white-space: nowrap;
+      .full {
+        grid-column: 1 / -1;
       }
       .empty-hint {
         margin: 0;
         color: var(--app-ink-muted);
-        font-size: 12px;
+        font-size: 12.5px;
         text-align: center;
       }
+      .add-entry-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        width: 100%;
+        padding: 11px 14px;
+        border: 1px solid var(--app-hairline);
+        border-radius: var(--app-radius-sm);
+        background: var(--app-surface);
+        color: var(--app-accent);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          border-color 0.15s ease;
+      }
+      .add-entry-btn:hover {
+        background: var(--app-accent-soft);
+        border-color: var(--app-accent);
+      }
+      .add-entry-btn lucide-icon {
+        width: 15px;
+        height: 15px;
+      }
+
       .error-notice {
         display: flex;
         align-items: flex-start;
@@ -368,83 +338,38 @@ const DIRECTION_OPTIONS: SelectOption<'in' | 'out'>[] = [
         height: 16px;
         flex: 0 0 auto;
       }
-      .preview-actions {
-        padding: 12px 16px;
+
+      .dialog-actions {
+        padding: 16px 12px;
         gap: 8px;
-        flex-wrap: wrap;
       }
-      .preview-actions button {
+      .dialog-actions button {
         border-radius: 999px;
-        /* Share the row equally, or stack full-width when even two
-           buttons cannot sit side by side on a narrow screen. */
-        flex: 1 1 130px;
+      }
+      .cancel-btn {
+        color: var(--app-ink-muted) !important;
       }
       .btn-spinner {
         display: inline-block;
         margin-right: 8px;
       }
+
       /* Finger-sized targets on touch devices (the PWA case). */
       @media (pointer: coarse) {
         .remove-btn {
-          width: 44px;
-          height: 44px;
-          border-radius: 12px;
+          width: 40px;
+          height: 40px;
         }
         .add-entry-btn {
-          min-height: 44px;
-          padding: 10px 16px;
-        }
-        .preview-actions button {
-          min-height: 44px;
+          min-height: 46px;
         }
       }
-      /* Mobile (PWA): full-width dialog, stacked fields on narrow screens. */
-      @media (max-width: 640px) {
-        .preview-container {
+      /* Narrow phones: keep the dialog inside the viewport and let the two
+         half-width fields (Amount / Type) stay side by side. */
+      @media (max-width: 480px) {
+        .dialog-container {
+          min-width: 0;
           max-width: 100%;
-          width: 100%;
-        }
-        .preview-header {
-          padding: 12px 16px;
-        }
-        .preview-content {
-          padding: 12px !important;
-        }
-        .f-amount,
-        .f-type,
-        .f-category {
-          flex: 1 1 100%;
-          width: 100%;
-        }
-        .entry-footer {
-          flex-direction: column;
-          align-items: stretch;
-          gap: 8px;
-        }
-        .f-note {
-          width: 100%;
-        }
-        .remove-btn {
-          align-self: flex-end;
-          width: 44px;
-          height: 44px;
-          border-radius: 12px;
-        }
-        .add-entry-btn {
-          width: 100%;
-          justify-content: center;
-          min-height: 48px;
-        }
-        .preview-actions {
-          flex-direction: column;
-          gap: 8px;
-        }
-        .preview-actions button {
-          flex: 1 1 100%;
-          min-height: 48px;
-        }
-        .entries-total {
-          white-space: normal;
         }
       }
     `,
