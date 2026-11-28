@@ -65,6 +65,7 @@ export interface QuickAddSheetData {
     MatButtonModule,
     MatButtonToggleModule,
     MatChipsModule,
+    MatProgressSpinnerModule,
     LucideAngularModule,
     TextFieldComponent,
     SelectFieldComponent,
@@ -169,24 +170,37 @@ export interface QuickAddSheetData {
           type="button"
           class="voice-btn"
           [class.recording]="recordingVoice()"
-          [disabled]="submitting() || scanningBill()"
+          [disabled]="submitting() || scanningBill() || processingVoice()"
           (click)="onVoiceRecord()"
-          [title]="recordingVoice() ? 'Stop recording' : 'Voice input'"
+          [title]="
+            processingVoice()
+              ? 'Processing recording'
+              : recordingVoice()
+                ? 'Stop recording'
+                : 'Voice input'
+          "
         >
           <lucide-icon
             [name]="recordingVoice() ? 'stop-circle' : 'mic'"
             class="voice-btn-icon"
             [class.pulse]="recordingVoice()"
           />
-          <span>{{ recordingVoice() ? 'Listening…' : 'Voice input' }}</span>
-          @if (!recordingVoice()) {
+          <span>
+            {{ processingVoice() ? 'Processing…' : recordingVoice() ? 'Listening…' : 'Voice input' }}
+          </span>
+          @if (!recordingVoice() && !processingVoice()) {
             <span class="voice-beta-badge">Beta</span>
           }
         </button>
-        @if (recordingVoice()) {
+        @if (processingVoice()) {
+          <span class="voice-processing" role="status" aria-live="polite">
+            <mat-spinner diameter="16" class="voice-spinner" />
+            <span class="voice-processing-text">{{ voiceStatus() }}</span>
+          </span>
+        } @else if (recordingVoice()) {
           <span class="voice-hint">Speak your entries, then tap to stop</span>
         }
-        @if (voiceRawText()) {
+        @if (voiceRawText() && !processingVoice()) {
           <p class="voice-heard">Heard: {{ voiceRawText() }}</p>
         }
       </div>
@@ -526,6 +540,27 @@ export interface QuickAddSheetData {
         color: var(--app-ink-muted);
         flex: 1 1 auto;
       }
+      .voice-processing {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex: 1 1 auto;
+        min-width: 0;
+        font-size: 12px;
+        color: var(--app-ink-muted);
+      }
+      .voice-spinner {
+        display: block;
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+        --mdc-circular-progress-active-indicator-color: var(--app-accent);
+      }
+      .voice-processing-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .voice-heard {
         margin: 6px 14px 0;
         font-size: 12.5px;
@@ -577,6 +612,8 @@ export class QuickAddSheetComponent {
   readonly notes = signal('');
   readonly scanProgress = signal(0);
   readonly recordingVoice = signal(false);
+  readonly processingVoice = signal(false);
+  readonly voiceStatus = signal('');
   readonly voiceRawText = signal('');
   readonly sttBeta = environment.sttBeta;
 
@@ -846,6 +883,8 @@ export class QuickAddSheetComponent {
   async onVoiceRecord(): Promise<void> {
     if (this.recordingVoice()) {
       this.recordingVoice.set(false);
+      this.processingVoice.set(true);
+      this.voiceStatus.set('Stopping recording…');
       try {
         const result = await this.audioCapture.stopRecording();
         await this.processVoiceAudio(result.blob);
@@ -853,6 +892,10 @@ export class QuickAddSheetComponent {
         this.snack.open(errorText(err, 'Failed to record audio.'), 'Dismiss', {
           duration: 4000,
         });
+      } finally {
+        // Always drop the loader — even on failure — so the bar never looks stuck.
+        this.processingVoice.set(false);
+        this.voiceStatus.set('');
       }
       return;
     }
@@ -886,6 +929,7 @@ export class QuickAddSheetComponent {
 
   private async processVoiceAudio(blob: Blob): Promise<void> {
     let transcript: string;
+    this.voiceStatus.set('Transcribing what you said…');
     try {
       transcript = await this.speechToText.transcribe(blob, { languageCode: 'en' });
     } catch (err: unknown) {
@@ -905,6 +949,7 @@ export class QuickAddSheetComponent {
     }
 
     this.voiceRawText.set(transcript);
+    this.voiceStatus.set('Reading your entries…');
 
     let entries;
     try {
@@ -924,6 +969,10 @@ export class QuickAddSheetComponent {
       );
       return;
     }
+
+    // Work is done — hide the loader before the preview takes over the screen.
+    this.processingVoice.set(false);
+    this.voiceStatus.set('');
 
     const ref = this.dialog.open<VoicePreviewComponent, VoicePreviewData, VoiceEntry[]>(
       VoicePreviewComponent,
